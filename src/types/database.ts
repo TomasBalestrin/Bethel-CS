@@ -9,6 +9,9 @@ export type Json =
 export type UserRole = 'admin' | 'especialista'
 export type KanbanType = 'initial' | 'mentorship'
 export type AttachmentType = 'photo' | 'video'
+export type EngagementType = 'area_membros' | 'mentoria_ao_vivo' | 'evento' | 'canal_especialista'
+export type CallType = 'ligacao' | 'whatsapp'
+export type RevenueType = 'crossell' | 'upsell'
 export type TestimonialCategory =
   | 'aumento_faturamento'
   | 'vida_pessoal'
@@ -93,6 +96,7 @@ export interface Database {
           current_stage_id: string | null
           kanban_type: KanbanType
           action_plan_token: string
+          cliente_fit: boolean
           created_by: string | null
           created_at: string
           updated_at: string
@@ -119,6 +123,7 @@ export interface Database {
           current_stage_id?: string | null
           kanban_type?: KanbanType
           action_plan_token?: string
+          cliente_fit?: boolean
           created_by?: string | null
           created_at?: string
           updated_at?: string
@@ -143,6 +148,7 @@ export interface Database {
           referred_by_mentee_id?: string | null
           current_stage_id?: string | null
           kanban_type?: KanbanType
+          cliente_fit?: boolean
           created_by?: string | null
           updated_at?: string
         }
@@ -255,6 +261,7 @@ export interface Database {
           product_name: string
           sale_value: number
           entry_value: number
+          revenue_type: RevenueType
           registered_by: string | null
           created_at: string
         }
@@ -264,6 +271,7 @@ export interface Database {
           product_name: string
           sale_value: number
           entry_value: number
+          revenue_type?: RevenueType
           registered_by?: string | null
           created_at?: string
         }
@@ -272,6 +280,7 @@ export interface Database {
           product_name?: string
           sale_value?: number
           entry_value?: number
+          revenue_type?: RevenueType
           registered_by?: string | null
         }
         Relationships: []
@@ -360,6 +369,90 @@ export interface Database {
         }
         Update: {
           name?: string
+        }
+        Relationships: []
+      }
+      engagement_records: {
+        Row: {
+          id: string
+          mentee_id: string
+          type: EngagementType
+          value: number
+          response_time_minutes: number | null
+          recorded_at: string
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          mentee_id: string
+          type: EngagementType
+          value: number
+          response_time_minutes?: number | null
+          recorded_at: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          mentee_id?: string
+          type?: EngagementType
+          value?: number
+          response_time_minutes?: number | null
+          recorded_at?: string
+          created_by?: string | null
+        }
+        Relationships: []
+      }
+      call_records: {
+        Row: {
+          id: string
+          mentee_id: string
+          duration_minutes: number
+          call_type: CallType
+          recorded_at: string
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          mentee_id: string
+          duration_minutes: number
+          call_type: CallType
+          recorded_at: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          mentee_id?: string
+          duration_minutes?: number
+          call_type?: CallType
+          recorded_at?: string
+          created_by?: string | null
+        }
+        Relationships: []
+      }
+      cancellations: {
+        Row: {
+          id: string
+          mentee_id: string
+          reason: string
+          cancelled_at: string
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          mentee_id: string
+          reason: string
+          cancelled_at: string
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          mentee_id?: string
+          reason?: string
+          cancelled_at?: string
+          created_by?: string | null
         }
         Relationships: []
       }

@@ -1,10 +1,13 @@
-export default function MentoradosPage() {
-  return (
-    <div>
-      <h1 className="font-heading text-2xl font-bold text-foreground">Mentorados</h1>
-      <p className="mt-2 text-muted-foreground">
-        Lista de mentorados em desenvolvimento — Fase 2
-      </p>
-    </div>
-  )
+import { createClient } from '@/lib/supabase/server'
+import { MentoradosList } from '@/components/mentorados-list'
+
+export default async function MentoradosPage() {
+  const supabase = createClient()
+
+  const { data: mentees } = await supabase
+    .from('mentees')
+    .select('*')
+    .order('full_name')
+
+  return <MentoradosList mentees={mentees ?? []} />
 }

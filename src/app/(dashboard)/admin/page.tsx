@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { AdminUserList } from '@/components/admin-user-list'
 
 export default async function AdminPage() {
   const supabase = createClient()
@@ -22,12 +23,10 @@ export default async function AdminPage() {
     redirect('/')
   }
 
-  return (
-    <div>
-      <h1 className="font-heading text-2xl font-bold text-foreground">Admin</h1>
-      <p className="mt-2 text-muted-foreground">
-        Painel administrativo em desenvolvimento — Fase 8
-      </p>
-    </div>
-  )
+  const { data: users } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('full_name')
+
+  return <AdminUserList users={users ?? []} currentUserId={user.id} />
 }

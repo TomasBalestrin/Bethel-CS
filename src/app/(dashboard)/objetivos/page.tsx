@@ -1,10 +1,18 @@
-export default function ObjetivosPage() {
-  return (
-    <div>
-      <h1 className="font-heading text-2xl font-bold text-foreground">Objetivos</h1>
-      <p className="mt-2 text-muted-foreground">
-        Objetivos em desenvolvimento — Fase 6
-      </p>
-    </div>
-  )
+import { createClient } from '@/lib/supabase/server'
+import { ObjectivesList } from '@/components/objectives-list'
+
+export default async function ObjetivosPage() {
+  const supabase = createClient()
+
+  const { data: objectives } = await supabase
+    .from('objectives')
+    .select('*, mentees(full_name)')
+    .order('created_at', { ascending: false })
+
+  const enrichedObjectives = (objectives ?? []).map((o) => ({
+    ...o,
+    mentee_name: (o.mentees as unknown as { full_name: string })?.full_name ?? 'Desconhecido',
+  }))
+
+  return <ObjectivesList objectives={enrichedObjectives} />
 }

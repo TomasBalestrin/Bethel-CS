@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import type { Database } from '@/types/database'
+import type { Database, KanbanType } from '@/types/database'
 
 type MenteeInsert = Database['public']['Tables']['mentees']['Insert']
 
@@ -24,6 +24,7 @@ interface CreateMenteeInput {
   funnel_origin?: string
   referred_by_mentee_id?: string
   priority_level?: number
+  kanban_type?: KanbanType
 }
 
 export async function createMentee(input: CreateMenteeInput) {
@@ -37,17 +38,19 @@ export async function createMentee(input: CreateMenteeInput) {
     return { error: 'Não autenticado' }
   }
 
-  // Get the first stage of the initial kanban
+  const kanbanType = input.kanban_type ?? 'initial'
+
+  // Get the first stage of the target kanban
   const { data: firstStage } = await supabase
     .from('kanban_stages')
     .select('id')
-    .eq('type', 'initial')
+    .eq('type', kanbanType)
     .order('position')
     .limit(1)
     .single()
 
   if (!firstStage) {
-    return { error: 'Etapas iniciais não encontradas' }
+    return { error: 'Etapas não encontradas' }
   }
 
   const menteeData: MenteeInsert = {
@@ -69,7 +72,7 @@ export async function createMentee(input: CreateMenteeInput) {
     referred_by_mentee_id: input.referred_by_mentee_id || null,
     priority_level: input.priority_level ?? 1,
     current_stage_id: firstStage.id,
-    kanban_type: 'initial',
+    kanban_type: kanbanType,
     created_by: user.id,
   }
 
@@ -80,6 +83,7 @@ export async function createMentee(input: CreateMenteeInput) {
   }
 
   revalidatePath('/etapas-iniciais')
+  revalidatePath('/etapas-mentoria')
   return { error: null }
 }
 
@@ -104,5 +108,6 @@ export async function moveMentee(menteeId: string, newStageId: string) {
   }
 
   revalidatePath('/etapas-iniciais')
+  revalidatePath('/etapas-mentoria')
   return { error: null }
 }

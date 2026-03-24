@@ -66,6 +66,8 @@ export default async function EtapasIniciaisPage() {
 
   return (
     <KanbanBoard
+      title="Etapas Iniciais"
+      kanbanType="initial"
       stages={stages ?? []}
       initialMentees={menteesWithStats}
       existingMentees={allMentees ?? []}

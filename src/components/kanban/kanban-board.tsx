@@ -15,19 +15,24 @@ import { Plus } from 'lucide-react'
 import { KanbanColumn } from './kanban-column'
 import { MenteeCard } from './mentee-card'
 import { CreateMenteeDialog } from './create-mentee-dialog'
+import { MenteePanel } from './mentee-panel'
 import { moveMentee } from '@/lib/actions/mentee-actions'
 import type { MenteeWithStats } from '@/types/kanban'
-import type { Database } from '@/types/database'
+import type { Database, KanbanType } from '@/types/database'
 
 type KanbanStage = Database['public']['Tables']['kanban_stages']['Row']
 
 interface KanbanBoardProps {
+  title: string
+  kanbanType: KanbanType
   stages: KanbanStage[]
   initialMentees: MenteeWithStats[]
   existingMentees: { id: string; full_name: string }[]
 }
 
 export function KanbanBoard({
+  title,
+  kanbanType,
   stages,
   initialMentees,
   existingMentees,
@@ -35,6 +40,8 @@ export function KanbanBoard({
   const [mentees, setMentees] = useState<MenteeWithStats[]>(initialMentees)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [selectedMentee, setSelectedMentee] = useState<MenteeWithStats | null>(null)
+  const [panelOpen, setPanelOpen] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -65,7 +72,6 @@ export function KanbanBoard({
       const mentee = mentees.find((m) => m.id === menteeId)
       if (!mentee || mentee.current_stage_id === newStageId) return
 
-      // Optimistic update
       const previousMentees = [...mentees]
       setMentees((prev) =>
         prev.map((m) =>
@@ -75,12 +81,16 @@ export function KanbanBoard({
 
       const result = await moveMentee(menteeId, newStageId)
       if (result.error) {
-        // Revert on error
         setMentees(previousMentees)
       }
     },
     [mentees]
   )
+
+  const handleCardClick = useCallback((mentee: MenteeWithStats) => {
+    setSelectedMentee(mentee)
+    setPanelOpen(true)
+  }, [])
 
   const getMenteesForStage = (stageId: string) =>
     mentees.filter((m) => m.current_stage_id === stageId)
@@ -89,7 +99,7 @@ export function KanbanBoard({
     <div>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="font-heading text-2xl font-bold text-foreground">
-          Etapas Iniciais
+          {title}
         </h1>
         <Button onClick={() => setDialogOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
@@ -108,6 +118,7 @@ export function KanbanBoard({
               key={stage.id}
               stage={stage}
               mentees={getMenteesForStage(stage.id)}
+              onCardClick={handleCardClick}
             />
           ))}
         </div>
@@ -121,6 +132,13 @@ export function KanbanBoard({
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         existingMentees={existingMentees}
+        kanbanType={kanbanType}
+      />
+
+      <MenteePanel
+        mentee={selectedMentee}
+        open={panelOpen}
+        onOpenChange={setPanelOpen}
       />
     </div>
   )

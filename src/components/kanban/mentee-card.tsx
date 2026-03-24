@@ -16,9 +16,10 @@ const PRIORITY_CONFIG: Record<number, { label: string; variant: 'muted' | 'warni
 
 interface MenteeCardProps {
   mentee: MenteeWithStats
+  onClick?: (mentee: MenteeWithStats) => void
 }
 
-export function MenteeCard({ mentee }: MenteeCardProps) {
+export function MenteeCard({ mentee, onClick }: MenteeCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: mentee.id,
@@ -31,12 +32,20 @@ export function MenteeCard({ mentee }: MenteeCardProps) {
 
   const priority = PRIORITY_CONFIG[mentee.priority_level] ?? PRIORITY_CONFIG[1]
 
+  function handleClick() {
+    // Only fire click if not dragging (distance < 8px threshold)
+    if (!isDragging && onClick) {
+      onClick(mentee)
+    }
+  }
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...listeners}
       {...attributes}
+      onClick={handleClick}
       className="cursor-grab rounded-lg border border-border bg-card p-3 shadow-card transition-shadow hover:shadow-md active:cursor-grabbing animate-fade-in"
     >
       <div className="flex items-start justify-between gap-2">

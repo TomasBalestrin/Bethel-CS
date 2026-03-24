@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { createMentee } from '@/lib/actions/mentee-actions'
+import type { KanbanType } from '@/types/database'
 
 const BR_STATES = [
   'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
@@ -32,12 +33,14 @@ interface CreateMenteeDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   existingMentees: { id: string; full_name: string }[]
+  kanbanType?: KanbanType
 }
 
 export function CreateMenteeDialog({
   open,
   onOpenChange,
   existingMentees,
+  kanbanType = 'initial',
 }: CreateMenteeDialogProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -106,6 +109,7 @@ export function CreateMenteeDialog({
       funnel_origin: funnelOrigin || undefined,
       referred_by_mentee_id: referredByMenteeId || undefined,
       priority_level: parseInt(priorityLevel, 10),
+      kanban_type: kanbanType,
     })
 
     setLoading(false)

@@ -12,9 +12,10 @@ type KanbanStage = Database['public']['Tables']['kanban_stages']['Row']
 interface KanbanColumnProps {
   stage: KanbanStage
   mentees: MenteeWithStats[]
+  onCardClick?: (mentee: MenteeWithStats) => void
 }
 
-export function KanbanColumn({ stage, mentees }: KanbanColumnProps) {
+export function KanbanColumn({ stage, mentees, onCardClick }: KanbanColumnProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: stage.id,
   })
@@ -40,7 +41,11 @@ export function KanbanColumn({ stage, mentees }: KanbanColumnProps) {
           className="flex min-h-[200px] flex-col gap-2 p-2"
         >
           {mentees.map((mentee) => (
-            <MenteeCard key={mentee.id} mentee={mentee} />
+            <MenteeCard
+              key={mentee.id}
+              mentee={mentee}
+              onClick={onCardClick}
+            />
           ))}
         </div>
       </ScrollArea>

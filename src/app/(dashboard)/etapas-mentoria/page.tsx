@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { KanbanBoard } from '@/components/kanban/kanban-board'
+import type { MenteeWithStats } from '@/types/kanban'
 
 export default async function EtapasMentoriaPage() {
   const supabase = createClient()
@@ -9,27 +11,60 @@ export default async function EtapasMentoriaPage() {
     .eq('type', 'mentorship')
     .order('position')
 
+  const { data: mentees } = await supabase
+    .from('mentees')
+    .select('*')
+    .eq('kanban_type', 'mentorship')
+
+  const { data: allMentees } = await supabase
+    .from('mentees')
+    .select('id, full_name')
+    .order('full_name')
+
+  const { data: attendances } = await supabase
+    .from('attendances')
+    .select('mentee_id')
+
+  const { data: indications } = await supabase
+    .from('indications')
+    .select('mentee_id')
+
+  const { data: revenues } = await supabase
+    .from('revenue_records')
+    .select('mentee_id, sale_value')
+
+  const attendanceMap = new Map<string, number>()
+  attendances?.forEach((a) => {
+    attendanceMap.set(a.mentee_id, (attendanceMap.get(a.mentee_id) ?? 0) + 1)
+  })
+
+  const indicationMap = new Map<string, number>()
+  indications?.forEach((i) => {
+    indicationMap.set(i.mentee_id, (indicationMap.get(i.mentee_id) ?? 0) + 1)
+  })
+
+  const revenueMap = new Map<string, number>()
+  revenues?.forEach((r) => {
+    revenueMap.set(
+      r.mentee_id,
+      (revenueMap.get(r.mentee_id) ?? 0) + Number(r.sale_value)
+    )
+  })
+
+  const menteesWithStats: MenteeWithStats[] = (mentees ?? []).map((m) => ({
+    ...m,
+    attendance_count: attendanceMap.get(m.id) ?? 0,
+    indication_count: indicationMap.get(m.id) ?? 0,
+    revenue_total: revenueMap.get(m.id) ?? 0,
+  }))
+
   return (
-    <div>
-      <h1 className="font-heading text-2xl font-bold text-foreground">Etapas Mentoria</h1>
-      <p className="mt-2 text-muted-foreground">
-        Kanban em desenvolvimento — Fase 4
-      </p>
-      {stages && stages.length > 0 && (
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
-          {stages.map((stage) => (
-            <div
-              key={stage.id}
-              className="rounded-lg border border-border bg-card p-4 shadow-card text-card-foreground animate-fade-in"
-            >
-              <h3 className="text-sm font-medium">{stage.name}</h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Etapa {stage.position}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+    <KanbanBoard
+      title="Etapas Mentoria"
+      kanbanType="mentorship"
+      stages={stages ?? []}
+      initialMentees={menteesWithStats}
+      existingMentees={allMentees ?? []}
+    />
   )
 }

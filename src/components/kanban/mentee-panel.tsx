@@ -44,6 +44,15 @@ import {
 import { formatDateBR } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { toast } from 'sonner'
+import {
   addIndication,
   addIntensivoRecord,
   addRevenueRecord,
@@ -57,6 +66,8 @@ import {
   toggleClienteFit,
   addEngagementRecord,
   addCsActivity,
+  updateMentee,
+  deleteMentee,
 } from '@/lib/actions/panel-actions'
 import type { MenteeWithStats } from '@/types/kanban'
 import type { Database, TestimonialCategory, EngagementType, CsActivityType, RevenueType } from '@/types/database'
@@ -92,9 +103,28 @@ interface MenteePanelProps {
   mentee: MenteeWithStats | null
   open: boolean
   onOpenChange: (open: boolean) => void
+  onMenteeDeleted?: (menteeId: string) => void
+  onMenteeUpdated?: (mentee: MenteeWithStats) => void
 }
 
-export function MenteePanel({ mentee, open, onOpenChange }: MenteePanelProps) {
+export function MenteePanel({ mentee, open, onOpenChange, onMenteeDeleted, onMenteeUpdated }: MenteePanelProps) {
+  const [userRole, setUserRole] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function fetchRole() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      setUserRole(profile?.role ?? null)
+    }
+    if (open) fetchRole()
+  }, [open])
+
   if (!mentee) return null
 
   const priorityLabel = `P${mentee.priority_level}`
@@ -136,13 +166,26 @@ export function MenteePanel({ mentee, open, onOpenChange }: MenteePanelProps) {
           </div>
         </SheetHeader>
         <Separator />
-        <PanelTabs mentee={mentee} />
+        <PanelTabs
+          mentee={mentee}
+          userRole={userRole}
+          onMenteeDeleted={(id) => {
+            onOpenChange(false)
+            onMenteeDeleted?.(id)
+          }}
+          onMenteeUpdated={onMenteeUpdated}
+        />
       </SheetContent>
     </Sheet>
   )
 }
 
-function PanelTabs({ mentee }: { mentee: MenteeWithStats }) {
+function PanelTabs({ mentee, userRole, onMenteeDeleted, onMenteeUpdated }: {
+  mentee: MenteeWithStats
+  userRole: string | null
+  onMenteeDeleted?: (menteeId: string) => void
+  onMenteeUpdated?: (mentee: MenteeWithStats) => void
+}) {
   return (
     <Tabs defaultValue="info" className="flex flex-col h-[calc(100vh-160px)]">
       <div className="mx-6 mt-3 overflow-x-auto scrollbar-none">
@@ -168,7 +211,14 @@ function PanelTabs({ mentee }: { mentee: MenteeWithStats }) {
         </TabsList>
       </div>
       <ScrollArea className="flex-1 px-6 py-4">
-        <TabsContent value="info"><TabInfo mentee={mentee} /></TabsContent>
+        <TabsContent value="info">
+          <TabInfo
+            mentee={mentee}
+            userRole={userRole}
+            onMenteeDeleted={onMenteeDeleted}
+            onMenteeUpdated={onMenteeUpdated}
+          />
+        </TabsContent>
         <TabsContent value="action-plan"><TabActionPlan mentee={mentee} /></TabsContent>
         <TabsContent value="indications"><TabIndications menteeId={mentee.id} /></TabsContent>
         <TabsContent value="intensivo"><TabIntensivo menteeId={mentee.id} /></TabsContent>
@@ -182,8 +232,172 @@ function PanelTabs({ mentee }: { mentee: MenteeWithStats }) {
 }
 
 // ─── Tab 1: Info Geral ───
-function TabInfo({ mentee }: { mentee: MenteeWithStats }) {
-  const instHandle = mentee.instagram?.replace(/^@/, '') || null
+function TabInfo({ mentee, userRole, onMenteeDeleted, onMenteeUpdated }: {
+  mentee: MenteeWithStats
+  userRole: string | null
+  onMenteeDeleted?: (menteeId: string) => void
+  onMenteeUpdated?: (mentee: MenteeWithStats) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  // Editable fields state
+  const [form, setForm] = useState({
+    full_name: mentee.full_name,
+    phone: mentee.phone,
+    email: mentee.email ?? '',
+    instagram: mentee.instagram ?? '',
+    city: mentee.city ?? '',
+    state: mentee.state ?? '',
+    birth_date: mentee.birth_date ?? '',
+    product_name: mentee.product_name,
+    start_date: mentee.start_date,
+    end_date: mentee.end_date ?? '',
+    priority_level: mentee.priority_level,
+    cpf: mentee.cpf ?? '',
+    has_partner: mentee.has_partner,
+    partner_name: mentee.partner_name ?? '',
+    seller_name: mentee.seller_name ?? '',
+    funnel_origin: mentee.funnel_origin ?? '',
+    status: mentee.status,
+  })
+
+  function resetForm() {
+    setForm({
+      full_name: mentee.full_name,
+      phone: mentee.phone,
+      email: mentee.email ?? '',
+      instagram: mentee.instagram ?? '',
+      city: mentee.city ?? '',
+      state: mentee.state ?? '',
+      birth_date: mentee.birth_date ?? '',
+      product_name: mentee.product_name,
+      start_date: mentee.start_date,
+      end_date: mentee.end_date ?? '',
+      priority_level: mentee.priority_level,
+      cpf: mentee.cpf ?? '',
+      has_partner: mentee.has_partner,
+      partner_name: mentee.partner_name ?? '',
+      seller_name: mentee.seller_name ?? '',
+      funnel_origin: mentee.funnel_origin ?? '',
+      status: mentee.status,
+    })
+  }
+
+  async function handleSave() {
+    setSaving(true)
+    const result = await updateMentee(mentee.id, {
+      full_name: form.full_name,
+      phone: form.phone,
+      email: form.email || null,
+      instagram: form.instagram || null,
+      city: form.city || null,
+      state: form.state || null,
+      birth_date: form.birth_date || null,
+      product_name: form.product_name,
+      start_date: form.start_date,
+      end_date: form.end_date || null,
+      priority_level: form.priority_level,
+      cpf: form.cpf || null,
+      has_partner: form.has_partner,
+      partner_name: form.partner_name || null,
+      seller_name: form.seller_name || null,
+      funnel_origin: form.funnel_origin || null,
+      status: form.status,
+    })
+    setSaving(false)
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      toast.success('Salvo')
+      setEditing(false)
+      onMenteeUpdated?.({ ...mentee, ...form, email: form.email || null, instagram: form.instagram || null, city: form.city || null, state: form.state || null, birth_date: form.birth_date || null, end_date: form.end_date || null, cpf: form.cpf || null, partner_name: form.partner_name || null, seller_name: form.seller_name || null, funnel_origin: form.funnel_origin || null })
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true)
+    const result = await deleteMentee(mentee.id)
+    setDeleting(false)
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      toast.success('Mentorado excluído')
+      setDeleteOpen(false)
+      onMenteeDeleted?.(mentee.id)
+    }
+  }
+
+  const isAdmin = userRole === 'admin'
+  const instHandle = (editing ? form.instagram : mentee.instagram)?.replace(/^@/, '') || null
+
+  if (editing) {
+    return (
+      <div className="space-y-4 animate-fade-in">
+        <div className="grid gap-3">
+          <EditField label="Nome" value={form.full_name} onChange={(v) => setForm({ ...form, full_name: v })} />
+          <EditField label="Telefone" value={form.phone} onChange={(v) => setForm({ ...form, phone: v })} />
+          <EditField label="Email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} />
+          <EditField label="Instagram" value={form.instagram} onChange={(v) => setForm({ ...form, instagram: v })} />
+          <div className="grid grid-cols-2 gap-3">
+            <EditField label="Cidade" value={form.city} onChange={(v) => setForm({ ...form, city: v })} />
+            <EditField label="Estado" value={form.state} onChange={(v) => setForm({ ...form, state: v })} />
+          </div>
+          <EditField label="CPF" value={form.cpf} onChange={(v) => setForm({ ...form, cpf: v })} />
+          <EditField label="Produto" value={form.product_name} onChange={(v) => setForm({ ...form, product_name: v })} />
+          <EditField label="Nascimento" value={form.birth_date} onChange={(v) => setForm({ ...form, birth_date: v })} type="date" />
+          <EditField label="Início" value={form.start_date} onChange={(v) => setForm({ ...form, start_date: v })} type="date" />
+          <EditField label="Término" value={form.end_date} onChange={(v) => setForm({ ...form, end_date: v })} type="date" />
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Nível de prioridade</Label>
+            <Select value={String(form.priority_level)} onValueChange={(v) => setForm({ ...form, priority_level: Number(v) })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <SelectItem key={n} value={String(n)}>P{n}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Status</Label>
+            <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as typeof form.status })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ativo">Ativo</SelectItem>
+                <SelectItem value="cancelado">Cancelado</SelectItem>
+                <SelectItem value="concluido">Concluído</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <EditField label="Vendedor" value={form.seller_name} onChange={(v) => setForm({ ...form, seller_name: v })} />
+          <EditField label="Funil" value={form.funnel_origin} onChange={(v) => setForm({ ...form, funnel_origin: v })} />
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={form.has_partner}
+              onChange={(e) => setForm({ ...form, has_partner: e.target.checked })}
+              className="rounded border-border"
+            />
+            <Label className="text-sm">Tem sócio</Label>
+          </div>
+          {form.has_partner && (
+            <EditField label="Nome do sócio" value={form.partner_name} onChange={(v) => setForm({ ...form, partner_name: v })} />
+          )}
+        </div>
+        <div className="flex gap-2 pt-2 border-t border-border">
+          <Button onClick={handleSave} disabled={saving} size="sm" className="bg-gradient-to-r from-accent to-accent/80 text-white">
+            {saving ? 'Salvando...' : 'Salvar'}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => { setEditing(false); resetForm() }}>
+            Cancelar
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   const fields: { icon: typeof User; label: string; value: string | null | undefined; render?: React.ReactNode }[] = [
     { icon: User, label: 'Nome', value: mentee.full_name },
@@ -214,6 +428,30 @@ function TabInfo({ mentee }: { mentee: MenteeWithStats }) {
 
   return (
     <div className="space-y-3 animate-fade-in">
+      {/* Admin action buttons */}
+      {isAdmin && (
+        <div className="flex gap-2 pb-2 border-b border-border">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEditing(true)}
+            className="text-sm"
+          >
+            <Pencil className="h-3.5 w-3.5 mr-1.5" />
+            Editar
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDeleteOpen(true)}
+            className="text-sm text-destructive border-destructive/30 hover:bg-destructive/5"
+          >
+            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+            Excluir
+          </Button>
+        </div>
+      )}
+
       {fields.map(({ icon: Icon, label, value, render }) => (
         value ? (
           <div key={label} className="flex items-center gap-3 text-sm">
@@ -252,6 +490,45 @@ function TabInfo({ mentee }: { mentee: MenteeWithStats }) {
         </div>
       )}
       <ClienteFitToggle menteeId={mentee.id} initialValue={mentee.cliente_fit} />
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir mentorado</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir {mentee.full_name}?
+              Esta ação não pode ser desfeita e removerá todos os dados associados.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="bg-destructive text-white hover:bg-destructive/90"
+            >
+              {deleting ? 'Excluindo...' : 'Sim, excluir'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function EditField({ label, value, onChange, type = 'text' }: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  type?: string
+}) {
+  return (
+    <div className="space-y-1">
+      <Label className="text-xs text-muted-foreground">{label}</Label>
+      <Input type={type} value={value} onChange={(e) => onChange(e.target.value)} />
     </div>
   )
 }

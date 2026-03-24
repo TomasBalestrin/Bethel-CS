@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import localFont from 'next/font/local'
+import { Toaster } from 'sonner'
 import { cn } from '@/lib/utils'
 import './globals.css'
 
@@ -34,7 +35,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className={cn(geistSans.variable, geistBody.variable)}>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Toaster position="bottom-right" richColors />
+      </body>
     </html>
   )
 }

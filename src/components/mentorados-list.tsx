@@ -23,12 +23,13 @@ interface MentoradosListProps {
   mentees: Mentee[]
 }
 
-export function MentoradosList({ mentees }: MentoradosListProps) {
+export function MentoradosList({ mentees: initialMentees }: MentoradosListProps) {
+  const [menteeList, setMenteeList] = useState(initialMentees)
   const [search, setSearch] = useState('')
   const [selectedMentee, setSelectedMentee] = useState<MenteeWithStats | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
 
-  const filtered = mentees.filter((m) => {
+  const filtered = menteeList.filter((m) => {
     if (!search) return true
     const term = search.toLowerCase()
     return (
@@ -160,6 +161,10 @@ export function MentoradosList({ mentees }: MentoradosListProps) {
         mentee={selectedMentee}
         open={panelOpen}
         onOpenChange={setPanelOpen}
+        onMenteeDeleted={(id) => {
+          setMenteeList((prev) => prev.filter((m) => m.id !== id))
+          setSelectedMentee(null)
+        }}
       />
     </div>
   )

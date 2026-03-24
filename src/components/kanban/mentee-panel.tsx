@@ -167,6 +167,7 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
   const [token, setToken] = useState<string | null>(null)
   const [plan, setPlan] = useState<ActionPlan | null>(null)
   const [loading, setLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -183,6 +184,13 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
     const result = await generateActionPlanLink(mentee.id)
     if (result.token) setToken(result.token)
     setLoading(false)
+  }
+
+  async function handleCopyLink() {
+    if (!link) return
+    await navigator.clipboard.writeText(link)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   const link = token
@@ -210,7 +218,17 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
           {link && (
             <div className="rounded-md bg-muted p-3">
               <p className="label-xs mb-1">Link do formulário</p>
-              <code className="text-xs text-foreground break-all">{link}</code>
+              <div className="flex items-start gap-2">
+                <code className="flex-1 text-xs text-foreground break-all">{link}</code>
+                <Button
+                  size="sm"
+                  variant={copied ? 'default' : 'outline'}
+                  onClick={handleCopyLink}
+                  className="shrink-0 text-xs"
+                >
+                  {copied ? 'Link copiado!' : 'Copiar link'}
+                </Button>
+              </div>
             </div>
           )}
         </div>

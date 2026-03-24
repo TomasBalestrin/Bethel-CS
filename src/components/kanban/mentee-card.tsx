@@ -6,12 +6,12 @@ import { Badge } from '@/components/ui/badge'
 import { Phone, Users, DollarSign } from 'lucide-react'
 import type { MenteeWithStats } from '@/types/kanban'
 
-const PRIORITY_COLORS: Record<number, string> = {
-  1: 'bg-gray-100 text-gray-700 border-gray-200',
-  2: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  3: 'bg-green-100 text-green-700 border-green-200',
-  4: 'bg-blue-100 text-blue-700 border-blue-200',
-  5: 'bg-purple-100 text-purple-700 border-purple-200',
+const PRIORITY_CONFIG: Record<number, { label: string; variant: 'muted' | 'warning' | 'info' | 'success' | 'accent' }> = {
+  1: { label: 'Nível 1', variant: 'muted' },
+  2: { label: 'Nível 2', variant: 'warning' },
+  3: { label: 'Nível 3', variant: 'info' },
+  4: { label: 'Nível 4', variant: 'success' },
+  5: { label: 'Nível 5', variant: 'accent' },
 }
 
 interface MenteeCardProps {
@@ -29,23 +29,25 @@ export function MenteeCard({ mentee }: MenteeCardProps) {
     opacity: isDragging ? 0.5 : 1,
   }
 
+  const priority = PRIORITY_CONFIG[mentee.priority_level] ?? PRIORITY_CONFIG[1]
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       {...listeners}
       {...attributes}
-      className="cursor-grab rounded-lg border bg-card p-3 shadow-sm transition-shadow hover:shadow-md active:cursor-grabbing"
+      className="cursor-grab rounded-lg border border-border bg-card p-3 shadow-card transition-shadow hover:shadow-md active:cursor-grabbing animate-fade-in"
     >
       <div className="flex items-start justify-between gap-2">
-        <h4 className="text-sm font-medium leading-tight">{mentee.full_name}</h4>
-        <Badge
-          className={`shrink-0 text-[10px] ${PRIORITY_COLORS[mentee.priority_level] ?? PRIORITY_COLORS[1]}`}
-        >
+        <h4 className="text-sm font-medium leading-tight text-foreground">
+          {mentee.full_name}
+        </h4>
+        <Badge variant={priority.variant} className="shrink-0 text-[10px]">
           P{mentee.priority_level}
         </Badge>
       </div>
-      <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+      <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground tabular">
         <span className="flex items-center gap-1" title="Atendimentos">
           <Phone className="h-3 w-3" />
           {mentee.attendance_count}

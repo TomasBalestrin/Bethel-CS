@@ -14,9 +14,9 @@ export function AppSidebar({ profile }: AppSidebarProps) {
   )
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col border-r bg-sidebar">
-      <div className="flex h-14 items-center border-b px-4">
-        <span className="text-lg font-semibold text-sidebar-foreground">
+    <aside className="fixed inset-y-0 left-0 z-30 flex w-[260px] flex-col bg-primary">
+      <div className="flex h-14 items-center border-b border-white/10 px-5">
+        <span className="font-heading text-lg font-bold text-white">
           Bethel CS
         </span>
       </div>

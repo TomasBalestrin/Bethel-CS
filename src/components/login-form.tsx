@@ -37,9 +37,11 @@ export function LoginForm() {
   }
 
   return (
-    <Card className="w-full max-w-sm">
+    <Card className="w-full max-w-sm animate-slide-up">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Bethel CS</CardTitle>
+        <CardTitle className="font-heading text-2xl font-bold text-foreground">
+          Bethel CS
+        </CardTitle>
         <p className="text-sm text-muted-foreground">
           Entre com suas credenciais
         </p>
@@ -68,7 +70,7 @@ export function LoginForm() {
             />
           </div>
           {error && (
-            <p className="text-sm text-destructive">{error}</p>
+            <p className="text-sm text-destructive animate-shake">{error}</p>
           )}
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? 'Entrando...' : 'Entrar'}

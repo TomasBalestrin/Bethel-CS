@@ -18,13 +18,13 @@ export function SidebarNavItem({ item }: SidebarNavItemProps) {
     <Link
       href={item.href}
       className={cn(
-        'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+        'flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors',
         isActive
-          ? 'bg-primary text-primary-foreground'
-          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+          ? 'bg-accent text-white'
+          : 'text-white/60 hover:bg-white/10 hover:text-white'
       )}
     >
-      <Icon className="h-4 w-4" />
+      <Icon className="h-5 w-5" />
       {item.label}
     </Link>
   )

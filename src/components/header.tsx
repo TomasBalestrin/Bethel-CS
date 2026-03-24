@@ -35,15 +35,17 @@ export function Header({ profile }: HeaderProps) {
     .toUpperCase()
 
   return (
-    <header className="flex h-14 items-center justify-end border-b bg-background px-6">
+    <header className="flex h-14 items-center justify-end border-b border-border bg-card px-6">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="flex items-center gap-2">
+          <Button variant="ghost" className="flex items-center gap-2 min-h-0 h-auto py-1.5">
             <Avatar className="h-8 w-8">
               <AvatarImage src={profile.avatar_url ?? undefined} />
-              <AvatarFallback>{initials}</AvatarFallback>
+              <AvatarFallback className="bg-accent text-accent-foreground text-xs font-medium">
+                {initials}
+              </AvatarFallback>
             </Avatar>
-            <span className="text-sm font-medium">{profile.full_name}</span>
+            <span className="text-sm font-medium text-foreground">{profile.full_name}</span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">

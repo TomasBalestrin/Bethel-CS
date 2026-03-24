@@ -22,15 +22,15 @@ export function KanbanColumn({ stage, mentees }: KanbanColumnProps) {
   return (
     <div
       className={cn(
-        'flex w-72 shrink-0 flex-col rounded-lg border bg-muted/50',
-        isOver && 'ring-2 ring-primary/50'
+        'flex w-72 shrink-0 flex-col rounded-lg border border-border bg-muted/50',
+        isOver && 'ring-2 ring-accent/50'
       )}
     >
-      <div className="flex items-center justify-between border-b px-3 py-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
+        <h3 className="label-xs">
           {stage.name}
         </h3>
-        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-medium text-muted-foreground">
+        <span className="flex h-5 min-w-[20px] items-center justify-center rounded-sm bg-muted px-1 text-[10px] font-medium text-muted-foreground tabular">
           {mentees.length}
         </span>
       </div>

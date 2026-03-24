@@ -134,9 +134,7 @@ export function CreateMenteeDialog({
           <form onSubmit={handleSubmit} className="space-y-4 pr-4">
             {/* Dados da mentoria */}
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-muted-foreground">
-                Dados da Mentoria
-              </h3>
+              <h3 className="label-xs">Dados da Mentoria</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2 space-y-1">
                   <Label htmlFor="product_name">Produto atual *</Label>
@@ -171,9 +169,7 @@ export function CreateMenteeDialog({
 
             {/* Dados pessoais */}
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-muted-foreground">
-                Dados Pessoais
-              </h3>
+              <h3 className="label-xs">Dados Pessoais</h3>
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2 space-y-1">
                   <Label htmlFor="full_name">Nome completo *</Label>
@@ -256,7 +252,7 @@ export function CreateMenteeDialog({
 
             {/* Sócio */}
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-muted-foreground">
+              <h3 className="label-xs">
                 Sócio
               </h3>
               <div className="flex items-center gap-2">
@@ -283,7 +279,7 @@ export function CreateMenteeDialog({
 
             {/* Informações adicionais */}
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-muted-foreground">
+              <h3 className="label-xs">
                 Informações Adicionais
               </h3>
               <div className="grid grid-cols-2 gap-3">

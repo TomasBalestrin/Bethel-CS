@@ -11,7 +11,7 @@ export default async function EtapasMentoriaPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold">Etapas Mentoria</h1>
+      <h1 className="font-heading text-2xl font-bold text-foreground">Etapas Mentoria</h1>
       <p className="mt-2 text-muted-foreground">
         Kanban em desenvolvimento — Fase 4
       </p>
@@ -20,7 +20,7 @@ export default async function EtapasMentoriaPage() {
           {stages.map((stage) => (
             <div
               key={stage.id}
-              className="rounded-lg border bg-card p-4 text-card-foreground"
+              className="rounded-lg border border-border bg-card p-4 shadow-card text-card-foreground animate-fade-in"
             >
               <h3 className="text-sm font-medium">{stage.name}</h3>
               <p className="mt-1 text-xs text-muted-foreground">

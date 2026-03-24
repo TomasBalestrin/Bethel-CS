@@ -87,8 +87,10 @@ export function KanbanBoard({
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Etapas Iniciais</h1>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="font-heading text-2xl font-bold text-foreground">
+          Etapas Iniciais
+        </h1>
         <Button onClick={() => setDialogOpen(true)}>
           <Plus className="mr-2 h-4 w-4" />
           Novo Mentorado

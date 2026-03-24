@@ -28,12 +28,12 @@ export default async function ActionPlanPage({ params }: Props) {
 
   if (plan?.submitted_at) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <div className="w-full max-w-2xl rounded-lg border border-border bg-card p-8 text-center shadow-card">
-          <h1 className="font-heading text-2xl font-bold text-foreground">
+      <div className="flex min-h-screen items-center justify-center p-4" style={{ backgroundColor: '#F8FBFF' }}>
+        <div className="w-full max-w-[680px] rounded-lg bg-white p-10 text-center shadow-card">
+          <h1 className="font-heading text-2xl font-semibold text-foreground">
             Formulário já enviado
           </h1>
-          <p className="mt-2 text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground">
             Seu plano de ação já foi enviado anteriormente. Nossa equipe entrará em contato em breve.
           </p>
         </div>

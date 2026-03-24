@@ -36,6 +36,10 @@ import {
   Pencil,
   Trash2,
   Star,
+  FileDown,
+  Headphones,
+  Users,
+  DollarSign,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -46,6 +50,8 @@ import {
   deleteRevenueRecord,
   addObjective,
   addTestimonial,
+  updateTestimonial,
+  deleteTestimonial,
   generateActionPlanLink,
   toggleClienteFit,
   addEngagementRecord,
@@ -90,12 +96,16 @@ interface MenteePanelProps {
 export function MenteePanel({ mentee, open, onOpenChange }: MenteePanelProps) {
   if (!mentee) return null
 
+  const priorityLabel = `P${mentee.priority_level}`
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full max-w-2xl p-0">
+      <SheetContent className="w-full min-w-[min(560px,100vw)] max-w-[680px] p-0">
         <SheetHeader className="px-6 pt-6 pb-4">
-          <div className="flex items-center gap-3">
-            <SheetTitle>{mentee.full_name}</SheetTitle>
+          <div className="flex items-center gap-2.5">
+            <SheetTitle className="font-heading font-semibold text-xl leading-tight">
+              {mentee.full_name}
+            </SheetTitle>
             <Badge
               variant={
                 ({ 1: 'muted', 2: 'warning', 3: 'info', 4: 'success', 5: 'accent' } as const)[
@@ -103,10 +113,26 @@ export function MenteePanel({ mentee, open, onOpenChange }: MenteePanelProps) {
                 ] ?? 'muted'
               }
             >
-              Nível {mentee.priority_level}
+              {priorityLabel}
             </Badge>
           </div>
-          <SheetDescription>{mentee.product_name}</SheetDescription>
+          <SheetDescription className="text-sm text-muted-foreground">
+            {mentee.product_name}
+          </SheetDescription>
+          <div className="flex items-center gap-3 pt-1 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <Headphones size={12} />
+              {mentee.attendance_count} atendimentos
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Users size={12} />
+              {mentee.indication_count} indicações
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <DollarSign size={12} />
+              R$ {(mentee.revenue_total / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} receita nova
+            </span>
+          </div>
         </SheetHeader>
         <Separator />
         <PanelTabs mentee={mentee} />
@@ -117,17 +143,29 @@ export function MenteePanel({ mentee, open, onOpenChange }: MenteePanelProps) {
 
 function PanelTabs({ mentee }: { mentee: MenteeWithStats }) {
   return (
-    <Tabs defaultValue="info" className="flex flex-col h-[calc(100vh-120px)]">
-      <TabsList className="mx-6 mt-4 flex-wrap h-auto gap-1 justify-start">
-        <TabsTrigger value="info">Info</TabsTrigger>
-        <TabsTrigger value="action-plan">Plano</TabsTrigger>
-        <TabsTrigger value="indications">Indicações</TabsTrigger>
-        <TabsTrigger value="intensivo">Intensivo</TabsTrigger>
-        <TabsTrigger value="revenue">Receita</TabsTrigger>
-        <TabsTrigger value="objectives">Objetivos</TabsTrigger>
-        <TabsTrigger value="testimonials">Depoimentos</TabsTrigger>
-        <TabsTrigger value="engagement">Engajamento</TabsTrigger>
-      </TabsList>
+    <Tabs defaultValue="info" className="flex flex-col h-[calc(100vh-160px)]">
+      <div className="mx-6 mt-3 overflow-x-auto scrollbar-none">
+        <TabsList className="inline-flex items-center gap-1 border-b border-border min-w-max h-auto rounded-none bg-transparent p-0">
+          {[
+            { value: 'info', label: 'Info' },
+            { value: 'action-plan', label: 'Plano' },
+            { value: 'indications', label: 'Indicações' },
+            { value: 'intensivo', label: 'Intensivo' },
+            { value: 'revenue', label: 'Receita' },
+            { value: 'objectives', label: 'Objetivos' },
+            { value: 'testimonials', label: 'Depoimentos' },
+            { value: 'engagement', label: 'Engajamento' },
+          ].map((tab) => (
+            <TabsTrigger
+              key={tab.value}
+              value={tab.value}
+              className="rounded-none border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-accent data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </div>
       <ScrollArea className="flex-1 px-6 py-4">
         <TabsContent value="info"><TabInfo mentee={mentee} /></TabsContent>
         <TabsContent value="action-plan"><TabActionPlan mentee={mentee} /></TabsContent>
@@ -229,11 +267,77 @@ function ClienteFitToggle({ menteeId, initialValue }: { menteeId: string; initia
 }
 
 // ─── Tab 2: Plano de Ação ───
+
+const ACTION_PLAN_LABELS: Record<string, string> = {
+  endereco_completo: 'Endereço completo',
+  como_nos_conheceu: 'Por onde nos conheceu',
+  motivacao_elite_premium: 'Por que decidiu entrar na Elite Premium',
+  expectativas_resultados: 'Expectativas de resultado',
+  atuacao_profissional: 'Atuação profissional',
+  tempo_atuacao: 'Tempo de atuação',
+  produtos_servicos: 'Principais produtos/serviços',
+  funis_venda: 'Funis de venda ativos',
+  processo_venda: 'Processo de venda',
+  media_faturamento: 'Faturamento médio mensal',
+  resultado_funis: 'Resultado por funil',
+  erros_identificados: 'Erros identificados',
+  desafios_funis: 'Principais desafios',
+  funis_testados: 'Funis testados sem resultado',
+  estrutura_comercial: 'Estrutura comercial',
+  estrutura_marketing: 'Estrutura de marketing',
+  entrega_produto: 'Entrega do produto/serviço',
+  estrutura_gestao: 'Estrutura de gestão',
+  equipe: 'Equipe',
+  momento_negocio: 'Momento do negócio',
+  objetivos_urgentes: 'Objetivos urgentes',
+  visao_futuro: 'Visão de futuro (6m, 1a, 5a)',
+}
+
+const PILL_KEYS = new Set(['como_nos_conheceu'])
+
+function ActionPlanResponseView({ data }: { data: Record<string, unknown> }) {
+  const keys = Object.keys(ACTION_PLAN_LABELS)
+
+  return (
+    <div className="space-y-0 divide-y divide-border/60">
+      {keys.map((key) => {
+        const value = data[key]
+        if (value === undefined || value === null || value === '') return null
+        const label = ACTION_PLAN_LABELS[key]
+        const isPill = PILL_KEYS.has(key)
+
+        return (
+          <div key={key} className="py-4 first:pt-0">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
+              {label}
+            </p>
+            {isPill && Array.isArray(value) ? (
+              <div className="flex flex-wrap gap-1.5">
+                {value.map((v: string) => (
+                  <span
+                    key={v}
+                    className="inline-flex items-center rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-medium text-accent"
+                  >
+                    {v}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-foreground whitespace-pre-wrap">{String(value)}</p>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
   const [token, setToken] = useState<string | null>(null)
   const [plan, setPlan] = useState<ActionPlan | null>(null)
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -259,18 +363,98 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  async function handleExportPdf() {
+    setExporting(true)
+    try {
+      const { default: jsPDF } = await import('jspdf')
+      const { default: html2canvas } = await import('html2canvas')
+
+      const el = document.getElementById('action-plan-content')
+      if (!el) return
+
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+      })
+
+      const imgWidth = 190
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      const pdf = new jsPDF('p', 'mm', 'a4')
+
+      // Header
+      pdf.setFontSize(16)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text(mentee.full_name, 10, 15)
+      pdf.setFontSize(10)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(100, 100, 100)
+      pdf.text(`${mentee.product_name ?? ''} — Preenchido em ${plan?.submitted_at ? new Date(plan.submitted_at).toLocaleDateString('pt-BR') : '—'}`, 10, 22)
+      pdf.setTextColor(0, 0, 0)
+
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const startY = 28
+      let heightLeft = imgHeight
+      let position = startY
+
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 10, position, imgWidth, imgHeight)
+      heightLeft -= (pageHeight - startY)
+
+      while (heightLeft > 0) {
+        position = position - pageHeight + startY
+        pdf.addPage()
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 10, position, imgWidth, imgHeight)
+        heightLeft -= pageHeight
+      }
+
+      // Footer on every page
+      const totalPages = pdf.getNumberOfPages()
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i)
+        pdf.setFontSize(8)
+        pdf.setTextColor(150, 150, 150)
+        pdf.text('Bethel CS — Confidencial', 10, pageHeight - 8)
+      }
+
+      pdf.save(`plano-acao-${mentee.full_name.replace(/\s+/g, '-').toLowerCase()}.pdf`)
+    } catch {
+      // silently fail
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const link = token
     ? `${window.location.origin}/form/action-plan/${token}`
     : null
 
+  const planData = plan?.data as Record<string, unknown> | null
+
   return (
     <div className="space-y-4 animate-fade-in">
       {plan?.submitted_at ? (
-        <div className="space-y-3">
-          <Badge variant="success">Preenchido</Badge>
-          <pre className="rounded-md bg-muted p-4 text-xs overflow-auto">
-            {JSON.stringify(plan.data, null, 2)}
-          </pre>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Badge variant="success">
+              Preenchido em {new Date(plan.submitted_at).toLocaleDateString('pt-BR')}
+            </Badge>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleExportPdf}
+              disabled={exporting}
+              className="text-xs gap-1.5"
+            >
+              <FileDown className="h-3.5 w-3.5" />
+              {exporting ? 'Gerando...' : 'Exportar PDF'}
+            </Button>
+          </div>
+          <div
+            id="action-plan-content"
+            className="rounded-lg bg-white p-5"
+          >
+            {planData && <ActionPlanResponseView data={planData} />}
+          </div>
         </div>
       ) : (
         <div className="space-y-3">
@@ -766,6 +950,7 @@ const TESTIMONIAL_CATEGORIES: { value: TestimonialCategory; label: string }[] = 
 function TabTestimonials({ menteeId }: { menteeId: string }) {
   const [items, setItems] = useState<Testimonial[]>([])
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [testimonialDate, setTestimonialDate] = useState('')
   const [description, setDescription] = useState('')
   const [niche, setNiche] = useState('')
@@ -773,6 +958,7 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
   const [employeeCount, setEmployeeCount] = useState('')
   const [categories, setCategories] = useState<TestimonialCategory[]>([])
   const [loading, setLoading] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const supabase = createClient()
 
   const fetchData = useCallback(() => {
@@ -792,19 +978,60 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
     )
   }
 
+  function resetForm() {
+    setTestimonialDate(''); setDescription(''); setNiche(''); setRevenueRange('')
+    setEmployeeCount(''); setCategories([]); setEditingId(null)
+  }
+
+  function handleEdit(item: Testimonial) {
+    setEditingId(item.id)
+    setTestimonialDate(item.testimonial_date)
+    setDescription(item.description)
+    setNiche(item.niche ?? '')
+    setRevenueRange(item.revenue_range ?? '')
+    setEmployeeCount(item.employee_count ?? '')
+    setCategories((item.categories as TestimonialCategory[]) ?? [])
+    setShowForm(true)
+  }
+
+  function handleCancelForm() {
+    resetForm()
+    setShowForm(false)
+  }
+
+  async function handleDelete(id: string) {
+    setLoading(true)
+    await deleteTestimonial(id)
+    setConfirmDeleteId(null)
+    setLoading(false)
+    fetchData()
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    await addTestimonial(menteeId, {
-      testimonial_date: testimonialDate,
-      description,
-      niche: niche || undefined,
-      revenue_range: revenueRange || undefined,
-      employee_count: employeeCount || undefined,
-      categories,
-    })
-    setTestimonialDate(''); setDescription(''); setNiche(''); setRevenueRange('')
-    setEmployeeCount(''); setCategories([])
+
+    if (editingId) {
+      await updateTestimonial(editingId, {
+        testimonial_date: testimonialDate,
+        description,
+        niche: niche || undefined,
+        revenue_range: revenueRange || undefined,
+        employee_count: employeeCount || undefined,
+        categories,
+      })
+    } else {
+      await addTestimonial(menteeId, {
+        testimonial_date: testimonialDate,
+        description,
+        niche: niche || undefined,
+        revenue_range: revenueRange || undefined,
+        employee_count: employeeCount || undefined,
+        categories,
+      })
+    }
+
+    resetForm()
     setShowForm(false); setLoading(false)
     fetchData()
   }
@@ -813,7 +1040,7 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between">
         <p className="label-xs">Depoimentos ({items.length})</p>
-        <Button size="sm" variant="outline" onClick={() => setShowForm(!showForm)}>
+        <Button size="sm" variant="outline" onClick={() => { resetForm(); setShowForm(!showForm) }}>
           <Plus className="mr-1 h-3 w-3" /> Registrar
         </Button>
       </div>
@@ -860,14 +1087,52 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
               ))}
             </div>
           </div>
-          <Button type="submit" size="sm" disabled={loading}>
-            {loading ? 'Salvando...' : 'Salvar'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button type="submit" size="sm" disabled={loading}>
+              {loading ? 'Salvando...' : editingId ? 'Atualizar' : 'Salvar'}
+            </Button>
+            {editingId && (
+              <Button type="button" size="sm" variant="ghost" onClick={handleCancelForm}>
+                Cancelar
+              </Button>
+            )}
+          </div>
         </form>
       )}
       {items.map((item) => (
-        <div key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
-          <div className="flex items-center justify-between">
+        <div key={item.id} className="relative rounded-lg border border-border bg-card p-3 text-sm group">
+          <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              type="button"
+              onClick={() => handleEdit(item)}
+              className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title="Editar"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDeleteId(item.id)}
+              className="rounded p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              title="Excluir"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          {confirmDeleteId === item.id && (
+            <div className="mb-2 rounded-md bg-destructive/10 border border-destructive/20 p-2 flex items-center justify-between">
+              <p className="text-xs text-destructive">Tem certeza que deseja excluir este depoimento?</p>
+              <div className="flex items-center gap-1">
+                <Button size="sm" variant="destructive" className="h-6 text-xs px-2" onClick={() => handleDelete(item.id)} disabled={loading}>
+                  Excluir
+                </Button>
+                <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => setConfirmDeleteId(null)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+          <div className="flex items-center justify-between pr-16">
             <p className="text-xs text-muted-foreground">{item.testimonial_date}</p>
             {item.niche && <Badge variant="outline" className="text-[10px]">{item.niche}</Badge>}
           </div>

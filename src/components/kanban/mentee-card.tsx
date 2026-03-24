@@ -2,16 +2,15 @@
 
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { Badge } from '@/components/ui/badge'
 import { Phone, Users, DollarSign, Star } from 'lucide-react'
 import type { MenteeWithStats } from '@/types/kanban'
 
-const PRIORITY_CONFIG: Record<number, { label: string; variant: 'muted' | 'warning' | 'info' | 'success' | 'accent' }> = {
-  1: { label: 'Nível 1', variant: 'muted' },
-  2: { label: 'Nível 2', variant: 'warning' },
-  3: { label: 'Nível 3', variant: 'info' },
-  4: { label: 'Nível 4', variant: 'success' },
-  5: { label: 'Nível 5', variant: 'accent' },
+const LEVEL_COLORS: Record<number, string> = {
+  1: '#888780',
+  2: '#FFAA00',
+  3: '#3B9FFF',
+  4: '#2FC695',
+  5: '#1F3A7D',
 }
 
 interface MenteeCardProps {
@@ -30,10 +29,9 @@ export function MenteeCard({ mentee, onClick }: MenteeCardProps) {
     opacity: isDragging ? 0.5 : 1,
   }
 
-  const priority = PRIORITY_CONFIG[mentee.priority_level] ?? PRIORITY_CONFIG[1]
+  const color = LEVEL_COLORS[mentee.priority_level] ?? LEVEL_COLORS[1]
 
   function handleClick() {
-    // Only fire click if not dragging (distance < 8px threshold)
     if (!isDragging && onClick) {
       onClick(mentee)
     }
@@ -46,33 +44,48 @@ export function MenteeCard({ mentee, onClick }: MenteeCardProps) {
       {...listeners}
       {...attributes}
       onClick={handleClick}
-      className="cursor-grab rounded-lg border border-border bg-card p-3 shadow-card transition-shadow hover:shadow-md active:cursor-grabbing animate-fade-in"
+      className="cursor-pointer rounded-lg border border-border/50 bg-card shadow-card transition-all hover:border-accent/30 hover:shadow-md active:cursor-grabbing animate-fade-in"
     >
-      <div className="flex items-start justify-between gap-2">
-        <h4 className="flex items-center gap-1 text-sm font-medium leading-tight text-foreground">
-          {mentee.cliente_fit && <Star className="h-3.5 w-3.5 text-warning fill-warning shrink-0" />}
-          {mentee.full_name}
-        </h4>
-        <Badge variant={priority.variant} className="shrink-0 text-[10px]">
-          P{mentee.priority_level}
-        </Badge>
-      </div>
-      <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground tabular">
-        <span className="flex items-center gap-1" title="Atendimentos">
-          <Phone className="h-3 w-3" />
-          {mentee.attendance_count}
-        </span>
-        <span className="flex items-center gap-1" title="Indicações">
-          <Users className="h-3 w-3" />
-          {mentee.indication_count}
-        </span>
-        <span className="flex items-center gap-1" title="Faturamento">
-          <DollarSign className="h-3 w-3" />
-          {mentee.revenue_total.toLocaleString('pt-BR', {
-            minimumFractionDigits: 0,
-            maximumFractionDigits: 0,
-          })}
-        </span>
+      <div className="flex">
+        {/* Color bar */}
+        <div
+          className="w-1 shrink-0 rounded-l-lg"
+          style={{ backgroundColor: color }}
+        />
+        <div className="flex-1 px-3.5 py-3">
+          {/* Name + badge */}
+          <div className="flex items-start justify-between gap-2">
+            <h4 className="flex items-center gap-1 font-heading font-medium text-sm leading-tight text-foreground">
+              {mentee.cliente_fit && <Star className="h-3.5 w-3.5 text-warning fill-warning shrink-0" />}
+              {mentee.full_name}
+            </h4>
+            <span
+              className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+              style={{ backgroundColor: `${color}15`, color }}
+            >
+              P{mentee.priority_level}
+            </span>
+          </div>
+          {/* Product */}
+          {mentee.product_name && (
+            <p className="text-xs text-muted-foreground mt-0.5">{mentee.product_name}</p>
+          )}
+          {/* Divider + metrics */}
+          <div className="mt-2 pt-2 border-t border-border/50 flex items-center gap-3 text-xs text-muted-foreground tabular">
+            <span className="flex items-center gap-1" title="Atendimentos">
+              <Phone size={12} />
+              {mentee.attendance_count} atend.
+            </span>
+            <span className="flex items-center gap-1" title="Indicações">
+              <Users size={12} />
+              {mentee.indication_count} indic.
+            </span>
+            <span className="flex items-center gap-1" title="Receita">
+              <DollarSign size={12} />
+              R$ {(mentee.revenue_total / 100).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
   )

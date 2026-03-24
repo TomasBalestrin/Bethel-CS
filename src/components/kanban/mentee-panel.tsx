@@ -41,6 +41,7 @@ import {
   Users,
   DollarSign,
 } from 'lucide-react'
+import { formatDateBR } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
 import {
   addIndication,
@@ -182,26 +183,43 @@ function PanelTabs({ mentee }: { mentee: MenteeWithStats }) {
 
 // ─── Tab 1: Info Geral ───
 function TabInfo({ mentee }: { mentee: MenteeWithStats }) {
-  const fields = [
+  const instHandle = mentee.instagram?.replace(/^@/, '') || null
+
+  const fields: { icon: typeof User; label: string; value: string | null | undefined; render?: React.ReactNode }[] = [
     { icon: User, label: 'Nome', value: mentee.full_name },
     { icon: Phone, label: 'Telefone', value: mentee.phone },
     { icon: Mail, label: 'Email', value: mentee.email },
-    { icon: AtSign, label: 'Instagram', value: mentee.instagram },
+    {
+      icon: AtSign,
+      label: 'Instagram',
+      value: mentee.instagram,
+      render: instHandle ? (
+        <a
+          href={`https://instagram.com/${instHandle}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-accent hover:underline hover:opacity-80 transition-opacity inline-flex items-center gap-1"
+        >
+          <AtSign size={14} />
+          {instHandle}
+        </a>
+      ) : undefined,
+    },
     { icon: MapPin, label: 'Cidade/Estado', value: [mentee.city, mentee.state].filter(Boolean).join(', ') },
-    { icon: Calendar, label: 'Nascimento', value: mentee.birth_date },
+    { icon: Calendar, label: 'Nascimento', value: mentee.birth_date ? formatDateBR(mentee.birth_date) : null },
     { icon: Briefcase, label: 'Produto', value: mentee.product_name },
-    { icon: Calendar, label: 'Início', value: mentee.start_date },
-    { icon: Calendar, label: 'Término', value: mentee.end_date },
+    { icon: Calendar, label: 'Início', value: mentee.start_date ? formatDateBR(mentee.start_date) : null },
+    { icon: Calendar, label: 'Término', value: mentee.end_date ? formatDateBR(mentee.end_date) : null },
   ]
 
   return (
     <div className="space-y-3 animate-fade-in">
-      {fields.map(({ icon: Icon, label, value }) => (
+      {fields.map(({ icon: Icon, label, value, render }) => (
         value ? (
           <div key={label} className="flex items-center gap-3 text-sm">
             <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
             <span className="text-muted-foreground w-24 shrink-0">{label}</span>
-            <span className="text-foreground">{value}</span>
+            {render ?? <span className="text-foreground">{value}</span>}
           </div>
         ) : null
       ))}
@@ -621,7 +639,7 @@ function TabIntensivo({ menteeId }: { menteeId: string }) {
         <div key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
           <div className="flex items-center gap-2">
             {item.participated ? <Badge variant="success">Participou</Badge> : <Badge variant="muted">Não participou</Badge>}
-            {item.participation_date && <span className="text-muted-foreground text-xs">{item.participation_date}</span>}
+            {item.participation_date && <span className="text-muted-foreground text-xs">{formatDateBR(item.participation_date)}</span>}
           </div>
           {item.indication_name && (
             <p className="mt-1 text-muted-foreground">Indicação: {item.indication_name} — {item.indication_phone}</p>
@@ -928,7 +946,7 @@ function TabObjectives({ menteeId }: { menteeId: string }) {
         <div key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
           <p className="font-medium text-foreground">{item.title}</p>
           {item.description && <p className="mt-1 text-muted-foreground">{item.description}</p>}
-          {item.achieved_at && <p className="mt-1 text-xs text-muted-foreground">{item.achieved_at}</p>}
+          {item.achieved_at && <p className="mt-1 text-xs text-muted-foreground">{formatDateBR(item.achieved_at)}</p>}
         </div>
       ))}
     </div>
@@ -1133,7 +1151,7 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
             </div>
           )}
           <div className="flex items-center justify-between pr-16">
-            <p className="text-xs text-muted-foreground">{item.testimonial_date}</p>
+            <p className="text-xs text-muted-foreground">{formatDateBR(item.testimonial_date)}</p>
             {item.niche && <Badge variant="outline" className="text-[10px]">{item.niche}</Badge>}
           </div>
           <p className="mt-1 text-foreground">{item.description}</p>
@@ -1319,7 +1337,7 @@ function TabEngagement({ menteeId }: { menteeId: string }) {
             <div key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
               <div className="flex items-center justify-between">
                 <Badge variant="info" className="text-[10px]">{ENGAGEMENT_LABELS[item.type]}</Badge>
-                <span className="text-xs text-muted-foreground">{item.recorded_at}</span>
+                <span className="text-xs text-muted-foreground">{formatDateBR(item.recorded_at)}</span>
               </div>
               <p className="mt-1 text-foreground tabular">Quantidade: {Number(item.value)}</p>
               {item.notes && <p className="text-xs text-muted-foreground">{item.notes}</p>}
@@ -1337,7 +1355,7 @@ function TabEngagement({ menteeId }: { menteeId: string }) {
                 <Badge variant={item.type === 'whatsapp' ? 'success' : 'warning'} className="text-[10px]">
                   {CS_ACTIVITY_LABELS[item.type]}
                 </Badge>
-                <span className="text-xs text-muted-foreground">{item.activity_date}</span>
+                <span className="text-xs text-muted-foreground">{formatDateBR(item.activity_date)}</span>
               </div>
               <p className="mt-1 text-foreground tabular">Duração: {Number(item.duration_minutes)} min</p>
               {item.notes && <p className="text-xs text-muted-foreground">{item.notes}</p>}

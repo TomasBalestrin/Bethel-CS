@@ -19,8 +19,11 @@ export const metadata: Metadata = {
   title: 'Bethel CS',
   description: 'Sistema de Customer Success para Mentoria Elite Premium',
   icons: {
-    icon: '/favicon.png',
+    icon: [
+      { url: '/logo.png', type: 'image/png' },
+    ],
     apple: '/logo.png',
+    shortcut: '/logo.png',
   },
 }
 

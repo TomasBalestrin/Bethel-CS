@@ -40,19 +40,19 @@ export function LoginForm() {
   return (
     <Card className="w-full max-w-sm animate-slide-up">
       <CardHeader className="text-center">
-        <div className="mx-auto mb-2">
+        <div className="mx-auto mb-2 flex items-center justify-center gap-3">
           <Image
             src="/logo.png"
             alt="Bethel CS"
-            width={160}
-            height={48}
-            className="h-12 w-auto"
+            width={40}
+            height={40}
+            className="h-10 w-10"
             priority
           />
+          <CardTitle className="font-heading text-2xl font-bold text-foreground">
+            Bethel CS
+          </CardTitle>
         </div>
-        <CardTitle className="font-heading text-2xl font-bold text-foreground">
-          Bethel CS
-        </CardTitle>
         <p className="text-sm text-muted-foreground">
           Entre com suas credenciais
         </p>

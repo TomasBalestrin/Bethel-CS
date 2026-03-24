@@ -47,6 +47,8 @@ import {
   deleteRevenueRecord,
   addObjective,
   addTestimonial,
+  updateTestimonial,
+  deleteTestimonial,
   generateActionPlanLink,
   toggleClienteFit,
   addEngagementRecord,
@@ -913,6 +915,7 @@ const TESTIMONIAL_CATEGORIES: { value: TestimonialCategory; label: string }[] = 
 function TabTestimonials({ menteeId }: { menteeId: string }) {
   const [items, setItems] = useState<Testimonial[]>([])
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [testimonialDate, setTestimonialDate] = useState('')
   const [description, setDescription] = useState('')
   const [niche, setNiche] = useState('')
@@ -920,6 +923,7 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
   const [employeeCount, setEmployeeCount] = useState('')
   const [categories, setCategories] = useState<TestimonialCategory[]>([])
   const [loading, setLoading] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const supabase = createClient()
 
   const fetchData = useCallback(() => {
@@ -939,19 +943,60 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
     )
   }
 
+  function resetForm() {
+    setTestimonialDate(''); setDescription(''); setNiche(''); setRevenueRange('')
+    setEmployeeCount(''); setCategories([]); setEditingId(null)
+  }
+
+  function handleEdit(item: Testimonial) {
+    setEditingId(item.id)
+    setTestimonialDate(item.testimonial_date)
+    setDescription(item.description)
+    setNiche(item.niche ?? '')
+    setRevenueRange(item.revenue_range ?? '')
+    setEmployeeCount(item.employee_count ?? '')
+    setCategories((item.categories as TestimonialCategory[]) ?? [])
+    setShowForm(true)
+  }
+
+  function handleCancelForm() {
+    resetForm()
+    setShowForm(false)
+  }
+
+  async function handleDelete(id: string) {
+    setLoading(true)
+    await deleteTestimonial(id)
+    setConfirmDeleteId(null)
+    setLoading(false)
+    fetchData()
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    await addTestimonial(menteeId, {
-      testimonial_date: testimonialDate,
-      description,
-      niche: niche || undefined,
-      revenue_range: revenueRange || undefined,
-      employee_count: employeeCount || undefined,
-      categories,
-    })
-    setTestimonialDate(''); setDescription(''); setNiche(''); setRevenueRange('')
-    setEmployeeCount(''); setCategories([])
+
+    if (editingId) {
+      await updateTestimonial(editingId, {
+        testimonial_date: testimonialDate,
+        description,
+        niche: niche || undefined,
+        revenue_range: revenueRange || undefined,
+        employee_count: employeeCount || undefined,
+        categories,
+      })
+    } else {
+      await addTestimonial(menteeId, {
+        testimonial_date: testimonialDate,
+        description,
+        niche: niche || undefined,
+        revenue_range: revenueRange || undefined,
+        employee_count: employeeCount || undefined,
+        categories,
+      })
+    }
+
+    resetForm()
     setShowForm(false); setLoading(false)
     fetchData()
   }
@@ -960,7 +1005,7 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between">
         <p className="label-xs">Depoimentos ({items.length})</p>
-        <Button size="sm" variant="outline" onClick={() => setShowForm(!showForm)}>
+        <Button size="sm" variant="outline" onClick={() => { resetForm(); setShowForm(!showForm) }}>
           <Plus className="mr-1 h-3 w-3" /> Registrar
         </Button>
       </div>
@@ -1007,14 +1052,52 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
               ))}
             </div>
           </div>
-          <Button type="submit" size="sm" disabled={loading}>
-            {loading ? 'Salvando...' : 'Salvar'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button type="submit" size="sm" disabled={loading}>
+              {loading ? 'Salvando...' : editingId ? 'Atualizar' : 'Salvar'}
+            </Button>
+            {editingId && (
+              <Button type="button" size="sm" variant="ghost" onClick={handleCancelForm}>
+                Cancelar
+              </Button>
+            )}
+          </div>
         </form>
       )}
       {items.map((item) => (
-        <div key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
-          <div className="flex items-center justify-between">
+        <div key={item.id} className="relative rounded-lg border border-border bg-card p-3 text-sm group">
+          <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              type="button"
+              onClick={() => handleEdit(item)}
+              className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title="Editar"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDeleteId(item.id)}
+              className="rounded p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              title="Excluir"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          {confirmDeleteId === item.id && (
+            <div className="mb-2 rounded-md bg-destructive/10 border border-destructive/20 p-2 flex items-center justify-between">
+              <p className="text-xs text-destructive">Tem certeza que deseja excluir este depoimento?</p>
+              <div className="flex items-center gap-1">
+                <Button size="sm" variant="destructive" className="h-6 text-xs px-2" onClick={() => handleDelete(item.id)} disabled={loading}>
+                  Excluir
+                </Button>
+                <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => setConfirmDeleteId(null)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
+          <div className="flex items-center justify-between pr-16">
             <p className="text-xs text-muted-foreground">{item.testimonial_date}</p>
             {item.niche && <Badge variant="outline" className="text-[10px]">{item.niche}</Badge>}
           </div>

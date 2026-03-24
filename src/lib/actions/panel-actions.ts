@@ -185,6 +185,49 @@ export async function addTestimonial(
   return { error: null }
 }
 
+export async function updateTestimonial(
+  testimonialId: string,
+  data: {
+    testimonial_date: string
+    description: string
+    niche?: string
+    revenue_range?: string
+    employee_count?: string
+    categories?: TestimonialCategory[]
+  }
+) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await supabase.from('testimonials').update({
+    testimonial_date: data.testimonial_date,
+    description: data.description,
+    niche: data.niche || null,
+    revenue_range: data.revenue_range || null,
+    employee_count: data.employee_count || null,
+    categories: data.categories ?? [],
+  }).eq('id', testimonialId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/etapas-iniciais')
+  revalidatePath('/etapas-mentoria')
+  return { error: null }
+}
+
+export async function deleteTestimonial(testimonialId: string) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await supabase.from('testimonials').delete().eq('id', testimonialId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/etapas-iniciais')
+  revalidatePath('/etapas-mentoria')
+  return { error: null }
+}
+
 export async function generateActionPlanLink(menteeId: string) {
   const supabase = createClient()
 

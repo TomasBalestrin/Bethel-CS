@@ -35,6 +35,7 @@ import {
   Briefcase,
   Pencil,
   Trash2,
+  Star,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -46,9 +47,12 @@ import {
   addObjective,
   addTestimonial,
   generateActionPlanLink,
+  toggleClienteFit,
+  addEngagementRecord,
+  addCallRecord,
 } from '@/lib/actions/panel-actions'
 import type { MenteeWithStats } from '@/types/kanban'
-import type { Database, TestimonialCategory } from '@/types/database'
+import type { Database, TestimonialCategory, EngagementType, CallType, RevenueType } from '@/types/database'
 
 type Indication = Database['public']['Tables']['indications']['Row']
 type IntensivoRecord = Database['public']['Tables']['intensivo_records']['Row']
@@ -57,6 +61,8 @@ type Objective = Database['public']['Tables']['objectives']['Row']
 type Testimonial = Database['public']['Tables']['testimonials']['Row']
 type ActionPlan = Database['public']['Tables']['action_plans']['Row']
 type Product = Database['public']['Tables']['products']['Row']
+type EngagementRecord = Database['public']['Tables']['engagement_records']['Row']
+type CallRecord = Database['public']['Tables']['call_records']['Row']
 
 // Currency mask helpers
 function formatCurrency(cents: number): string {
@@ -121,6 +127,7 @@ function PanelTabs({ mentee }: { mentee: MenteeWithStats }) {
         <TabsTrigger value="revenue">Receita</TabsTrigger>
         <TabsTrigger value="objectives">Objetivos</TabsTrigger>
         <TabsTrigger value="testimonials">Depoimentos</TabsTrigger>
+        <TabsTrigger value="engagement">Engajamento</TabsTrigger>
       </TabsList>
       <ScrollArea className="flex-1 px-6 py-4">
         <TabsContent value="info"><TabInfo mentee={mentee} /></TabsContent>
@@ -130,6 +137,7 @@ function PanelTabs({ mentee }: { mentee: MenteeWithStats }) {
         <TabsContent value="revenue"><TabRevenue menteeId={mentee.id} /></TabsContent>
         <TabsContent value="objectives"><TabObjectives menteeId={mentee.id} /></TabsContent>
         <TabsContent value="testimonials"><TabTestimonials menteeId={mentee.id} /></TabsContent>
+        <TabsContent value="engagement"><TabEngagement menteeId={mentee.id} /></TabsContent>
       </ScrollArea>
     </Tabs>
   )
@@ -188,6 +196,35 @@ function TabInfo({ mentee }: { mentee: MenteeWithStats }) {
           <span className="text-foreground">{mentee.funnel_origin}</span>
         </div>
       )}
+      <ClienteFitToggle menteeId={mentee.id} initialValue={mentee.cliente_fit} />
+    </div>
+  )
+}
+
+function ClienteFitToggle({ menteeId, initialValue }: { menteeId: string; initialValue: boolean }) {
+  const [fit, setFit] = useState(initialValue)
+  const [saving, setSaving] = useState(false)
+
+  async function handleToggle() {
+    setSaving(true)
+    const newValue = !fit
+    setFit(newValue)
+    await toggleClienteFit(menteeId, newValue)
+    setSaving(false)
+  }
+
+  return (
+    <div className="flex items-center gap-3 text-sm pt-2 border-t border-border mt-2">
+      <Star className={`h-4 w-4 shrink-0 ${fit ? 'text-warning fill-warning' : 'text-muted-foreground'}`} />
+      <span className="text-muted-foreground w-24 shrink-0">Cliente Fit</span>
+      <button
+        type="button"
+        onClick={handleToggle}
+        disabled={saving}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${fit ? 'bg-warning' : 'bg-muted'}`}
+      >
+        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${fit ? 'translate-x-6' : 'translate-x-1'}`} />
+      </button>
     </div>
   )
 }
@@ -423,6 +460,7 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
   const [saleCents, setSaleCents] = useState(0)
   const [entryCents, setEntryCents] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [revenueType, setRevenueType] = useState<RevenueType>('crossell')
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const supabase = createClient()
 
@@ -454,11 +492,12 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
 
   function resetForm() {
     setSelectedProduct(''); setCustomProductName('')
-    setSaleCents(0); setEntryCents(0)
+    setSaleCents(0); setEntryCents(0); setRevenueType('crossell')
     setEditingId(null); setShowForm(false)
   }
 
   function handleEdit(item: RevenueRecord) {
+    setRevenueType(item.revenue_type)
     const matchingProduct = products.find((p) => p.name === item.product_name)
     if (matchingProduct) {
       setSelectedProduct(matchingProduct.id)
@@ -492,12 +531,14 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
         product_name: resolvedProductName,
         sale_value: centsToDecimal(saleCents),
         entry_value: centsToDecimal(entryCents),
+        revenue_type: revenueType,
       })
     } else {
       await addRevenueRecord(menteeId, {
         product_name: resolvedProductName,
         sale_value: centsToDecimal(saleCents),
         entry_value: centsToDecimal(entryCents),
+        revenue_type: revenueType,
       })
     }
 
@@ -554,6 +595,18 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
               />
             </div>
           )}
+          <div className="space-y-1">
+            <Label>Tipo *</Label>
+            <Select value={revenueType} onValueChange={(v) => setRevenueType(v as RevenueType)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="crossell">Crossell</SelectItem>
+                <SelectItem value="upsell">Upsell (Ascensão)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="rev-sale">Valor de venda *</Label>
@@ -586,7 +639,12 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
       {items.map((item) => (
         <div key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
           <div className="flex items-center justify-between">
-            <p className="font-medium text-foreground">{item.product_name}</p>
+            <div className="flex items-center gap-2">
+              <p className="font-medium text-foreground">{item.product_name}</p>
+              <Badge variant={item.revenue_type === 'upsell' ? 'accent' : 'info'} className="text-[10px]">
+                {item.revenue_type === 'upsell' ? 'Upsell' : 'Crossell'}
+              </Badge>
+            </div>
             <div className="flex items-center gap-2">
               <span className="font-medium text-success tabular">
                 R$ {Number(item.sale_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
@@ -823,6 +881,216 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
           )}
         </div>
       ))}
+    </div>
+  )
+}
+
+// ─── Tab 8: Engajamento ───
+const ENGAGEMENT_LABELS: Record<EngagementType, string> = {
+  area_membros: 'Área de Membros',
+  mentoria_ao_vivo: 'Mentoria ao Vivo',
+  evento: 'Evento',
+  canal_especialista: 'Canal do Especialista',
+}
+
+const CALL_TYPE_LABELS: Record<CallType, string> = {
+  ligacao: 'Ligação',
+  whatsapp: 'WhatsApp',
+}
+
+function TabEngagement({ menteeId }: { menteeId: string }) {
+  const [engagements, setEngagements] = useState<EngagementRecord[]>([])
+  const [calls, setCalls] = useState<CallRecord[]>([])
+  const [showForm, setShowForm] = useState(false)
+  const [formMode, setFormMode] = useState<'engagement' | 'call'>('engagement')
+  // engagement fields
+  const [engType, setEngType] = useState<EngagementType>('area_membros')
+  const [engValue, setEngValue] = useState('')
+  const [responseTime, setResponseTime] = useState('')
+  const [engDate, setEngDate] = useState('')
+  // call fields
+  const [callType, setCallType] = useState<CallType>('ligacao')
+  const [callDuration, setCallDuration] = useState('')
+  const [callDate, setCallDate] = useState('')
+  const [loading, setLoading] = useState(false)
+  const supabase = createClient()
+
+  const fetchData = useCallback(() => {
+    supabase
+      .from('engagement_records')
+      .select('*')
+      .eq('mentee_id', menteeId)
+      .order('recorded_at', { ascending: false })
+      .then(({ data }) => { if (data) setEngagements(data) })
+    supabase
+      .from('call_records')
+      .select('*')
+      .eq('mentee_id', menteeId)
+      .order('recorded_at', { ascending: false })
+      .then(({ data }) => { if (data) setCalls(data) })
+  }, [menteeId, supabase])
+
+  useEffect(() => { fetchData() }, [fetchData])
+
+  async function handleSubmitEngagement(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    await addEngagementRecord(menteeId, {
+      type: engType,
+      value: parseFloat(engValue),
+      response_time_minutes: responseTime ? parseInt(responseTime, 10) : undefined,
+      recorded_at: engDate,
+    })
+    setEngValue(''); setResponseTime(''); setEngDate('')
+    setShowForm(false); setLoading(false)
+    fetchData()
+  }
+
+  async function handleSubmitCall(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    await addCallRecord(menteeId, {
+      duration_minutes: parseInt(callDuration, 10),
+      call_type: callType,
+      recorded_at: callDate,
+    })
+    setCallDuration(''); setCallDate('')
+    setShowForm(false); setLoading(false)
+    fetchData()
+  }
+
+  return (
+    <div className="space-y-4 animate-fade-in">
+      <div className="flex items-center justify-between">
+        <p className="label-xs">Engajamento & Ligações</p>
+        <Button size="sm" variant="outline" onClick={() => setShowForm(!showForm)}>
+          <Plus className="mr-1 h-3 w-3" /> Registrar
+        </Button>
+      </div>
+
+      {showForm && (
+        <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3">
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={formMode === 'engagement' ? 'default' : 'outline'}
+              onClick={() => setFormMode('engagement')}
+            >
+              Engajamento
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={formMode === 'call' ? 'default' : 'outline'}
+              onClick={() => setFormMode('call')}
+            >
+              Ligação / WhatsApp
+            </Button>
+          </div>
+
+          {formMode === 'engagement' ? (
+            <form onSubmit={handleSubmitEngagement} className="space-y-3">
+              <div className="space-y-1">
+                <Label>Tipo *</Label>
+                <Select value={engType} onValueChange={(v) => setEngType(v as EngagementType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="area_membros">Área de Membros</SelectItem>
+                    <SelectItem value="mentoria_ao_vivo">Mentoria ao Vivo</SelectItem>
+                    <SelectItem value="evento">Evento</SelectItem>
+                    <SelectItem value="canal_especialista">Canal do Especialista</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="eng-value">Valor / Quantidade *</Label>
+                  <Input id="eng-value" type="number" step="0.01" value={engValue} onChange={(e) => setEngValue(e.target.value)} required />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="eng-date">Data *</Label>
+                  <Input id="eng-date" type="date" value={engDate} onChange={(e) => setEngDate(e.target.value)} required />
+                </div>
+              </div>
+              {engType === 'canal_especialista' && (
+                <div className="space-y-1">
+                  <Label htmlFor="eng-response">Tempo de resposta (min)</Label>
+                  <Input id="eng-response" type="number" value={responseTime} onChange={(e) => setResponseTime(e.target.value)} />
+                </div>
+              )}
+              <Button type="submit" size="sm" disabled={loading}>
+                {loading ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={handleSubmitCall} className="space-y-3">
+              <div className="space-y-1">
+                <Label>Tipo *</Label>
+                <Select value={callType} onValueChange={(v) => setCallType(v as CallType)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ligacao">Ligação</SelectItem>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="call-duration">Duração (min) *</Label>
+                  <Input id="call-duration" type="number" value={callDuration} onChange={(e) => setCallDuration(e.target.value)} required />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="call-date">Data *</Label>
+                  <Input id="call-date" type="date" value={callDate} onChange={(e) => setCallDate(e.target.value)} required />
+                </div>
+              </div>
+              <Button type="submit" size="sm" disabled={loading}>
+                {loading ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </form>
+          )}
+        </div>
+      )}
+
+      {engagements.length > 0 && (
+        <div className="space-y-2">
+          <p className="label-xs text-muted-foreground">Engajamento</p>
+          {engagements.map((item) => (
+            <div key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
+              <div className="flex items-center justify-between">
+                <Badge variant="info" className="text-[10px]">{ENGAGEMENT_LABELS[item.type]}</Badge>
+                <span className="text-xs text-muted-foreground">{item.recorded_at}</span>
+              </div>
+              <p className="mt-1 text-foreground tabular">Valor: {Number(item.value)}</p>
+              {item.response_time_minutes && (
+                <p className="text-xs text-muted-foreground">Tempo de resposta: {item.response_time_minutes} min</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {calls.length > 0 && (
+        <div className="space-y-2">
+          <p className="label-xs text-muted-foreground">Ligações / WhatsApp</p>
+          {calls.map((item) => (
+            <div key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
+              <div className="flex items-center justify-between">
+                <Badge variant={item.call_type === 'whatsapp' ? 'success' : 'warning'} className="text-[10px]">
+                  {CALL_TYPE_LABELS[item.call_type]}
+                </Badge>
+                <span className="text-xs text-muted-foreground">{item.recorded_at}</span>
+              </div>
+              <p className="mt-1 text-foreground tabular">Duração: {item.duration_minutes} min</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {engagements.length === 0 && calls.length === 0 && (
+        <p className="text-sm text-muted-foreground">Nenhum registro de engajamento.</p>
+      )}
     </div>
   )
 }

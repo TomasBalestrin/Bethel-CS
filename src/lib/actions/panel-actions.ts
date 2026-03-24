@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import type { TestimonialCategory } from '@/types/database'
+import type { TestimonialCategory, EngagementType, CallType, RevenueType } from '@/types/database'
 
 export async function addIndication(
   menteeId: string,
@@ -60,6 +60,7 @@ export async function addRevenueRecord(
     product_name: string
     sale_value: number
     entry_value: number
+    revenue_type?: RevenueType
   }
 ) {
   const supabase = createClient()
@@ -71,6 +72,7 @@ export async function addRevenueRecord(
     product_name: data.product_name,
     sale_value: data.sale_value,
     entry_value: data.entry_value,
+    revenue_type: data.revenue_type ?? 'crossell',
     registered_by: user.id,
   })
 
@@ -86,6 +88,7 @@ export async function updateRevenueRecord(
     product_name: string
     sale_value: number
     entry_value: number
+    revenue_type?: RevenueType
   }
 ) {
   const supabase = createClient()
@@ -98,6 +101,7 @@ export async function updateRevenueRecord(
       product_name: data.product_name,
       sale_value: data.sale_value,
       entry_value: data.entry_value,
+      revenue_type: data.revenue_type ?? 'crossell',
     })
     .eq('id', recordId)
 
@@ -192,4 +196,97 @@ export async function generateActionPlanLink(menteeId: string) {
 
   if (!mentee) return { error: 'Mentorado não encontrado', token: null }
   return { error: null, token: mentee.action_plan_token }
+}
+
+export async function toggleClienteFit(menteeId: string, value: boolean) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await supabase
+    .from('mentees')
+    .update({ cliente_fit: value })
+    .eq('id', menteeId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/')
+  revalidatePath('/etapas-iniciais')
+  revalidatePath('/etapas-mentoria')
+  revalidatePath('/mentorados')
+  return { error: null }
+}
+
+export async function addEngagementRecord(
+  menteeId: string,
+  data: {
+    type: EngagementType
+    value: number
+    response_time_minutes?: number
+    recorded_at: string
+  }
+) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await supabase.from('engagement_records').insert({
+    mentee_id: menteeId,
+    type: data.type,
+    value: data.value,
+    response_time_minutes: data.response_time_minutes ?? null,
+    recorded_at: data.recorded_at,
+    created_by: user.id,
+  })
+
+  if (error) return { error: error.message }
+  revalidatePath('/')
+  return { error: null }
+}
+
+export async function addCallRecord(
+  menteeId: string,
+  data: {
+    duration_minutes: number
+    call_type: CallType
+    recorded_at: string
+  }
+) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await supabase.from('call_records').insert({
+    mentee_id: menteeId,
+    duration_minutes: data.duration_minutes,
+    call_type: data.call_type,
+    recorded_at: data.recorded_at,
+    created_by: user.id,
+  })
+
+  if (error) return { error: error.message }
+  revalidatePath('/')
+  return { error: null }
+}
+
+export async function addCancellation(
+  menteeId: string,
+  data: {
+    reason: string
+    cancelled_at: string
+  }
+) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await supabase.from('cancellations').insert({
+    mentee_id: menteeId,
+    reason: data.reason,
+    cancelled_at: data.cancelled_at,
+    created_by: user.id,
+  })
+
+  if (error) return { error: error.message }
+  revalidatePath('/')
+  return { error: null }
 }

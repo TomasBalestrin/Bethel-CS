@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Phone, Mail, MapPin } from 'lucide-react'
+import { Phone, Mail, MapPin, Star } from 'lucide-react'
 import { MenteePanel } from '@/components/kanban/mentee-panel'
 import type { Database } from '@/types/database'
 import type { MenteeWithStats } from '@/types/kanban'
@@ -73,7 +73,10 @@ export function MentoradosList({ mentees }: MentoradosListProps) {
           >
             <div className="flex items-start justify-between">
               <div>
-                <p className="font-medium text-foreground">{m.full_name}</p>
+                <p className="flex items-center gap-1 font-medium text-foreground">
+                  {m.cliente_fit && <Star className="h-3.5 w-3.5 text-warning fill-warning shrink-0" />}
+                  {m.full_name}
+                </p>
                 <p className="text-xs text-muted-foreground">{m.product_name}</p>
               </div>
               <Badge variant={PRIORITY_VARIANT[m.priority_level] ?? 'muted'}>

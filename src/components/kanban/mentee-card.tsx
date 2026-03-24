@@ -3,7 +3,7 @@
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { Badge } from '@/components/ui/badge'
-import { Phone, Users, DollarSign } from 'lucide-react'
+import { Phone, Users, DollarSign, Star } from 'lucide-react'
 import type { MenteeWithStats } from '@/types/kanban'
 
 const PRIORITY_CONFIG: Record<number, { label: string; variant: 'muted' | 'warning' | 'info' | 'success' | 'accent' }> = {
@@ -49,7 +49,8 @@ export function MenteeCard({ mentee, onClick }: MenteeCardProps) {
       className="cursor-grab rounded-lg border border-border bg-card p-3 shadow-card transition-shadow hover:shadow-md active:cursor-grabbing animate-fade-in"
     >
       <div className="flex items-start justify-between gap-2">
-        <h4 className="text-sm font-medium leading-tight text-foreground">
+        <h4 className="flex items-center gap-1 text-sm font-medium leading-tight text-foreground">
+          {mentee.cliente_fit && <Star className="h-3.5 w-3.5 text-warning fill-warning shrink-0" />}
           {mentee.full_name}
         </h4>
         <Badge variant={priority.variant} className="shrink-0 text-[10px]">

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Badge } from '@/components/ui/badge'
+import { formatDateBR } from '@/lib/format'
 import { Label } from '@/components/ui/label'
 import {
   Select,
@@ -123,7 +124,7 @@ export function TestimonialsList({ testimonials }: TestimonialsListProps) {
             <div className="flex items-start justify-between">
               <div>
                 <p className="font-medium text-foreground">{t.mentee_name}</p>
-                <p className="text-xs text-muted-foreground">{t.testimonial_date}</p>
+                <p className="text-xs text-muted-foreground">{formatDateBR(t.testimonial_date)}</p>
               </div>
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <MessageSquareQuote className="h-3 w-3" />

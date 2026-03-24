@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   Sheet,
   SheetContent,
@@ -26,20 +26,14 @@ import {
 import {
   Link2,
   Plus,
-  Calendar,
-  User,
-  Phone,
-  MapPin,
-  Mail,
   AtSign,
-  Briefcase,
   Pencil,
   Trash2,
-  Star,
   FileDown,
   Headphones,
   Users,
   DollarSign,
+  ChevronRight,
 } from 'lucide-react'
 import { formatDateBR } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
@@ -109,6 +103,9 @@ interface MenteePanelProps {
 
 export function MenteePanel({ mentee, open, onOpenChange, onMenteeDeleted, onMenteeUpdated }: MenteePanelProps) {
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     async function fetchRole() {
@@ -125,27 +122,72 @@ export function MenteePanel({ mentee, open, onOpenChange, onMenteeDeleted, onMen
     if (open) fetchRole()
   }, [open])
 
+  // Reset edit state when panel closes
+  useEffect(() => {
+    if (!open) setEditing(false)
+  }, [open])
+
+  async function handleDelete() {
+    if (!mentee) return
+    setDeleting(true)
+    const result = await deleteMentee(mentee.id)
+    setDeleting(false)
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      toast.success('Mentorado excluído')
+      setDeleteOpen(false)
+      onOpenChange(false)
+      onMenteeDeleted?.(mentee.id)
+    }
+  }
+
   if (!mentee) return null
 
+  const isAdmin = userRole === 'admin'
   const priorityLabel = `P${mentee.priority_level}`
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full min-w-[min(560px,100vw)] max-w-[680px] p-0">
+      <SheetContent className="w-full min-w-[min(580px,100vw)] max-w-[680px] p-0 sm:max-w-[680px]">
         <SheetHeader className="px-6 pt-6 pb-4">
-          <div className="flex items-center gap-2.5">
-            <SheetTitle className="font-heading font-semibold text-xl leading-tight">
-              {mentee.full_name}
-            </SheetTitle>
-            <Badge
-              variant={
-                ({ 1: 'muted', 2: 'warning', 3: 'info', 4: 'success', 5: 'accent' } as const)[
-                  mentee.priority_level
-                ] ?? 'muted'
-              }
-            >
-              {priorityLabel}
-            </Badge>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <SheetTitle className="font-heading font-semibold text-xl leading-tight truncate">
+                {mentee.full_name}
+              </SheetTitle>
+              <Badge
+                variant={
+                  ({ 1: 'muted', 2: 'warning', 3: 'info', 4: 'success', 5: 'accent' } as const)[
+                    mentee.priority_level
+                  ] ?? 'muted'
+                }
+              >
+                {priorityLabel}
+              </Badge>
+            </div>
+            {isAdmin && (
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setEditing((e) => !e)}
+                  className="text-xs h-7 px-2"
+                >
+                  <Pencil className="h-3 w-3 mr-1" />
+                  {editing ? 'Cancelar' : 'Editar'}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDeleteOpen(true)}
+                  className="text-xs h-7 px-2 text-destructive border-destructive/30 hover:bg-destructive/5"
+                >
+                  <Trash2 className="h-3 w-3 mr-1" />
+                  Excluir
+                </Button>
+              </div>
+            )}
           </div>
           <SheetDescription className="text-sm text-muted-foreground">
             {mentee.product_name}
@@ -168,54 +210,107 @@ export function MenteePanel({ mentee, open, onOpenChange, onMenteeDeleted, onMen
         <Separator />
         <PanelTabs
           mentee={mentee}
-          userRole={userRole}
-          onMenteeDeleted={(id) => {
-            onOpenChange(false)
-            onMenteeDeleted?.(id)
-          }}
+          editing={editing}
+          setEditing={setEditing}
           onMenteeUpdated={onMenteeUpdated}
         />
+
+        {/* Delete confirmation dialog */}
+        <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Excluir mentorado</DialogTitle>
+              <DialogDescription>
+                Tem certeza que deseja excluir {mentee.full_name}?
+                Esta ação não pode ser desfeita e removerá todos os dados associados.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="bg-destructive text-white hover:bg-destructive/90"
+              >
+                {deleting ? 'Excluindo...' : 'Sim, excluir'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </SheetContent>
     </Sheet>
   )
 }
 
-function PanelTabs({ mentee, userRole, onMenteeDeleted, onMenteeUpdated }: {
+// ─── Scrollable Tabs ───
+function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated }: {
   mentee: MenteeWithStats
-  userRole: string | null
-  onMenteeDeleted?: (menteeId: string) => void
+  editing: boolean
+  setEditing: (v: boolean) => void
   onMenteeUpdated?: (mentee: MenteeWithStats) => void
 }) {
+  const tabsRef = useRef<HTMLDivElement>(null)
+  const [showOverflow, setShowOverflow] = useState(false)
+
+  useEffect(() => {
+    function check() {
+      const el = tabsRef.current
+      if (!el) return
+      setShowOverflow(el.scrollWidth > el.clientWidth + 2)
+    }
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
   return (
-    <Tabs defaultValue="info" className="flex flex-col h-[calc(100vh-160px)]">
-      <div className="mx-6 mt-3 overflow-x-auto scrollbar-none">
-        <TabsList className="inline-flex items-center gap-1 border-b border-border min-w-max h-auto rounded-none bg-transparent p-0">
-          {[
-            { value: 'info', label: 'Info' },
-            { value: 'action-plan', label: 'Plano' },
-            { value: 'indications', label: 'Indicações' },
-            { value: 'intensivo', label: 'Intensivo' },
-            { value: 'revenue', label: 'Receita' },
-            { value: 'objectives', label: 'Objetivos' },
-            { value: 'testimonials', label: 'Depoimentos' },
-            { value: 'engagement', label: 'Engajamento' },
-          ].map((tab) => (
-            <TabsTrigger
-              key={tab.value}
-              value={tab.value}
-              className="rounded-none border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-accent data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-            >
-              {tab.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
+    <Tabs defaultValue="info" className="flex flex-col h-[calc(100vh-180px)]">
+      <div className="relative mx-6 mt-3">
+        <div
+          ref={tabsRef}
+          className="overflow-x-auto scrollbar-none"
+          onScroll={() => {
+            const el = tabsRef.current
+            if (!el) return
+            setShowOverflow(el.scrollLeft + el.clientWidth < el.scrollWidth - 2)
+          }}
+        >
+          <TabsList className="inline-flex items-center gap-1 border-b border-border min-w-max h-auto rounded-none bg-transparent p-0">
+            {[
+              { value: 'info', label: 'Info' },
+              { value: 'action-plan', label: 'Plano' },
+              { value: 'indications', label: 'Indicações' },
+              { value: 'intensivo', label: 'Intensivo' },
+              { value: 'revenue', label: 'Receita' },
+              { value: 'objectives', label: 'Objetivos' },
+              { value: 'testimonials', label: 'Depoimentos' },
+              { value: 'engagement', label: 'Engajamento' },
+            ].map((tab) => (
+              <TabsTrigger
+                key={tab.value}
+                value={tab.value}
+                className="whitespace-nowrap rounded-none border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-accent data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+              >
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
+        {showOverflow && (
+          <div className="absolute right-0 top-0 bottom-0 flex items-center pointer-events-none">
+            <div className="w-8 h-full bg-gradient-to-l from-background to-transparent" />
+            <ChevronRight size={14} className="text-muted-foreground -ml-4" />
+          </div>
+        )}
       </div>
       <ScrollArea className="flex-1 px-6 py-4">
         <TabsContent value="info">
           <TabInfo
             mentee={mentee}
-            userRole={userRole}
-            onMenteeDeleted={onMenteeDeleted}
+            editing={editing}
+            setEditing={setEditing}
             onMenteeUpdated={onMenteeUpdated}
           />
         </TabsContent>
@@ -231,19 +326,34 @@ function PanelTabs({ mentee, userRole, onMenteeDeleted, onMenteeUpdated }: {
   )
 }
 
+// ─── Info field row ───
+function InfoRow({ label, value, render }: { label: string; value?: string | null; render?: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between py-2 text-sm">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      {render ?? <span className={value ? 'text-foreground' : 'text-muted-foreground'}>{value || '—'}</span>}
+    </div>
+  )
+}
+
+// ─── Section header ───
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+      {children}
+    </h3>
+  )
+}
+
 // ─── Tab 1: Info Geral ───
-function TabInfo({ mentee, userRole, onMenteeDeleted, onMenteeUpdated }: {
+function TabInfo({ mentee, editing, setEditing, onMenteeUpdated }: {
   mentee: MenteeWithStats
-  userRole: string | null
-  onMenteeDeleted?: (menteeId: string) => void
+  editing: boolean
+  setEditing: (v: boolean) => void
   onMenteeUpdated?: (mentee: MenteeWithStats) => void
 }) {
-  const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [deleteOpen, setDeleteOpen] = useState(false)
-  const [deleting, setDeleting] = useState(false)
 
-  // Editable fields state
   const [form, setForm] = useState({
     full_name: mentee.full_name,
     phone: mentee.phone,
@@ -317,22 +427,9 @@ function TabInfo({ mentee, userRole, onMenteeDeleted, onMenteeUpdated }: {
     }
   }
 
-  async function handleDelete() {
-    setDeleting(true)
-    const result = await deleteMentee(mentee.id)
-    setDeleting(false)
-    if (result.error) {
-      toast.error(result.error)
-    } else {
-      toast.success('Mentorado excluído')
-      setDeleteOpen(false)
-      onMenteeDeleted?.(mentee.id)
-    }
-  }
-
-  const isAdmin = userRole === 'admin'
   const instHandle = (editing ? form.instagram : mentee.instagram)?.replace(/^@/, '') || null
 
+  // ─── Edit mode ───
   if (editing) {
     return (
       <div className="space-y-4 animate-fade-in">
@@ -399,122 +496,93 @@ function TabInfo({ mentee, userRole, onMenteeDeleted, onMenteeUpdated }: {
     )
   }
 
-  const fields: { icon: typeof User; label: string; value: string | null | undefined; render?: React.ReactNode }[] = [
-    { icon: User, label: 'Nome', value: mentee.full_name },
-    { icon: Phone, label: 'Telefone', value: mentee.phone },
-    { icon: Mail, label: 'Email', value: mentee.email },
-    {
-      icon: AtSign,
-      label: 'Instagram',
-      value: mentee.instagram,
-      render: instHandle ? (
-        <a
-          href={`https://instagram.com/${instHandle}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-accent hover:underline hover:opacity-80 transition-opacity inline-flex items-center gap-1"
-        >
-          <AtSign size={14} />
-          {instHandle}
-        </a>
-      ) : undefined,
-    },
-    { icon: MapPin, label: 'Cidade/Estado', value: [mentee.city, mentee.state].filter(Boolean).join(', ') },
-    { icon: Calendar, label: 'Nascimento', value: mentee.birth_date ? formatDateBR(mentee.birth_date) : null },
-    { icon: Briefcase, label: 'Produto', value: mentee.product_name },
-    { icon: Calendar, label: 'Início', value: mentee.start_date ? formatDateBR(mentee.start_date) : null },
-    { icon: Calendar, label: 'Término', value: mentee.end_date ? formatDateBR(mentee.end_date) : null },
-  ]
-
+  // ─── View mode — 2 column grouped layout ───
   return (
-    <div className="space-y-3 animate-fade-in">
-      {/* Admin action buttons */}
-      {isAdmin && (
-        <div className="flex gap-2 pb-2 border-b border-border">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setEditing(true)}
-            className="text-sm"
-          >
-            <Pencil className="h-3.5 w-3.5 mr-1.5" />
-            Editar
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setDeleteOpen(true)}
-            className="text-sm text-destructive border-destructive/30 hover:bg-destructive/5"
-          >
-            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-            Excluir
-          </Button>
-        </div>
-      )}
-
-      {fields.map(({ icon: Icon, label, value, render }) => (
-        value ? (
-          <div key={label} className="flex items-center gap-3 text-sm">
-            <Icon className="h-4 w-4 text-muted-foreground shrink-0" />
-            <span className="text-muted-foreground w-24 shrink-0">{label}</span>
-            {render ?? <span className="text-foreground">{value}</span>}
+    <div className="animate-fade-in space-y-5">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+        {/* Dados Pessoais */}
+        <div>
+          <SectionTitle>Dados Pessoais</SectionTitle>
+          <div className="divide-y divide-border/50">
+            <InfoRow label="Nome" value={mentee.full_name} />
+            <InfoRow label="CPF" value={mentee.cpf} />
+            <InfoRow label="Nascimento" value={mentee.birth_date ? formatDateBR(mentee.birth_date) : null} />
+            <InfoRow label="Telefone" value={mentee.phone} />
+            <InfoRow label="Email" value={mentee.email} />
+            <InfoRow
+              label="Instagram"
+              value={mentee.instagram}
+              render={
+                instHandle ? (
+                  <a
+                    href={`https://instagram.com/${instHandle}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-accent hover:underline hover:opacity-80 transition-opacity inline-flex items-center gap-1 text-sm"
+                  >
+                    <AtSign size={14} />
+                    {instHandle}
+                  </a>
+                ) : (
+                  <span className="text-muted-foreground text-sm">—</span>
+                )
+              }
+            />
+            <InfoRow label="Cidade/Estado" value={[mentee.city, mentee.state].filter(Boolean).join(', ') || null} />
           </div>
-        ) : null
-      ))}
-      {mentee.cpf && (
-        <div className="flex items-center gap-3 text-sm">
-          <User className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="text-muted-foreground w-24 shrink-0">CPF</span>
-          <span className="text-foreground">{mentee.cpf}</span>
         </div>
-      )}
-      {mentee.has_partner && mentee.partner_name && (
-        <div className="flex items-center gap-3 text-sm">
-          <User className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="text-muted-foreground w-24 shrink-0">Sócio</span>
-          <span className="text-foreground">{mentee.partner_name}</span>
-        </div>
-      )}
-      {mentee.seller_name && (
-        <div className="flex items-center gap-3 text-sm">
-          <Briefcase className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="text-muted-foreground w-24 shrink-0">Vendedor</span>
-          <span className="text-foreground">{mentee.seller_name}</span>
-        </div>
-      )}
-      {mentee.funnel_origin && (
-        <div className="flex items-center gap-3 text-sm">
-          <Briefcase className="h-4 w-4 text-muted-foreground shrink-0" />
-          <span className="text-muted-foreground w-24 shrink-0">Funil</span>
-          <span className="text-foreground">{mentee.funnel_origin}</span>
-        </div>
-      )}
-      <ClienteFitToggle menteeId={mentee.id} initialValue={mentee.cliente_fit} />
 
-      {/* Delete confirmation dialog */}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Excluir mentorado</DialogTitle>
-            <DialogDescription>
-              Tem certeza que deseja excluir {mentee.full_name}?
-              Esta ação não pode ser desfeita e removerá todos os dados associados.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleDelete}
-              disabled={deleting}
-              className="bg-destructive text-white hover:bg-destructive/90"
+        {/* Dados da Mentoria */}
+        <div>
+          <SectionTitle>Dados da Mentoria</SectionTitle>
+          <div className="divide-y divide-border/50">
+            <InfoRow label="Produto" value={mentee.product_name} />
+            <InfoRow label="Início" value={mentee.start_date ? formatDateBR(mentee.start_date) : null} />
+            <InfoRow label="Término" value={mentee.end_date ? formatDateBR(mentee.end_date) : null} />
+            <InfoRow label="Vendedor" value={mentee.seller_name} />
+            <InfoRow label="Funil" value={mentee.funnel_origin} />
+            <InfoRow label="Status" value={
+              mentee.status === 'ativo' ? 'Ativo' :
+              mentee.status === 'cancelado' ? 'Cancelado' :
+              mentee.status === 'concluido' ? 'Concluído' : mentee.status
+            } />
+          </div>
+        </div>
+      </div>
+
+      {/* Sociedade — only if has_partner */}
+      {mentee.has_partner && (
+        <div className="border-t border-border/50 pt-4">
+          <SectionTitle>Sociedade</SectionTitle>
+          <div className="divide-y divide-border/50">
+            <InfoRow label="Entrou com sócio" value="Sim" />
+            <InfoRow label="Nome do sócio" value={mentee.partner_name} />
+          </div>
+        </div>
+      )}
+
+      {/* Classificação */}
+      <div className="border-t border-border/50 pt-4">
+        <SectionTitle>Classificação</SectionTitle>
+        <div className="divide-y divide-border/50">
+          <div className="flex items-center justify-between py-2 text-sm">
+            <span className="text-xs text-muted-foreground">Nível de prioridade</span>
+            <Badge
+              variant={
+                ({ 1: 'muted', 2: 'warning', 3: 'info', 4: 'success', 5: 'accent' } as const)[
+                  mentee.priority_level
+                ] ?? 'muted'
+              }
             >
-              {deleting ? 'Excluindo...' : 'Sim, excluir'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              P{mentee.priority_level}
+            </Badge>
+          </div>
+          <div className="flex items-center justify-between py-2 text-sm">
+            <span className="text-xs text-muted-foreground">Cliente Fit</span>
+            <ClienteFitToggle menteeId={mentee.id} initialValue={mentee.cliente_fit} />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -546,18 +614,14 @@ function ClienteFitToggle({ menteeId, initialValue }: { menteeId: string; initia
   }
 
   return (
-    <div className="flex items-center gap-3 text-sm pt-2 border-t border-border mt-2">
-      <Star className={`h-4 w-4 shrink-0 ${fit ? 'text-warning fill-warning' : 'text-muted-foreground'}`} />
-      <span className="text-muted-foreground w-24 shrink-0">Cliente Fit</span>
-      <button
-        type="button"
-        onClick={handleToggle}
-        disabled={saving}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${fit ? 'bg-warning' : 'bg-muted'}`}
-      >
-        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${fit ? 'translate-x-6' : 'translate-x-1'}`} />
-      </button>
-    </div>
+    <button
+      type="button"
+      onClick={handleToggle}
+      disabled={saving}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${fit ? 'bg-warning' : 'bg-muted'}`}
+    >
+      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${fit ? 'translate-x-6' : 'translate-x-1'}`} />
+    </button>
   )
 }
 

@@ -37,6 +37,9 @@ import {
   Trash2,
   Star,
   FileDown,
+  Headphones,
+  Users,
+  DollarSign,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -93,12 +96,16 @@ interface MenteePanelProps {
 export function MenteePanel({ mentee, open, onOpenChange }: MenteePanelProps) {
   if (!mentee) return null
 
+  const priorityLabel = `P${mentee.priority_level}`
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full max-w-2xl p-0">
+      <SheetContent className="w-full min-w-[min(560px,100vw)] max-w-[680px] p-0">
         <SheetHeader className="px-6 pt-6 pb-4">
-          <div className="flex items-center gap-3">
-            <SheetTitle>{mentee.full_name}</SheetTitle>
+          <div className="flex items-center gap-2.5">
+            <SheetTitle className="font-heading font-semibold text-xl leading-tight">
+              {mentee.full_name}
+            </SheetTitle>
             <Badge
               variant={
                 ({ 1: 'muted', 2: 'warning', 3: 'info', 4: 'success', 5: 'accent' } as const)[
@@ -106,10 +113,26 @@ export function MenteePanel({ mentee, open, onOpenChange }: MenteePanelProps) {
                 ] ?? 'muted'
               }
             >
-              Nível {mentee.priority_level}
+              {priorityLabel}
             </Badge>
           </div>
-          <SheetDescription>{mentee.product_name}</SheetDescription>
+          <SheetDescription className="text-sm text-muted-foreground">
+            {mentee.product_name}
+          </SheetDescription>
+          <div className="flex items-center gap-3 pt-1 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1">
+              <Headphones size={12} />
+              {mentee.attendance_count} atendimentos
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <Users size={12} />
+              {mentee.indication_count} indicações
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <DollarSign size={12} />
+              R$ {(mentee.revenue_total / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} receita nova
+            </span>
+          </div>
         </SheetHeader>
         <Separator />
         <PanelTabs mentee={mentee} />
@@ -120,17 +143,29 @@ export function MenteePanel({ mentee, open, onOpenChange }: MenteePanelProps) {
 
 function PanelTabs({ mentee }: { mentee: MenteeWithStats }) {
   return (
-    <Tabs defaultValue="info" className="flex flex-col h-[calc(100vh-120px)]">
-      <TabsList className="mx-6 mt-4 flex-wrap h-auto gap-1 justify-start">
-        <TabsTrigger value="info">Info</TabsTrigger>
-        <TabsTrigger value="action-plan">Plano</TabsTrigger>
-        <TabsTrigger value="indications">Indicações</TabsTrigger>
-        <TabsTrigger value="intensivo">Intensivo</TabsTrigger>
-        <TabsTrigger value="revenue">Receita</TabsTrigger>
-        <TabsTrigger value="objectives">Objetivos</TabsTrigger>
-        <TabsTrigger value="testimonials">Depoimentos</TabsTrigger>
-        <TabsTrigger value="engagement">Engajamento</TabsTrigger>
-      </TabsList>
+    <Tabs defaultValue="info" className="flex flex-col h-[calc(100vh-160px)]">
+      <div className="mx-6 mt-3 overflow-x-auto scrollbar-none">
+        <TabsList className="inline-flex items-center gap-1 border-b border-border min-w-max h-auto rounded-none bg-transparent p-0">
+          {[
+            { value: 'info', label: 'Info' },
+            { value: 'action-plan', label: 'Plano' },
+            { value: 'indications', label: 'Indicações' },
+            { value: 'intensivo', label: 'Intensivo' },
+            { value: 'revenue', label: 'Receita' },
+            { value: 'objectives', label: 'Objetivos' },
+            { value: 'testimonials', label: 'Depoimentos' },
+            { value: 'engagement', label: 'Engajamento' },
+          ].map((tab) => (
+            <TabsTrigger
+              key={tab.value}
+              value={tab.value}
+              className="rounded-none border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-accent data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            >
+              {tab.label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </div>
       <ScrollArea className="flex-1 px-6 py-4">
         <TabsContent value="info"><TabInfo mentee={mentee} /></TabsContent>
         <TabsContent value="action-plan"><TabActionPlan mentee={mentee} /></TabsContent>

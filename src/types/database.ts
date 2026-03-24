@@ -9,9 +9,11 @@ export type Json =
 export type UserRole = 'admin' | 'especialista'
 export type KanbanType = 'initial' | 'mentorship'
 export type AttachmentType = 'photo' | 'video'
-export type EngagementType = 'area_membros' | 'mentoria_ao_vivo' | 'evento' | 'canal_especialista'
+export type EngagementType = 'aula' | 'live' | 'evento' | 'whatsapp_contato'
+export type CsActivityType = 'ligacao' | 'whatsapp'
 export type CallType = 'ligacao' | 'whatsapp'
-export type RevenueType = 'crossell' | 'upsell'
+export type MenteeStatus = 'ativo' | 'cancelado' | 'concluido'
+export type RevenueType = 'crossell' | 'upsell' | 'indicacao_perpetuo' | 'indicacao_intensivo' | 'indicacao_encontro'
 export type TestimonialCategory =
   | 'aumento_faturamento'
   | 'vida_pessoal'
@@ -97,6 +99,7 @@ export interface Database {
           kanban_type: KanbanType
           action_plan_token: string
           cliente_fit: boolean
+          status: MenteeStatus
           created_by: string | null
           created_at: string
           updated_at: string
@@ -124,6 +127,7 @@ export interface Database {
           kanban_type?: KanbanType
           action_plan_token?: string
           cliente_fit?: boolean
+          status?: MenteeStatus
           created_by?: string | null
           created_at?: string
           updated_at?: string
@@ -149,6 +153,7 @@ export interface Database {
           current_stage_id?: string | null
           kanban_type?: KanbanType
           cliente_fit?: boolean
+          status?: MenteeStatus
           created_by?: string | null
           updated_at?: string
         }
@@ -376,30 +381,30 @@ export interface Database {
         Row: {
           id: string
           mentee_id: string
+          specialist_id: string | null
           type: EngagementType
           value: number
-          response_time_minutes: number | null
+          notes: string | null
           recorded_at: string
-          created_by: string | null
           created_at: string
         }
         Insert: {
           id?: string
           mentee_id: string
+          specialist_id?: string | null
           type: EngagementType
           value: number
-          response_time_minutes?: number | null
+          notes?: string | null
           recorded_at: string
-          created_by?: string | null
           created_at?: string
         }
         Update: {
           mentee_id?: string
+          specialist_id?: string | null
           type?: EngagementType
           value?: number
-          response_time_minutes?: number | null
+          notes?: string | null
           recorded_at?: string
-          created_by?: string | null
         }
         Relationships: []
       }
@@ -428,6 +433,37 @@ export interface Database {
           call_type?: CallType
           recorded_at?: string
           created_by?: string | null
+        }
+        Relationships: []
+      }
+      cs_activities: {
+        Row: {
+          id: string
+          mentee_id: string
+          specialist_id: string | null
+          type: CsActivityType
+          duration_minutes: number
+          notes: string | null
+          activity_date: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          mentee_id: string
+          specialist_id?: string | null
+          type: CsActivityType
+          duration_minutes: number
+          notes?: string | null
+          activity_date: string
+          created_at?: string
+        }
+        Update: {
+          mentee_id?: string
+          specialist_id?: string | null
+          type?: CsActivityType
+          duration_minutes?: number
+          notes?: string | null
+          activity_date?: string
         }
         Relationships: []
       }

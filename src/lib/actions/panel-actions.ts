@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
-import type { TestimonialCategory, EngagementType, CallType, RevenueType } from '@/types/database'
+import type { TestimonialCategory, EngagementType, CsActivityType, RevenueType } from '@/types/database'
 
 export async function addIndication(
   menteeId: string,
@@ -221,7 +221,7 @@ export async function addEngagementRecord(
   data: {
     type: EngagementType
     value: number
-    response_time_minutes?: number
+    notes?: string
     recorded_at: string
   }
 ) {
@@ -231,11 +231,11 @@ export async function addEngagementRecord(
 
   const { error } = await supabase.from('engagement_records').insert({
     mentee_id: menteeId,
+    specialist_id: user.id,
     type: data.type,
     value: data.value,
-    response_time_minutes: data.response_time_minutes ?? null,
+    notes: data.notes ?? null,
     recorded_at: data.recorded_at,
-    created_by: user.id,
   })
 
   if (error) return { error: error.message }
@@ -243,47 +243,26 @@ export async function addEngagementRecord(
   return { error: null }
 }
 
-export async function addCallRecord(
+export async function addCsActivity(
   menteeId: string,
   data: {
+    type: CsActivityType
     duration_minutes: number
-    call_type: CallType
-    recorded_at: string
+    notes?: string
+    activity_date: string
   }
 ) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autenticado' }
 
-  const { error } = await supabase.from('call_records').insert({
+  const { error } = await supabase.from('cs_activities').insert({
     mentee_id: menteeId,
+    specialist_id: user.id,
+    type: data.type,
     duration_minutes: data.duration_minutes,
-    call_type: data.call_type,
-    recorded_at: data.recorded_at,
-    created_by: user.id,
-  })
-
-  if (error) return { error: error.message }
-  revalidatePath('/')
-  return { error: null }
-}
-
-export async function addCancellation(
-  menteeId: string,
-  data: {
-    reason: string
-    cancelled_at: string
-  }
-) {
-  const supabase = createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { error: 'Não autenticado' }
-
-  const { error } = await supabase.from('cancellations').insert({
-    mentee_id: menteeId,
-    reason: data.reason,
-    cancelled_at: data.cancelled_at,
-    created_by: user.id,
+    notes: data.notes ?? null,
+    activity_date: data.activity_date,
   })
 
   if (error) return { error: error.message }

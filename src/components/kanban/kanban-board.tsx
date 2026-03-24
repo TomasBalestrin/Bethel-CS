@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -39,6 +39,11 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const [mentees, setMentees] = useState<MenteeWithStats[]>(initialMentees)
   const [activeId, setActiveId] = useState<string | null>(null)
+
+  // Sync local state when server data changes (e.g. after router.refresh())
+  useEffect(() => {
+    setMentees(initialMentees)
+  }, [initialMentees])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedMentee, setSelectedMentee] = useState<MenteeWithStats | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)

@@ -36,6 +36,7 @@ import {
   Pencil,
   Trash2,
   Star,
+  FileDown,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
@@ -229,11 +230,77 @@ function ClienteFitToggle({ menteeId, initialValue }: { menteeId: string; initia
 }
 
 // ─── Tab 2: Plano de Ação ───
+
+const ACTION_PLAN_LABELS: Record<string, string> = {
+  endereco_completo: 'Endereço completo',
+  como_nos_conheceu: 'Por onde nos conheceu',
+  motivacao_elite_premium: 'Por que decidiu entrar na Elite Premium',
+  expectativas_resultados: 'Expectativas de resultado',
+  atuacao_profissional: 'Atuação profissional',
+  tempo_atuacao: 'Tempo de atuação',
+  produtos_servicos: 'Principais produtos/serviços',
+  funis_venda: 'Funis de venda ativos',
+  processo_venda: 'Processo de venda',
+  media_faturamento: 'Faturamento médio mensal',
+  resultado_funis: 'Resultado por funil',
+  erros_identificados: 'Erros identificados',
+  desafios_funis: 'Principais desafios',
+  funis_testados: 'Funis testados sem resultado',
+  estrutura_comercial: 'Estrutura comercial',
+  estrutura_marketing: 'Estrutura de marketing',
+  entrega_produto: 'Entrega do produto/serviço',
+  estrutura_gestao: 'Estrutura de gestão',
+  equipe: 'Equipe',
+  momento_negocio: 'Momento do negócio',
+  objetivos_urgentes: 'Objetivos urgentes',
+  visao_futuro: 'Visão de futuro (6m, 1a, 5a)',
+}
+
+const PILL_KEYS = new Set(['como_nos_conheceu'])
+
+function ActionPlanResponseView({ data }: { data: Record<string, unknown> }) {
+  const keys = Object.keys(ACTION_PLAN_LABELS)
+
+  return (
+    <div className="space-y-0 divide-y divide-border/60">
+      {keys.map((key) => {
+        const value = data[key]
+        if (value === undefined || value === null || value === '') return null
+        const label = ACTION_PLAN_LABELS[key]
+        const isPill = PILL_KEYS.has(key)
+
+        return (
+          <div key={key} className="py-4 first:pt-0">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
+              {label}
+            </p>
+            {isPill && Array.isArray(value) ? (
+              <div className="flex flex-wrap gap-1.5">
+                {value.map((v: string) => (
+                  <span
+                    key={v}
+                    className="inline-flex items-center rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-medium text-accent"
+                  >
+                    {v}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-foreground whitespace-pre-wrap">{String(value)}</p>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
   const [token, setToken] = useState<string | null>(null)
   const [plan, setPlan] = useState<ActionPlan | null>(null)
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -259,18 +326,98 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  async function handleExportPdf() {
+    setExporting(true)
+    try {
+      const { default: jsPDF } = await import('jspdf')
+      const { default: html2canvas } = await import('html2canvas')
+
+      const el = document.getElementById('action-plan-content')
+      if (!el) return
+
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+      })
+
+      const imgWidth = 190
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      const pdf = new jsPDF('p', 'mm', 'a4')
+
+      // Header
+      pdf.setFontSize(16)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text(mentee.full_name, 10, 15)
+      pdf.setFontSize(10)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(100, 100, 100)
+      pdf.text(`${mentee.product_name ?? ''} — Preenchido em ${plan?.submitted_at ? new Date(plan.submitted_at).toLocaleDateString('pt-BR') : '—'}`, 10, 22)
+      pdf.setTextColor(0, 0, 0)
+
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const startY = 28
+      let heightLeft = imgHeight
+      let position = startY
+
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 10, position, imgWidth, imgHeight)
+      heightLeft -= (pageHeight - startY)
+
+      while (heightLeft > 0) {
+        position = position - pageHeight + startY
+        pdf.addPage()
+        pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 10, position, imgWidth, imgHeight)
+        heightLeft -= pageHeight
+      }
+
+      // Footer on every page
+      const totalPages = pdf.getNumberOfPages()
+      for (let i = 1; i <= totalPages; i++) {
+        pdf.setPage(i)
+        pdf.setFontSize(8)
+        pdf.setTextColor(150, 150, 150)
+        pdf.text('Bethel CS — Confidencial', 10, pageHeight - 8)
+      }
+
+      pdf.save(`plano-acao-${mentee.full_name.replace(/\s+/g, '-').toLowerCase()}.pdf`)
+    } catch {
+      // silently fail
+    } finally {
+      setExporting(false)
+    }
+  }
+
   const link = token
     ? `${window.location.origin}/form/action-plan/${token}`
     : null
 
+  const planData = plan?.data as Record<string, unknown> | null
+
   return (
     <div className="space-y-4 animate-fade-in">
       {plan?.submitted_at ? (
-        <div className="space-y-3">
-          <Badge variant="success">Preenchido</Badge>
-          <pre className="rounded-md bg-muted p-4 text-xs overflow-auto">
-            {JSON.stringify(plan.data, null, 2)}
-          </pre>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <Badge variant="success">
+              Preenchido em {new Date(plan.submitted_at).toLocaleDateString('pt-BR')}
+            </Badge>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleExportPdf}
+              disabled={exporting}
+              className="text-xs gap-1.5"
+            >
+              <FileDown className="h-3.5 w-3.5" />
+              {exporting ? 'Gerando...' : 'Exportar PDF'}
+            </Button>
+          </div>
+          <div
+            id="action-plan-content"
+            className="rounded-lg bg-white p-5"
+          >
+            {planData && <ActionPlanResponseView data={planData} />}
+          </div>
         </div>
       ) : (
         <div className="space-y-3">

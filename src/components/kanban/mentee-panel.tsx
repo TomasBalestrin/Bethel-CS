@@ -33,12 +33,16 @@ import {
   Mail,
   AtSign,
   Briefcase,
+  Pencil,
+  Trash2,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import {
   addIndication,
   addIntensivoRecord,
   addRevenueRecord,
+  updateRevenueRecord,
+  deleteRevenueRecord,
   addObjective,
   addTestimonial,
   generateActionPlanLink,
@@ -413,11 +417,13 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
   const [items, setItems] = useState<RevenueRecord[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [selectedProduct, setSelectedProduct] = useState('')
   const [customProductName, setCustomProductName] = useState('')
   const [saleCents, setSaleCents] = useState(0)
   const [entryCents, setEntryCents] = useState(0)
   const [loading, setLoading] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const supabase = createClient()
 
   const fetchData = useCallback(() => {
@@ -446,18 +452,57 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
       ? customProductName
       : products.find((p) => p.id === selectedProduct)?.name ?? ''
 
+  function resetForm() {
+    setSelectedProduct(''); setCustomProductName('')
+    setSaleCents(0); setEntryCents(0)
+    setEditingId(null); setShowForm(false)
+  }
+
+  function handleEdit(item: RevenueRecord) {
+    const matchingProduct = products.find((p) => p.name === item.product_name)
+    if (matchingProduct) {
+      setSelectedProduct(matchingProduct.id)
+      setCustomProductName('')
+    } else {
+      setSelectedProduct('__outro__')
+      setCustomProductName(item.product_name)
+    }
+    setSaleCents(Math.round(Number(item.sale_value) * 100))
+    setEntryCents(Math.round(Number(item.entry_value) * 100))
+    setEditingId(item.id)
+    setShowForm(true)
+  }
+
+  async function handleDelete(recordId: string) {
+    const confirmed = window.confirm('Excluir este registro de receita?')
+    if (!confirmed) return
+    setDeletingId(recordId)
+    await deleteRevenueRecord(recordId)
+    setDeletingId(null)
+    fetchData()
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!resolvedProductName) return
     setLoading(true)
-    await addRevenueRecord(menteeId, {
-      product_name: resolvedProductName,
-      sale_value: centsToDecimal(saleCents),
-      entry_value: centsToDecimal(entryCents),
-    })
-    setSelectedProduct(''); setCustomProductName('')
-    setSaleCents(0); setEntryCents(0)
-    setShowForm(false); setLoading(false)
+
+    if (editingId) {
+      await updateRevenueRecord(editingId, {
+        product_name: resolvedProductName,
+        sale_value: centsToDecimal(saleCents),
+        entry_value: centsToDecimal(entryCents),
+      })
+    } else {
+      await addRevenueRecord(menteeId, {
+        product_name: resolvedProductName,
+        sale_value: centsToDecimal(saleCents),
+        entry_value: centsToDecimal(entryCents),
+      })
+    }
+
+    setLoading(false)
+    resetForm()
     fetchData()
   }
 
@@ -470,12 +515,20 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
             R$ {totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </p>
         </div>
-        <Button size="sm" variant="outline" onClick={() => setShowForm(!showForm)}>
+        <Button size="sm" variant="outline" onClick={() => { resetForm(); setShowForm(!showForm) }}>
           <Plus className="mr-1 h-3 w-3" /> Registrar
         </Button>
       </div>
       {showForm && (
         <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-border bg-muted/50 p-4">
+          <div className="flex items-center justify-between">
+            <p className="label-xs">{editingId ? 'Editar registro' : 'Novo registro'}</p>
+            {editingId && (
+              <Button type="button" size="sm" variant="ghost" onClick={resetForm} className="text-xs text-muted-foreground">
+                Cancelar edição
+              </Button>
+            )}
+          </div>
           <div className="space-y-1">
             <Label>Produto *</Label>
             <Select value={selectedProduct} onValueChange={setSelectedProduct}>
@@ -526,7 +579,7 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
             </div>
           </div>
           <Button type="submit" size="sm" disabled={loading || !resolvedProductName}>
-            {loading ? 'Salvando...' : 'Salvar'}
+            {loading ? 'Salvando...' : editingId ? 'Atualizar' : 'Salvar'}
           </Button>
         </form>
       )}
@@ -534,9 +587,28 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
         <div key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
           <div className="flex items-center justify-between">
             <p className="font-medium text-foreground">{item.product_name}</p>
-            <span className="font-medium text-success tabular">
-              R$ {Number(item.sale_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-success tabular">
+                R$ {Number(item.sale_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </span>
+              <button
+                type="button"
+                onClick={() => handleEdit(item)}
+                className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
+                title="Editar"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDelete(item.id)}
+                disabled={deletingId === item.id}
+                className="rounded p-1 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
+                title="Excluir"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
           </div>
           <p className="text-xs text-muted-foreground tabular">
             Entrada: R$ {Number(item.entry_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}

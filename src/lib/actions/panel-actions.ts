@@ -80,6 +80,49 @@ export async function addRevenueRecord(
   return { error: null }
 }
 
+export async function updateRevenueRecord(
+  recordId: string,
+  data: {
+    product_name: string
+    sale_value: number
+    entry_value: number
+  }
+) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await supabase
+    .from('revenue_records')
+    .update({
+      product_name: data.product_name,
+      sale_value: data.sale_value,
+      entry_value: data.entry_value,
+    })
+    .eq('id', recordId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/etapas-iniciais')
+  revalidatePath('/etapas-mentoria')
+  return { error: null }
+}
+
+export async function deleteRevenueRecord(recordId: string) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await supabase
+    .from('revenue_records')
+    .delete()
+    .eq('id', recordId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/etapas-iniciais')
+  revalidatePath('/etapas-mentoria')
+  return { error: null }
+}
+
 export async function addObjective(
   menteeId: string,
   data: {

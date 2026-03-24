@@ -49,10 +49,10 @@ import {
   generateActionPlanLink,
   toggleClienteFit,
   addEngagementRecord,
-  addCallRecord,
+  addCsActivity,
 } from '@/lib/actions/panel-actions'
 import type { MenteeWithStats } from '@/types/kanban'
-import type { Database, TestimonialCategory, EngagementType, CallType, RevenueType } from '@/types/database'
+import type { Database, TestimonialCategory, EngagementType, CsActivityType, RevenueType } from '@/types/database'
 
 type Indication = Database['public']['Tables']['indications']['Row']
 type IntensivoRecord = Database['public']['Tables']['intensivo_records']['Row']
@@ -62,7 +62,6 @@ type Testimonial = Database['public']['Tables']['testimonials']['Row']
 type ActionPlan = Database['public']['Tables']['action_plans']['Row']
 type Product = Database['public']['Tables']['products']['Row']
 type EngagementRecord = Database['public']['Tables']['engagement_records']['Row']
-type CallRecord = Database['public']['Tables']['call_records']['Row']
 
 // Currency mask helpers
 function formatCurrency(cents: number): string {
@@ -604,6 +603,9 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
               <SelectContent>
                 <SelectItem value="crossell">Crossell</SelectItem>
                 <SelectItem value="upsell">Upsell (Ascensão)</SelectItem>
+                <SelectItem value="indicacao_perpetuo">Indicação Perpétuo</SelectItem>
+                <SelectItem value="indicacao_intensivo">Indicação Intensivo</SelectItem>
+                <SelectItem value="indicacao_encontro">Indicação Encontro Elite</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -887,31 +889,34 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
 
 // ─── Tab 8: Engajamento ───
 const ENGAGEMENT_LABELS: Record<EngagementType, string> = {
-  area_membros: 'Área de Membros',
-  mentoria_ao_vivo: 'Mentoria ao Vivo',
+  aula: 'Área de Membros (Mentorfy)',
+  live: 'Mentoria ao Vivo',
   evento: 'Evento',
-  canal_especialista: 'Canal do Especialista',
+  whatsapp_contato: 'Canal do Especialista',
 }
 
-const CALL_TYPE_LABELS: Record<CallType, string> = {
+const CS_ACTIVITY_LABELS: Record<CsActivityType, string> = {
   ligacao: 'Ligação',
   whatsapp: 'WhatsApp',
 }
 
+type CsActivity = Database['public']['Tables']['cs_activities']['Row']
+
 function TabEngagement({ menteeId }: { menteeId: string }) {
   const [engagements, setEngagements] = useState<EngagementRecord[]>([])
-  const [calls, setCalls] = useState<CallRecord[]>([])
+  const [activities, setActivities] = useState<CsActivity[]>([])
   const [showForm, setShowForm] = useState(false)
-  const [formMode, setFormMode] = useState<'engagement' | 'call'>('engagement')
+  const [formMode, setFormMode] = useState<'engagement' | 'cs'>('engagement')
   // engagement fields
-  const [engType, setEngType] = useState<EngagementType>('area_membros')
+  const [engType, setEngType] = useState<EngagementType>('aula')
   const [engValue, setEngValue] = useState('')
-  const [responseTime, setResponseTime] = useState('')
+  const [engNotes, setEngNotes] = useState('')
   const [engDate, setEngDate] = useState('')
-  // call fields
-  const [callType, setCallType] = useState<CallType>('ligacao')
-  const [callDuration, setCallDuration] = useState('')
-  const [callDate, setCallDate] = useState('')
+  // cs activity fields
+  const [csType, setCsType] = useState<CsActivityType>('ligacao')
+  const [csDuration, setCsDuration] = useState('')
+  const [csNotes, setCsNotes] = useState('')
+  const [csDate, setCsDate] = useState('')
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
 
@@ -923,11 +928,11 @@ function TabEngagement({ menteeId }: { menteeId: string }) {
       .order('recorded_at', { ascending: false })
       .then(({ data }) => { if (data) setEngagements(data) })
     supabase
-      .from('call_records')
+      .from('cs_activities')
       .select('*')
       .eq('mentee_id', menteeId)
-      .order('recorded_at', { ascending: false })
-      .then(({ data }) => { if (data) setCalls(data) })
+      .order('activity_date', { ascending: false })
+      .then(({ data }) => { if (data) setActivities(data) })
   }, [menteeId, supabase])
 
   useEffect(() => { fetchData() }, [fetchData])
@@ -938,23 +943,24 @@ function TabEngagement({ menteeId }: { menteeId: string }) {
     await addEngagementRecord(menteeId, {
       type: engType,
       value: parseFloat(engValue),
-      response_time_minutes: responseTime ? parseInt(responseTime, 10) : undefined,
+      notes: engNotes || undefined,
       recorded_at: engDate,
     })
-    setEngValue(''); setResponseTime(''); setEngDate('')
+    setEngValue(''); setEngNotes(''); setEngDate('')
     setShowForm(false); setLoading(false)
     fetchData()
   }
 
-  async function handleSubmitCall(e: React.FormEvent) {
+  async function handleSubmitCsActivity(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    await addCallRecord(menteeId, {
-      duration_minutes: parseInt(callDuration, 10),
-      call_type: callType,
-      recorded_at: callDate,
+    await addCsActivity(menteeId, {
+      type: csType,
+      duration_minutes: parseInt(csDuration, 10),
+      notes: csNotes || undefined,
+      activity_date: csDate,
     })
-    setCallDuration(''); setCallDate('')
+    setCsDuration(''); setCsNotes(''); setCsDate('')
     setShowForm(false); setLoading(false)
     fetchData()
   }
@@ -962,7 +968,7 @@ function TabEngagement({ menteeId }: { menteeId: string }) {
   return (
     <div className="space-y-4 animate-fade-in">
       <div className="flex items-center justify-between">
-        <p className="label-xs">Engajamento & Ligações</p>
+        <p className="label-xs">Engajamento & Atividades CS</p>
         <Button size="sm" variant="outline" onClick={() => setShowForm(!showForm)}>
           <Plus className="mr-1 h-3 w-3" /> Registrar
         </Button>
@@ -971,21 +977,11 @@ function TabEngagement({ menteeId }: { menteeId: string }) {
       {showForm && (
         <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3">
           <div className="flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant={formMode === 'engagement' ? 'default' : 'outline'}
-              onClick={() => setFormMode('engagement')}
-            >
+            <Button type="button" size="sm" variant={formMode === 'engagement' ? 'default' : 'outline'} onClick={() => setFormMode('engagement')}>
               Engajamento
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={formMode === 'call' ? 'default' : 'outline'}
-              onClick={() => setFormMode('call')}
-            >
-              Ligação / WhatsApp
+            <Button type="button" size="sm" variant={formMode === 'cs' ? 'default' : 'outline'} onClick={() => setFormMode('cs')}>
+              Atividade CS
             </Button>
           </div>
 
@@ -996,16 +992,16 @@ function TabEngagement({ menteeId }: { menteeId: string }) {
                 <Select value={engType} onValueChange={(v) => setEngType(v as EngagementType)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="area_membros">Área de Membros</SelectItem>
-                    <SelectItem value="mentoria_ao_vivo">Mentoria ao Vivo</SelectItem>
+                    <SelectItem value="aula">Área de Membros (Mentorfy)</SelectItem>
+                    <SelectItem value="live">Mentoria ao Vivo</SelectItem>
                     <SelectItem value="evento">Evento</SelectItem>
-                    <SelectItem value="canal_especialista">Canal do Especialista</SelectItem>
+                    <SelectItem value="whatsapp_contato">Canal do Especialista</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label htmlFor="eng-value">Valor / Quantidade *</Label>
+                  <Label htmlFor="eng-value">Quantidade *</Label>
                   <Input id="eng-value" type="number" step="0.01" value={engValue} onChange={(e) => setEngValue(e.target.value)} required />
                 </div>
                 <div className="space-y-1">
@@ -1013,21 +1009,17 @@ function TabEngagement({ menteeId }: { menteeId: string }) {
                   <Input id="eng-date" type="date" value={engDate} onChange={(e) => setEngDate(e.target.value)} required />
                 </div>
               </div>
-              {engType === 'canal_especialista' && (
-                <div className="space-y-1">
-                  <Label htmlFor="eng-response">Tempo de resposta (min)</Label>
-                  <Input id="eng-response" type="number" value={responseTime} onChange={(e) => setResponseTime(e.target.value)} />
-                </div>
-              )}
-              <Button type="submit" size="sm" disabled={loading}>
-                {loading ? 'Salvando...' : 'Salvar'}
-              </Button>
+              <div className="space-y-1">
+                <Label htmlFor="eng-notes">Observação</Label>
+                <Input id="eng-notes" value={engNotes} onChange={(e) => setEngNotes(e.target.value)} />
+              </div>
+              <Button type="submit" size="sm" disabled={loading}>{loading ? 'Salvando...' : 'Salvar'}</Button>
             </form>
           ) : (
-            <form onSubmit={handleSubmitCall} className="space-y-3">
+            <form onSubmit={handleSubmitCsActivity} className="space-y-3">
               <div className="space-y-1">
                 <Label>Tipo *</Label>
-                <Select value={callType} onValueChange={(v) => setCallType(v as CallType)}>
+                <Select value={csType} onValueChange={(v) => setCsType(v as CsActivityType)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ligacao">Ligação</SelectItem>
@@ -1037,17 +1029,19 @@ function TabEngagement({ menteeId }: { menteeId: string }) {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label htmlFor="call-duration">Duração (min) *</Label>
-                  <Input id="call-duration" type="number" value={callDuration} onChange={(e) => setCallDuration(e.target.value)} required />
+                  <Label htmlFor="cs-duration">Duração (min) *</Label>
+                  <Input id="cs-duration" type="number" value={csDuration} onChange={(e) => setCsDuration(e.target.value)} required />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="call-date">Data *</Label>
-                  <Input id="call-date" type="date" value={callDate} onChange={(e) => setCallDate(e.target.value)} required />
+                  <Label htmlFor="cs-date">Data *</Label>
+                  <Input id="cs-date" type="date" value={csDate} onChange={(e) => setCsDate(e.target.value)} required />
                 </div>
               </div>
-              <Button type="submit" size="sm" disabled={loading}>
-                {loading ? 'Salvando...' : 'Salvar'}
-              </Button>
+              <div className="space-y-1">
+                <Label htmlFor="cs-notes">Observação</Label>
+                <Input id="cs-notes" value={csNotes} onChange={(e) => setCsNotes(e.target.value)} />
+              </div>
+              <Button type="submit" size="sm" disabled={loading}>{loading ? 'Salvando...' : 'Salvar'}</Button>
             </form>
           )}
         </div>
@@ -1062,34 +1056,33 @@ function TabEngagement({ menteeId }: { menteeId: string }) {
                 <Badge variant="info" className="text-[10px]">{ENGAGEMENT_LABELS[item.type]}</Badge>
                 <span className="text-xs text-muted-foreground">{item.recorded_at}</span>
               </div>
-              <p className="mt-1 text-foreground tabular">Valor: {Number(item.value)}</p>
-              {item.response_time_minutes && (
-                <p className="text-xs text-muted-foreground">Tempo de resposta: {item.response_time_minutes} min</p>
-              )}
+              <p className="mt-1 text-foreground tabular">Quantidade: {Number(item.value)}</p>
+              {item.notes && <p className="text-xs text-muted-foreground">{item.notes}</p>}
             </div>
           ))}
         </div>
       )}
 
-      {calls.length > 0 && (
+      {activities.length > 0 && (
         <div className="space-y-2">
-          <p className="label-xs text-muted-foreground">Ligações / WhatsApp</p>
-          {calls.map((item) => (
+          <p className="label-xs text-muted-foreground">Atividades CS</p>
+          {activities.map((item) => (
             <div key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
               <div className="flex items-center justify-between">
-                <Badge variant={item.call_type === 'whatsapp' ? 'success' : 'warning'} className="text-[10px]">
-                  {CALL_TYPE_LABELS[item.call_type]}
+                <Badge variant={item.type === 'whatsapp' ? 'success' : 'warning'} className="text-[10px]">
+                  {CS_ACTIVITY_LABELS[item.type]}
                 </Badge>
-                <span className="text-xs text-muted-foreground">{item.recorded_at}</span>
+                <span className="text-xs text-muted-foreground">{item.activity_date}</span>
               </div>
-              <p className="mt-1 text-foreground tabular">Duração: {item.duration_minutes} min</p>
+              <p className="mt-1 text-foreground tabular">Duração: {Number(item.duration_minutes)} min</p>
+              {item.notes && <p className="text-xs text-muted-foreground">{item.notes}</p>}
             </div>
           ))}
         </div>
       )}
 
-      {engagements.length === 0 && calls.length === 0 && (
-        <p className="text-sm text-muted-foreground">Nenhum registro de engajamento.</p>
+      {engagements.length === 0 && activities.length === 0 && (
+        <p className="text-sm text-muted-foreground">Nenhum registro.</p>
       )}
     </div>
   )

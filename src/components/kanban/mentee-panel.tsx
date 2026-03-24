@@ -17,6 +17,13 @@ import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Link2,
   Plus,
   Calendar,
@@ -45,6 +52,25 @@ type RevenueRecord = Database['public']['Tables']['revenue_records']['Row']
 type Objective = Database['public']['Tables']['objectives']['Row']
 type Testimonial = Database['public']['Tables']['testimonials']['Row']
 type ActionPlan = Database['public']['Tables']['action_plans']['Row']
+type Product = Database['public']['Tables']['products']['Row']
+
+// Currency mask helpers
+function formatCurrency(cents: number): string {
+  return (cents / 100).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+function parseCurrencyInput(raw: string): number {
+  // Keep only digits
+  const digits = raw.replace(/\D/g, '')
+  return parseInt(digits || '0', 10)
+}
+
+function centsToDecimal(cents: number): number {
+  return cents / 100
+}
 
 interface MenteePanelProps {
   mentee: MenteeWithStats | null
@@ -167,6 +193,7 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
   const [token, setToken] = useState<string | null>(null)
   const [plan, setPlan] = useState<ActionPlan | null>(null)
   const [loading, setLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -183,6 +210,13 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
     const result = await generateActionPlanLink(mentee.id)
     if (result.token) setToken(result.token)
     setLoading(false)
+  }
+
+  async function handleCopyLink() {
+    if (!link) return
+    await navigator.clipboard.writeText(link)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   const link = token
@@ -210,7 +244,17 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
           {link && (
             <div className="rounded-md bg-muted p-3">
               <p className="label-xs mb-1">Link do formulário</p>
-              <code className="text-xs text-foreground break-all">{link}</code>
+              <div className="flex items-start gap-2">
+                <code className="flex-1 text-xs text-foreground break-all">{link}</code>
+                <Button
+                  size="sm"
+                  variant={copied ? 'default' : 'outline'}
+                  onClick={handleCopyLink}
+                  className="shrink-0 text-xs"
+                >
+                  {copied ? 'Link copiado!' : 'Copiar link'}
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -367,10 +411,12 @@ function TabIntensivo({ menteeId }: { menteeId: string }) {
 // ─── Tab 5: Receita Nova ───
 function TabRevenue({ menteeId }: { menteeId: string }) {
   const [items, setItems] = useState<RevenueRecord[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [showForm, setShowForm] = useState(false)
-  const [productName, setProductName] = useState('')
-  const [saleValue, setSaleValue] = useState('')
-  const [entryValue, setEntryValue] = useState('')
+  const [selectedProduct, setSelectedProduct] = useState('')
+  const [customProductName, setCustomProductName] = useState('')
+  const [saleCents, setSaleCents] = useState(0)
+  const [entryCents, setEntryCents] = useState(0)
   const [loading, setLoading] = useState(false)
   const supabase = createClient()
 
@@ -383,19 +429,34 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
       .then(({ data }) => { if (data) setItems(data) })
   }, [menteeId, supabase])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  const fetchProducts = useCallback(() => {
+    supabase
+      .from('products')
+      .select('*')
+      .order('name')
+      .then(({ data }) => { if (data) setProducts(data) })
+  }, [supabase])
+
+  useEffect(() => { fetchData(); fetchProducts() }, [fetchData, fetchProducts])
 
   const totalRevenue = items.reduce((sum, r) => sum + Number(r.sale_value), 0)
 
+  const resolvedProductName =
+    selectedProduct === '__outro__'
+      ? customProductName
+      : products.find((p) => p.id === selectedProduct)?.name ?? ''
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (!resolvedProductName) return
     setLoading(true)
     await addRevenueRecord(menteeId, {
-      product_name: productName,
-      sale_value: parseFloat(saleValue),
-      entry_value: parseFloat(entryValue),
+      product_name: resolvedProductName,
+      sale_value: centsToDecimal(saleCents),
+      entry_value: centsToDecimal(entryCents),
     })
-    setProductName(''); setSaleValue(''); setEntryValue('')
+    setSelectedProduct(''); setCustomProductName('')
+    setSaleCents(0); setEntryCents(0)
     setShowForm(false); setLoading(false)
     fetchData()
   }
@@ -416,20 +477,55 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
       {showForm && (
         <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-border bg-muted/50 p-4">
           <div className="space-y-1">
-            <Label htmlFor="rev-product">Produto *</Label>
-            <Input id="rev-product" value={productName} onChange={(e) => setProductName(e.target.value)} required />
+            <Label>Produto *</Label>
+            <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o produto" />
+              </SelectTrigger>
+              <SelectContent>
+                {products.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+                <SelectItem value="__outro__">Outro...</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
+          {selectedProduct === '__outro__' && (
+            <div className="space-y-1">
+              <Label htmlFor="rev-custom-product">Nome do produto *</Label>
+              <Input
+                id="rev-custom-product"
+                value={customProductName}
+                onChange={(e) => setCustomProductName(e.target.value)}
+                required
+              />
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="rev-sale">Valor de venda *</Label>
-              <Input id="rev-sale" type="number" step="0.01" value={saleValue} onChange={(e) => setSaleValue(e.target.value)} required />
+              <Input
+                id="rev-sale"
+                inputMode="numeric"
+                value={saleCents > 0 ? `R$ ${formatCurrency(saleCents)}` : ''}
+                placeholder="R$ 0,00"
+                onChange={(e) => setSaleCents(parseCurrencyInput(e.target.value))}
+                required
+              />
             </div>
             <div className="space-y-1">
               <Label htmlFor="rev-entry">Valor de entrada *</Label>
-              <Input id="rev-entry" type="number" step="0.01" value={entryValue} onChange={(e) => setEntryValue(e.target.value)} required />
+              <Input
+                id="rev-entry"
+                inputMode="numeric"
+                value={entryCents > 0 ? `R$ ${formatCurrency(entryCents)}` : ''}
+                placeholder="R$ 0,00"
+                onChange={(e) => setEntryCents(parseCurrencyInput(e.target.value))}
+                required
+              />
             </div>
           </div>
-          <Button type="submit" size="sm" disabled={loading}>
+          <Button type="submit" size="sm" disabled={loading || !resolvedProductName}>
             {loading ? 'Salvando...' : 'Salvar'}
           </Button>
         </form>

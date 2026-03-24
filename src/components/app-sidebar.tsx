@@ -16,15 +16,18 @@ export function AppSidebar({ profile }: AppSidebarProps) {
 
   return (
     <aside className="fixed inset-y-0 left-0 z-30 flex w-[260px] flex-col bg-primary">
-      <div className="flex h-16 items-center border-b border-white/10 px-5">
+      <div className="flex h-16 items-center gap-3 border-b border-white/10 px-5">
         <Image
           src="/logo.png"
           alt="Bethel CS"
-          width={140}
-          height={40}
-          className="h-9 w-auto"
+          width={36}
+          height={36}
+          className="h-9 w-9 shrink-0"
           priority
         />
+        <span className="font-heading text-lg font-bold text-white">
+          Bethel CS
+        </span>
       </div>
       <nav className="flex-1 space-y-1 p-3">
         {items.map((item) => (

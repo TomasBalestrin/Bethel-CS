@@ -347,6 +347,22 @@ export interface Database {
         }
         Relationships: []
       }
+      products: {
+        Row: {
+          id: string
+          name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          created_at?: string
+        }
+        Update: {
+          name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

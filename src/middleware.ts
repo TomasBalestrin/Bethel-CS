@@ -6,6 +6,11 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname
 
+  // Public routes (no auth required)
+  if (pathname.startsWith('/form/')) {
+    return supabaseResponse
+  }
+
   // Not authenticated and not on login page → redirect to login
   if (!user && pathname !== '/login') {
     const url = request.nextUrl.clone()

@@ -144,6 +144,14 @@ export function KanbanBoard({
         mentee={selectedMentee}
         open={panelOpen}
         onOpenChange={setPanelOpen}
+        onMenteeDeleted={(id) => {
+          setMentees((prev) => prev.filter((m) => m.id !== id))
+          setSelectedMentee(null)
+        }}
+        onMenteeUpdated={(updated) => {
+          setMentees((prev) => prev.map((m) => m.id === updated.id ? updated : m))
+          setSelectedMentee(updated)
+        }}
       />
     </div>
   )

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -39,6 +40,16 @@ export function LoginForm() {
   return (
     <Card className="w-full max-w-sm animate-slide-up">
       <CardHeader className="text-center">
+        <div className="mx-auto mb-2">
+          <Image
+            src="/logo.png"
+            alt="Bethel CS"
+            width={160}
+            height={48}
+            className="h-12 w-auto"
+            priority
+          />
+        </div>
         <CardTitle className="font-heading text-2xl font-bold text-foreground">
           Bethel CS
         </CardTitle>

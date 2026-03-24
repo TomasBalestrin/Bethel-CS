@@ -2,6 +2,7 @@
 
 import { useDroppable } from '@dnd-kit/core'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Plus } from 'lucide-react'
 import { MenteeCard } from './mentee-card'
 import { cn } from '@/lib/utils'
 import type { MenteeWithStats } from '@/types/kanban'
@@ -13,9 +14,11 @@ interface KanbanColumnProps {
   stage: KanbanStage
   mentees: MenteeWithStats[]
   onCardClick?: (mentee: MenteeWithStats) => void
+  showAddButton?: boolean
+  onAddClick?: () => void
 }
 
-export function KanbanColumn({ stage, mentees, onCardClick }: KanbanColumnProps) {
+export function KanbanColumn({ stage, mentees, onCardClick, showAddButton, onAddClick }: KanbanColumnProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: stage.id,
   })
@@ -23,7 +26,7 @@ export function KanbanColumn({ stage, mentees, onCardClick }: KanbanColumnProps)
   return (
     <div
       className={cn(
-        'flex w-72 shrink-0 flex-col rounded-lg border border-border bg-muted/50',
+        'flex min-w-[260px] w-72 shrink-0 flex-col rounded-lg border border-border bg-muted/50',
         isOver && 'ring-2 ring-accent/50'
       )}
     >
@@ -47,6 +50,16 @@ export function KanbanColumn({ stage, mentees, onCardClick }: KanbanColumnProps)
               onClick={onCardClick}
             />
           ))}
+          {showAddButton && (
+            <button
+              type="button"
+              onClick={onAddClick}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-accent/40 px-3 py-2.5 text-sm text-accent transition-colors hover:bg-accent/5"
+            >
+              <Plus className="h-4 w-4" />
+              Adicionar mentorado
+            </button>
+          )}
         </div>
       </ScrollArea>
     </div>

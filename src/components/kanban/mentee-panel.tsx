@@ -34,6 +34,7 @@ import {
   Users,
   DollarSign,
   ChevronRight,
+  ArrowRight,
 } from 'lucide-react'
 import { formatDateBR } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
@@ -99,9 +100,10 @@ interface MenteePanelProps {
   onOpenChange: (open: boolean) => void
   onMenteeDeleted?: (menteeId: string) => void
   onMenteeUpdated?: (mentee: MenteeWithStats) => void
+  onTransitionToMentorship?: (mentee: MenteeWithStats) => void
 }
 
-export function MenteePanel({ mentee, open, onOpenChange, onMenteeDeleted, onMenteeUpdated }: MenteePanelProps) {
+export function MenteePanel({ mentee, open, onOpenChange, onMenteeDeleted, onMenteeUpdated, onTransitionToMentorship }: MenteePanelProps) {
   const [userRole, setUserRole] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
@@ -213,6 +215,8 @@ export function MenteePanel({ mentee, open, onOpenChange, onMenteeDeleted, onMen
           editing={editing}
           setEditing={setEditing}
           onMenteeUpdated={onMenteeUpdated}
+          isAdmin={isAdmin}
+          onTransitionToMentorship={onTransitionToMentorship}
         />
 
         {/* Delete confirmation dialog */}
@@ -245,11 +249,13 @@ export function MenteePanel({ mentee, open, onOpenChange, onMenteeDeleted, onMen
 }
 
 // ─── Scrollable Tabs ───
-function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated }: {
+function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTransitionToMentorship }: {
   mentee: MenteeWithStats
   editing: boolean
   setEditing: (v: boolean) => void
   onMenteeUpdated?: (mentee: MenteeWithStats) => void
+  isAdmin: boolean
+  onTransitionToMentorship?: (mentee: MenteeWithStats) => void
 }) {
   const tabsRef = useRef<HTMLDivElement>(null)
   const [showOverflow, setShowOverflow] = useState(false)
@@ -312,6 +318,8 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated }: {
             editing={editing}
             setEditing={setEditing}
             onMenteeUpdated={onMenteeUpdated}
+            isAdmin={isAdmin}
+            onTransitionToMentorship={onTransitionToMentorship}
           />
         </TabsContent>
         <TabsContent value="action-plan"><TabActionPlan mentee={mentee} /></TabsContent>
@@ -346,11 +354,13 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 // ─── Tab 1: Info Geral ───
-function TabInfo({ mentee, editing, setEditing, onMenteeUpdated }: {
+function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTransitionToMentorship }: {
   mentee: MenteeWithStats
   editing: boolean
   setEditing: (v: boolean) => void
   onMenteeUpdated?: (mentee: MenteeWithStats) => void
+  isAdmin: boolean
+  onTransitionToMentorship?: (mentee: MenteeWithStats) => void
 }) {
   const [saving, setSaving] = useState(false)
 
@@ -583,6 +593,20 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated }: {
           </div>
         </div>
       </div>
+
+      {/* Transition to Mentorship button — admin only, initial kanban only */}
+      {isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship && (
+        <div className="border-t border-border/50 pt-4">
+          <Button
+            variant="outline"
+            onClick={() => onTransitionToMentorship(mentee)}
+            className="w-full text-sm"
+          >
+            Enviar para Etapas Mentoria
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

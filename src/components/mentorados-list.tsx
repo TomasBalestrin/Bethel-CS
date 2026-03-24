@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Phone, Mail, MapPin } from 'lucide-react'
+import { MenteePanel } from '@/components/kanban/mentee-panel'
 import type { Database } from '@/types/database'
+import type { MenteeWithStats } from '@/types/kanban'
 
 type Mentee = Database['public']['Tables']['mentees']['Row']
 
@@ -22,6 +24,8 @@ interface MentoradosListProps {
 
 export function MentoradosList({ mentees }: MentoradosListProps) {
   const [search, setSearch] = useState('')
+  const [selectedMentee, setSelectedMentee] = useState<MenteeWithStats | null>(null)
+  const [panelOpen, setPanelOpen] = useState(false)
 
   const filtered = mentees.filter((m) => {
     if (!search) return true
@@ -33,6 +37,17 @@ export function MentoradosList({ mentees }: MentoradosListProps) {
       (m.product_name?.toLowerCase().includes(term) ?? false)
     )
   })
+
+  function handleCardClick(mentee: Mentee) {
+    const menteeWithStats: MenteeWithStats = {
+      ...mentee,
+      attendance_count: 0,
+      indication_count: 0,
+      revenue_total: 0,
+    }
+    setSelectedMentee(menteeWithStats)
+    setPanelOpen(true)
+  }
 
   return (
     <div>
@@ -53,7 +68,8 @@ export function MentoradosList({ mentees }: MentoradosListProps) {
         {filtered.map((m) => (
           <div
             key={m.id}
-            className="rounded-lg border border-border bg-card p-4 shadow-card animate-fade-in"
+            onClick={() => handleCardClick(m)}
+            className="cursor-pointer rounded-lg border border-border bg-card p-4 shadow-card animate-fade-in transition-shadow hover:shadow-md"
           >
             <div className="flex items-start justify-between">
               <div>
@@ -91,6 +107,12 @@ export function MentoradosList({ mentees }: MentoradosListProps) {
           </div>
         ))}
       </div>
+
+      <MenteePanel
+        mentee={selectedMentee}
+        open={panelOpen}
+        onOpenChange={setPanelOpen}
+      />
     </div>
   )
 }

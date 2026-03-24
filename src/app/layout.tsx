@@ -18,6 +18,10 @@ const geistBody = localFont({
 export const metadata: Metadata = {
   title: 'Bethel CS',
   description: 'Sistema de Customer Success para Mentoria Elite Premium',
+  icons: {
+    icon: '/favicon.png',
+    apple: '/logo.png',
+  },
 }
 
 export default function RootLayout({

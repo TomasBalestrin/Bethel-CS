@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
     token,
     api_key: apiKey,
     user_id: streamUserId,
+    mentee_id: mentee.id,
     channel_id: mentee.stream_channel_id,
     specialist_name: specialistName,
     mentee_name: mentee.full_name,

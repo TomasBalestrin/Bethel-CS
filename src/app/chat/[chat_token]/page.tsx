@@ -10,8 +10,10 @@ import {
   Window,
 } from 'stream-chat-react'
 import { StreamChat } from 'stream-chat'
-import { Loader2 } from 'lucide-react'
 import Image from 'next/image'
+import { SplashScreen } from '@/components/splash-screen'
+import { subscribeToPush } from '@/lib/push/subscribe'
+import { InstallBanner } from '@/components/install-banner'
 
 import 'stream-chat-react/dist/css/v2/index.css'
 
@@ -19,6 +21,7 @@ interface TokenData {
   token: string
   api_key: string
   user_id: string
+  mentee_id: string
   channel_id: string | null
   specialist_name: string
   mentee_name: string
@@ -31,6 +34,8 @@ export default function MenteeChatPage() {
   const [client, setClient] = useState<StreamChat | null>(null)
   const [channel, setChannel] = useState<ReturnType<StreamChat['channel']> | null>(null)
   const [specialistName, setSpecialistName] = useState('')
+  const [menteeId, setMenteeId] = useState<string | null>(null)
+  const [pushRequested, setPushRequested] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -56,6 +61,7 @@ export default function MenteeChatPage() {
         }
 
         setSpecialistName(data.specialist_name)
+        setMenteeId(data.mentee_id)
 
         chatClient = StreamChat.getInstance(data.api_key)
 
@@ -86,6 +92,29 @@ export default function MenteeChatPage() {
     }
   }, [chatToken])
 
+  // Request push permission when mentee sends first message
+  useEffect(() => {
+    if (!channel || !menteeId || pushRequested) return
+
+    const handleMessage = () => {
+      if (!pushRequested) {
+        setPushRequested(true)
+        subscribeToPush(menteeId)
+      }
+    }
+
+    channel.on('message.new', (event) => {
+      // Only trigger on mentee's own messages
+      if (event.message?.user?.id?.startsWith('mentee-')) {
+        handleMessage()
+      }
+    })
+
+    return () => {
+      channel.off('message.new', handleMessage)
+    }
+  }, [channel, menteeId, pushRequested])
+
   if (error) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-background p-6 text-center">
@@ -96,12 +125,7 @@ export default function MenteeChatPage() {
   }
 
   if (!client || !channel) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        <p className="mt-2 text-xs text-muted-foreground">Conectando ao chat...</p>
-      </div>
-    )
+    return <SplashScreen subtitle="Carregando seu chat..." />
   }
 
   return (
@@ -128,6 +152,8 @@ export default function MenteeChatPage() {
           </Channel>
         </Chat>
       </div>
+
+      <InstallBanner variant="chat" />
     </div>
   )
 }

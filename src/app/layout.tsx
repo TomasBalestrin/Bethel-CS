@@ -19,12 +19,20 @@ const geistBody = localFont({
 export const metadata: Metadata = {
   title: 'Bethel CS',
   description: 'Sistema de Customer Success para Mentoria Elite Premium',
+  manifest: '/manifest.json',
+  themeColor: '#060A16',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Bethel CS',
+  },
   icons: {
     icon: [
-      { url: '/logo.png', type: 'image/png' },
+      { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
     ],
-    apple: '/logo.png',
-    shortcut: '/logo.png',
+    apple: '/icons/icon-192x192.png',
+    shortcut: '/icons/icon-96x96.png',
   },
 }
 

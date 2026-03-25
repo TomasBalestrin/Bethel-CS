@@ -35,6 +35,7 @@ import {
   DollarSign,
   ChevronRight,
   ArrowRight,
+  MessageSquare,
 } from 'lucide-react'
 import { formatDateBR } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
@@ -64,7 +65,13 @@ import {
   updateMentee,
   deleteMentee,
 } from '@/lib/actions/panel-actions'
+import dynamic from 'next/dynamic'
 import type { MenteeWithStats } from '@/types/kanban'
+
+const TabChat = dynamic(
+  () => import('./tab-chat').then((mod) => ({ default: mod.TabChat })),
+  { ssr: false }
+)
 import type { Database, TestimonialCategory, EngagementType, CsActivityType, RevenueType } from '@/types/database'
 
 type Indication = Database['public']['Tables']['indications']['Row']
@@ -259,6 +266,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
 }) {
   const tabsRef = useRef<HTMLDivElement>(null)
   const [showOverflow, setShowOverflow] = useState(false)
+  const [chatUnread, setChatUnread] = useState(0)
 
   useEffect(() => {
     function check() {
@@ -293,13 +301,26 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
               { value: 'objectives', label: 'Objetivos' },
               { value: 'testimonials', label: 'Depoimentos' },
               { value: 'engagement', label: 'Engajamento' },
+              { value: 'chat', label: 'Chat' },
             ].map((tab) => (
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
                 className="whitespace-nowrap rounded-none border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-accent data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
               >
-                {tab.label}
+                {tab.value === 'chat' ? (
+                  <span className="flex items-center gap-1.5">
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    Chat
+                    {chatUnread > 0 && (
+                      <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-white">
+                        {chatUnread}
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  tab.label
+                )}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -329,6 +350,12 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
         <TabsContent value="objectives"><TabObjectives menteeId={mentee.id} /></TabsContent>
         <TabsContent value="testimonials"><TabTestimonials menteeId={mentee.id} /></TabsContent>
         <TabsContent value="engagement"><TabEngagement menteeId={mentee.id} /></TabsContent>
+        <TabsContent value="chat">
+          <TabChat
+            channelId={mentee.stream_channel_id}
+            onUnreadCountChange={setChatUnread}
+          />
+        </TabsContent>
       </ScrollArea>
     </Tabs>
   )

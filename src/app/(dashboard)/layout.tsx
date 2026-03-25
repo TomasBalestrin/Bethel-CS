@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { AppSidebar } from '@/components/app-sidebar'
 import { Header } from '@/components/header'
 import { SplashScreen } from '@/components/splash-screen'
+import { PushPrompt } from '@/components/push-prompt'
 
 export default async function DashboardLayout({
   children,
@@ -32,6 +33,7 @@ export default async function DashboardLayout({
   return (
     <>
       <SplashScreen />
+      <PushPrompt />
       <div className="flex min-h-screen">
         <AppSidebar profile={profile} />
         <div className="flex flex-1 flex-col pl-[260px]">

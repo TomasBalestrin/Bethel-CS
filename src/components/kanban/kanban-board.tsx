@@ -26,6 +26,7 @@ import { MenteeCard } from './mentee-card'
 import { CreateMenteeDialog } from './create-mentee-dialog'
 import { MenteePanel } from './mentee-panel'
 import { moveMentee, transitionToMentorship } from '@/lib/actions/mentee-actions'
+import { useUnreadCounts } from '@/hooks/use-unread-counts'
 import type { MenteeWithStats } from '@/types/kanban'
 import type { Database, KanbanType } from '@/types/database'
 
@@ -48,6 +49,7 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const [mentees, setMentees] = useState<MenteeWithStats[]>(initialMentees)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const unreadMap = useUnreadCounts()
 
   useEffect(() => {
     setMentees(initialMentees)
@@ -187,6 +189,7 @@ export function KanbanBoard({
                 key={stage.id}
                 stage={stage}
                 mentees={getMenteesForStage(stage.id)}
+                unreadMap={unreadMap}
                 onCardClick={handleCardClick}
                 showAddButton={idx === 0 && firstStage?.id === stage.id}
                 onAddClick={() => setDialogOpen(true)}

@@ -27,7 +27,7 @@ interface MentoradosListProps {
 export function MentoradosList({ mentees: initialMentees }: MentoradosListProps) {
   const [menteeList, setMenteeList] = useState(initialMentees)
   const [search, setSearch] = useState('')
-  const unreadMap = useUnreadCounts()
+  const { unreadMap } = useUnreadCounts()
   const [selectedMentee, setSelectedMentee] = useState<MenteeWithStats | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
 

@@ -3,13 +3,17 @@
 import { useEffect, useState, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
+interface UnreadData {
+  unreadMap: Record<string, number>
+  lastMessageMap: Record<string, string> // menteeId → latest sent_at ISO
+}
+
 /**
- * Hook that fetches unread WhatsApp message counts per mentee_id
- * and listens for real-time changes via Supabase Realtime.
- * Returns a map: { [menteeId]: unreadCount }
+ * Hook that fetches unread WhatsApp message counts and last message timestamps
+ * per mentee_id, with Supabase Realtime updates.
  */
-export function useUnreadCounts() {
-  const [unreadMap, setUnreadMap] = useState<Record<string, number>>({})
+export function useUnreadCounts(): UnreadData {
+  const [data, setData] = useState<UnreadData>({ unreadMap: {}, lastMessageMap: {} })
   const initialized = useRef(false)
 
   useEffect(() => {
@@ -18,34 +22,48 @@ export function useUnreadCounts() {
 
     const supabase = createClient()
 
-    async function fetchUnread() {
-      const { data, error } = await supabase
+    async function fetchData() {
+      // Fetch unread counts
+      const { data: unreadRows } = await supabase
         .from('wpp_messages')
         .select('mentee_id')
         .eq('direction', 'incoming')
         .eq('is_read', false)
 
-      if (error || !data) return
-
-      const map: Record<string, number> = {}
-      for (const row of data) {
-        map[row.mentee_id] = (map[row.mentee_id] || 0) + 1
+      const unreadMap: Record<string, number> = {}
+      if (unreadRows) {
+        for (const row of unreadRows) {
+          unreadMap[row.mentee_id] = (unreadMap[row.mentee_id] || 0) + 1
+        }
       }
-      setUnreadMap(map)
+
+      // Fetch last message per mentee (most recent first, deduplicate)
+      const { data: lastRows } = await supabase
+        .from('wpp_messages')
+        .select('mentee_id, sent_at')
+        .order('sent_at', { ascending: false })
+        .limit(500)
+
+      const lastMessageMap: Record<string, string> = {}
+      if (lastRows) {
+        for (const row of lastRows) {
+          if (!lastMessageMap[row.mentee_id]) {
+            lastMessageMap[row.mentee_id] = row.sent_at
+          }
+        }
+      }
+
+      setData({ unreadMap, lastMessageMap })
     }
 
-    fetchUnread()
+    fetchData()
 
-    // Listen for new messages and read updates
     const channel = supabase
       .channel('wpp_unread_global')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'wpp_messages' },
-        () => {
-          // Re-fetch on any change
-          fetchUnread()
-        }
+        () => { fetchData() }
       )
       .subscribe()
 
@@ -54,5 +72,5 @@ export function useUnreadCounts() {
     }
   }, [])
 
-  return unreadMap
+  return data
 }

@@ -36,7 +36,7 @@ export async function POST() {
   }
 
   // Get specialist info for channel creation
-  const specialistIds = [...new Set(mentees.map(m => m.created_by).filter(Boolean))]
+  const specialistIds = Array.from(new Set(mentees.map(m => m.created_by).filter(Boolean)))
   const { data: specialists } = await supabase
     .from('profiles')
     .select('id, full_name, avatar_url')

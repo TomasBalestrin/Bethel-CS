@@ -1,15 +1,39 @@
 /**
  * Next Apps (WhatsApp) server-side authentication and API client.
- * Manages JWT tokens with auto-refresh. NEVER import in client components.
+ * Tokens persisted in system_tokens table for serverless compatibility.
+ * NEVER import in client components.
  */
+
+import { createAdminClient } from '@/lib/supabase/admin'
 
 const BASE_URL = process.env.NEXTAPPS_BASE_URL || 'https://service.nexttrack.com.br'
 const EMAIL = process.env.NEXTAPPS_EMAIL || ''
 const PASSWORD = process.env.NEXTAPPS_PASSWORD || ''
 
-let accessToken = ''
-let refreshToken = ''
-let tokenExpiresAt = 0
+// In-memory cache (survives within a single request/warm lambda)
+let cachedAccessToken = ''
+let cachedExpiresAt = 0
+
+async function saveToken(key: string, value: string, expiresAt: Date) {
+  const supabase = createAdminClient()
+  await supabase
+    .from('system_tokens' as never)
+    .upsert(
+      { key, value, expires_at: expiresAt.toISOString(), updated_at: new Date().toISOString() } as never,
+      { onConflict: 'key' } as never
+    )
+}
+
+async function loadToken(key: string): Promise<{ value: string; expires_at: string } | null> {
+  const supabase = createAdminClient()
+  const { data } = await supabase
+    .from('system_tokens' as never)
+    .select('value, expires_at' as never)
+    .eq('key' as never, key as never)
+    .single()
+
+  return data as { value: string; expires_at: string } | null
+}
 
 async function doLogin(): Promise<string> {
   const res = await fetch(`${BASE_URL}/api/auth/login`, {
@@ -24,49 +48,79 @@ async function doLogin(): Promise<string> {
   }
 
   const data = await res.json()
-  accessToken = data.accessToken || data.token || ''
-  refreshToken = data.refreshToken || ''
-  // Assume token lasts 1 hour if not specified
-  tokenExpiresAt = Date.now() + (data.expiresIn || 3600) * 1000
+  const access = data.accessToken || data.token || ''
+  const refresh = data.refreshToken || ''
 
-  return accessToken
+  // Persist tokens
+  const accessExpiry = new Date(Date.now() + 23 * 60 * 60 * 1000) // 23h
+  const refreshExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7d
+
+  await Promise.all([
+    saveToken('nextapps_access', access, accessExpiry),
+    refresh ? saveToken('nextapps_refresh', refresh, refreshExpiry) : Promise.resolve(),
+  ])
+
+  // Update in-memory cache
+  cachedAccessToken = access
+  cachedExpiresAt = accessExpiry.getTime()
+
+  return access
 }
 
-async function doRefresh(): Promise<string> {
+async function doRefresh(refreshTokenValue: string): Promise<string> {
   try {
     const res = await fetch(`${BASE_URL}/api/auth/refresh-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken }),
+      body: JSON.stringify({ refreshToken: refreshTokenValue }),
     })
 
     if (!res.ok) {
-      // Refresh failed, do full login
       return await doLogin()
     }
 
     const data = await res.json()
-    accessToken = data.accessToken || data.token || ''
-    if (data.refreshToken) refreshToken = data.refreshToken
-    tokenExpiresAt = Date.now() + (data.expiresIn || 3600) * 1000
+    const access = data.accessToken || data.token || ''
+    const newRefresh = data.refreshToken || refreshTokenValue
 
-    return accessToken
+    const accessExpiry = new Date(Date.now() + 23 * 60 * 60 * 1000)
+    const refreshExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+
+    await Promise.all([
+      saveToken('nextapps_access', access, accessExpiry),
+      saveToken('nextapps_refresh', newRefresh, refreshExpiry),
+    ])
+
+    cachedAccessToken = access
+    cachedExpiresAt = accessExpiry.getTime()
+
+    return access
   } catch {
-    // Refresh failed, do full login
     return await doLogin()
   }
 }
 
 async function getToken(): Promise<string> {
-  // Valid token with 60s buffer
-  if (accessToken && Date.now() < tokenExpiresAt - 60000) {
-    return accessToken
+  // 1. Check in-memory cache (same lambda invocation)
+  if (cachedAccessToken && Date.now() < cachedExpiresAt - 60000) {
+    return cachedAccessToken
   }
-  // Try refresh if we have a refresh token
-  if (refreshToken) {
-    return await doRefresh()
+
+  // 2. Check database for valid access token
+  const accessRow = await loadToken('nextapps_access')
+  if (accessRow && accessRow.expires_at && new Date(accessRow.expires_at).getTime() > Date.now() + 60000) {
+    cachedAccessToken = accessRow.value
+    cachedExpiresAt = new Date(accessRow.expires_at).getTime()
+    return accessRow.value
   }
-  // No tokens at all, do full login
+
+  // 3. Try refresh token from database
+  const refreshRow = await loadToken('nextapps_refresh')
+  if (refreshRow && refreshRow.expires_at && new Date(refreshRow.expires_at).getTime() > Date.now()) {
+    return await doRefresh(refreshRow.value)
+  }
+
+  // 4. No valid tokens — full login
   return await doLogin()
 }
 
@@ -80,10 +134,14 @@ async function authFetch(url: string, options: RequestInit = {}): Promise<Respon
 
   let res = await fetch(url, { ...options, headers })
 
-  // Retry once on 401 (token expired mid-request)
+  // Retry once on 401 (token expired between check and use)
   if (res.status === 401) {
-    accessToken = ''
-    tokenExpiresAt = 0
+    cachedAccessToken = ''
+    cachedExpiresAt = 0
+    // Clear stale access token from DB
+    const supabase = createAdminClient()
+    await supabase.from('system_tokens' as never).delete().eq('key' as never, 'nextapps_access' as never)
+
     const newToken = await getToken()
     res = await fetch(url, {
       ...options,

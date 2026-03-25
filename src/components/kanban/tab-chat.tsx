@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown } from 'lucide-react'
+import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { CallInterface } from './call-interface'
+import { toast } from 'sonner'
 import type { Database } from '@/types/database'
 
 type WppMessage = Database['public']['Tables']['wpp_messages']['Row']
@@ -61,6 +63,11 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const [attachedFile, setAttachedFile] = useState<File | null>(null)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Call state
+  const [inCall, setInCall] = useState(false)
+  const [callData, setCallData] = useState<{ roomUrl: string; token: string; callId: string } | null>(null)
+  const [callingLoading, setCallingLoading] = useState(false)
 
   // Audio recording
   const [recording, setRecording] = useState(false)
@@ -232,6 +239,28 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
     }
   }
 
+  // ─── Start call ───
+  async function handleCall() {
+    setCallingLoading(true)
+    try {
+      const res = await fetch('/api/calls/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ menteeId }),
+      })
+      if (!res.ok) throw new Error('Falha ao criar ligação')
+      const data = await res.json()
+      setCallData({ roomUrl: data.roomUrl, token: data.token, callId: data.callId })
+      setInCall(true)
+      toast.success(`Link enviado para ${menteeName} via WhatsApp`)
+    } catch (err) {
+      console.error('Call error:', err)
+      toast.error('Erro ao iniciar ligação')
+    } finally {
+      setCallingLoading(false)
+    }
+  }
+
   // ─── Audio recording ───
   async function startRecording() {
     try {
@@ -323,7 +352,19 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
             {menteePhone}<ExternalLink className="h-3 w-3" />
           </a>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
+          {canSend && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 text-xs"
+              onClick={handleCall}
+              disabled={callingLoading || inCall}
+            >
+              {callingLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Phone className="h-3 w-3" />}
+              Ligar
+            </Button>
+          )}
           <span className={`h-2 w-2 rounded-full ${instanceStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'}`} />
           <span className="text-[10px] text-muted-foreground">
             {instanceStatus === 'connected' ? 'Conectado' : 'Desconectado'}
@@ -331,7 +372,19 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         </div>
       </div>
 
-      {/* Messages — scrollable */}
+      {/* Call interface — replaces messages when in call */}
+      {inCall && callData && (
+        <CallInterface
+          roomUrl={callData.roomUrl}
+          token={callData.token}
+          callId={callData.callId}
+          menteeName={menteeName}
+          onEnd={() => { setInCall(false); setCallData(null) }}
+        />
+      )}
+
+      {/* Messages — scrollable (hidden during call) */}
+      {!inCall && (
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1 min-h-0">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
@@ -483,6 +536,8 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   )
 }

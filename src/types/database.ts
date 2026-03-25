@@ -102,6 +102,7 @@ export interface Database {
           kanban_type: KanbanType
           action_plan_token: string
           chat_token: string
+          call_token: string
           stream_channel_id: string | null
           cliente_fit: boolean
           status: MenteeStatus
@@ -132,6 +133,7 @@ export interface Database {
           kanban_type?: KanbanType
           action_plan_token?: string
           chat_token?: string
+          call_token?: string
           stream_channel_id?: string | null
           cliente_fit?: boolean
           status?: MenteeStatus
@@ -563,6 +565,46 @@ export interface Database {
           p256dh?: string
           auth?: string
           user_agent?: string | null
+        }
+        Relationships: []
+      }
+      call_records: {
+        Row: {
+          id: string
+          mentee_id: string
+          specialist_id: string
+          daily_room_name: string
+          daily_room_url: string
+          started_at: string | null
+          ended_at: string | null
+          duration_seconds: number | null
+          recording_url: string | null
+          recording_status: 'pending' | 'processing' | 'ready' | 'failed'
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          mentee_id: string
+          specialist_id: string
+          daily_room_name: string
+          daily_room_url: string
+          started_at?: string | null
+          ended_at?: string | null
+          duration_seconds?: number | null
+          recording_url?: string | null
+          recording_status?: 'pending' | 'processing' | 'ready' | 'failed'
+          created_at?: string
+        }
+        Update: {
+          mentee_id?: string
+          specialist_id?: string
+          daily_room_name?: string
+          daily_room_url?: string
+          started_at?: string | null
+          ended_at?: string | null
+          duration_seconds?: number | null
+          recording_url?: string | null
+          recording_status?: 'pending' | 'processing' | 'ready' | 'failed'
         }
         Relationships: []
       }

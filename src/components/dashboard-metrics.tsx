@@ -107,7 +107,7 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
       {/* ═══ SEÇÃO 1: FILTROS GLOBAIS ═══ */}
       <section className="rounded-lg border border-border bg-card p-4 shadow-card">
         <p className="label-xs mb-3">Filtros</p>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
           <div className="space-y-1">
             <Label className="text-xs">Especialista</Label>
             <Select value={props.filters.specialistId ?? '__all__'} onValueChange={(v) => updateFilter('specialist', v)}>
@@ -145,15 +145,15 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
       {/* ═══ SEÇÃO 2: VISÃO GERAL DOS MENTORADOS ═══ */}
       <section>
         <SectionTitle>Visão geral dos mentorados</SectionTitle>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <MetricCard icon={Users} label="Mentorados ativos" value={props.section2.totalMentees} color="text-accent" bg="bg-accent/10" />
           <MetricCard icon={Star} label="Clientes Fit" value={props.section2.fitMentees} color="text-warning" bg="bg-warning/10" />
           <MetricCard icon={UserPlus} label="Indicações geradas" value={props.section2.totalIndications} color="text-success" bg="bg-success/10" />
           <MetricCard icon={XCircle} label="Cancelamentos" value={props.section2.cancelados} color="text-destructive" bg="bg-destructive/10" />
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-5">
+        <div className="mt-4 flex gap-3 overflow-x-auto pb-2 scrollbar-none sm:grid sm:grid-cols-5 sm:overflow-visible sm:pb-0">
           {[1, 2, 3, 4, 5].map((level) => (
-            <div key={level} className="rounded-lg border border-border bg-card p-3 shadow-card text-center">
+            <div key={level} className="min-w-[120px] shrink-0 rounded-lg border border-border bg-card p-3 shadow-card text-center sm:min-w-0 sm:shrink">
               <Badge variant={PRIORITY_VARIANT[level]}>Nível {level}</Badge>
               <p className="mt-1 font-heading text-xl font-bold text-foreground tabular">{props.section2.priorityDistribution[level] ?? 0}</p>
               <p className="text-[10px] text-muted-foreground">mentorados</p>
@@ -167,7 +167,7 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
       {/* ═══ SEÇÃO 3: INDICADORES DE SUCESSO DO CLIENTE ═══ */}
       <section>
         <SectionTitle>Sucesso do cliente</SectionTitle>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
           {/* Card 1 */}
           <MetricCard icon={DollarSign} label="Receita nova gerada" value={formatBRL(props.section3.totalRevenue)} color="text-success" bg="bg-success/10" />
           {/* Card 2 */}
@@ -192,7 +192,7 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
       {/* ═══ SEÇÃO 4: TRABALHO DO CS ═══ */}
       <section>
         <SectionTitle>Trabalho do CS</SectionTitle>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
           <MetricCard icon={Phone} label="Ligações realizadas" value={props.section4.totalLigacoes} color="text-warning" bg="bg-warning/10" />
           <MetricCard icon={Phone} label="Tempo total de ligações" value={formatMinutes(props.section4.totalLigacaoDuration)} color="text-warning" bg="bg-warning/10" />
           <MetricCard icon={MessageCircle} label="Atendimentos WhatsApp" value={props.section4.totalWhatsapp} color="text-success" bg="bg-success/10" />
@@ -205,7 +205,7 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
       {/* ═══ SEÇÃO 5: INDICADORES DE RECEITA NOVA ═══ */}
       <section>
         <SectionTitle>Receita nova</SectionTitle>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-3">
           <MetricCard icon={DollarSign} label="Crossell" value={formatBRL(props.section5.crossell)} color="text-success" bg="bg-success/10" />
           <MetricCard icon={TrendingUp} label="Ascensão (Upsell)" value={formatBRL(props.section5.upsell)} color="text-accent" bg="bg-accent/10" />
           <MetricCard icon={UserPlus} label="Indicação Perpétuo" value={formatBRL(props.section5.indicacao_perpetuo)} color="text-info" bg="bg-info/10" />

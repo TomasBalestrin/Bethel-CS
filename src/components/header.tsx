@@ -35,21 +35,29 @@ export function Header({ profile }: HeaderProps) {
     .toUpperCase()
 
   return (
-    <header className="flex h-14 items-center justify-end border-b border-border bg-card px-6">
+    <header className="flex h-14 items-center justify-between border-b border-border bg-card px-4 md:justify-end md:px-6">
+      {/* Mobile: spacer for hamburger button */}
+      <div className="w-10 md:hidden" />
+
+      {/* Mobile: centered logo */}
+      <span className="font-heading text-sm font-semibold text-foreground md:hidden">
+        Bethel CS
+      </span>
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="flex items-center gap-2 min-h-0 h-auto py-1.5">
+          <Button variant="ghost" className="flex items-center gap-2 min-h-[44px] h-auto py-1.5">
             <Avatar className="h-8 w-8">
               <AvatarImage src={profile.avatar_url ?? undefined} />
               <AvatarFallback className="bg-accent text-accent-foreground text-xs font-medium">
                 {initials}
               </AvatarFallback>
             </Avatar>
-            <span className="text-sm font-medium text-foreground">{profile.full_name}</span>
+            <span className="hidden text-sm font-medium text-foreground sm:inline">{profile.full_name}</span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={handleLogout}>
+          <DropdownMenuItem onClick={handleLogout} className="min-h-[44px] md:min-h-0">
             <LogOut className="mr-2 h-4 w-4" />
             Sair
           </DropdownMenuItem>

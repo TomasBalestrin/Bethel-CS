@@ -126,7 +126,7 @@ export function CreateMenteeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle>Novo Mentorado</DialogTitle>
           <DialogDescription>
@@ -139,7 +139,7 @@ export function CreateMenteeDialog({
             {/* Dados da mentoria */}
             <div className="space-y-3">
               <h3 className="label-xs">Dados da Mentoria</h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="col-span-2 space-y-1">
                   <Label htmlFor="product_name">Produto atual *</Label>
                   <Input
@@ -174,7 +174,7 @@ export function CreateMenteeDialog({
             {/* Dados pessoais */}
             <div className="space-y-3">
               <h3 className="label-xs">Dados Pessoais</h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="col-span-2 space-y-1">
                   <Label htmlFor="full_name">Nome completo *</Label>
                   <Input
@@ -286,7 +286,7 @@ export function CreateMenteeDialog({
               <h3 className="label-xs">
                 Informações Adicionais
               </h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="space-y-1">
                   <Label htmlFor="seller_name">Vendedor que vendeu</Label>
                   <Input

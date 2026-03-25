@@ -166,8 +166,8 @@ export function MenteePanel({ mentee, open, onOpenChange, onMenteeDeleted, onMen
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full min-w-[min(580px,100vw)] max-w-[680px] p-0 sm:max-w-[680px]">
-        <SheetHeader className="px-6 pt-6 pb-4">
+      <SheetContent className="w-full max-w-full p-0 sm:min-w-[580px] sm:max-w-[680px]">
+        <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
               <SheetTitle className="font-heading font-semibold text-xl leading-tight truncate">
@@ -289,7 +289,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
 
   return (
     <Tabs defaultValue="info" className="flex flex-col h-[calc(100vh-180px)]">
-      <div className="relative mx-6 mt-3">
+      <div className="relative mx-4 mt-3 sm:mx-6">
         <div
           ref={tabsRef}
           className="overflow-x-auto scrollbar-none"
@@ -345,7 +345,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
           </button>
         )}
       </div>
-      <ScrollArea className="flex-1 px-6 py-4">
+      <ScrollArea className="flex-1 px-4 py-4 sm:px-6">
         <TabsContent value="info">
           <TabInfo
             mentee={mentee}

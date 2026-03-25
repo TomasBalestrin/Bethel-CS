@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
   if (payload.user_id) {
     query.eq('user_id', payload.user_id)
   } else {
-    query.eq('mentee_id', payload.mentee_id)
+    query.eq('mentee_id', payload.mentee_id!)
   }
 
   const { data: subscriptions, error } = await query

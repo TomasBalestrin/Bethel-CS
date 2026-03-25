@@ -38,7 +38,7 @@ export default async function DashboardLayout({
       <InstallBanner />
       <div className="flex min-h-screen">
         <AppSidebar profile={profile} />
-        <div className="flex flex-1 flex-col pl-[260px]">
+        <div className="flex flex-1 flex-col md:pl-[260px]">
           <Header profile={profile} />
           <main className="flex-1 p-4 md:p-6 lg:p-8">{children}</main>
         </div>

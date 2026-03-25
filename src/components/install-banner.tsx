@@ -1,25 +1,41 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 interface InstallBannerProps {
   variant?: 'default' | 'chat'
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let deferredPromptGlobal: any = null
+
 export function InstallBanner({ variant = 'default' }: InstallBannerProps) {
   const [show, setShow] = useState(false)
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [isIOS, setIsIOS] = useState(false)
+  const captured = useRef(false)
 
   useEffect(() => {
+    // Only show on mobile devices
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+      || window.innerWidth < 768
+    if (!isMobile) return
+
     // Don't show if already dismissed
     if (localStorage.getItem('pwa-dismissed') === 'true') return
 
     // Don't show if already installed (standalone mode)
     if (window.matchMedia('(display-mode: standalone)').matches) return
+    // iOS standalone check
+    if ((navigator as unknown as { standalone?: boolean }).standalone === true) return
 
+    const iosDevice = /iPhone|iPad|iPod/i.test(navigator.userAgent)
+    setIsIOS(iosDevice)
+
+    // Capture beforeinstallprompt globally
     const handler = (e: Event) => {
       e.preventDefault()
-      setDeferredPrompt(e as BeforeInstallPromptEvent)
+      deferredPromptGlobal = e
+      captured.current = true
     }
 
     window.addEventListener('beforeinstallprompt', handler)
@@ -36,13 +52,25 @@ export function InstallBanner({ variant = 'default' }: InstallBannerProps) {
   }, [])
 
   const handleInstall = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt()
-      const result = await deferredPrompt.userChoice
-      if (result.outcome === 'accepted') {
-        setShow(false)
+    if (deferredPromptGlobal) {
+      try {
+        deferredPromptGlobal.prompt()
+        const { outcome } = await deferredPromptGlobal.userChoice
+        if (outcome === 'accepted') {
+          setShow(false)
+        }
+      } catch {
+        // prompt() can only be called once
       }
-      setDeferredPrompt(null)
+      deferredPromptGlobal = null
+      return
+    }
+
+    // Fallback: manual install instructions per OS
+    if (isIOS) {
+      alert('Para instalar:\n1. Toque no botão "Compartilhar" (ícone ⬆️)\n2. Selecione "Adicionar à Tela de Início"')
+    } else {
+      alert('Para instalar:\n1. Toque no menu do navegador (⋮)\n2. Selecione "Adicionar à tela inicial"')
     }
   }
 
@@ -66,13 +94,13 @@ export function InstallBanner({ variant = 'default' }: InstallBannerProps) {
       <div className="flex items-center gap-2">
         <button
           onClick={handleDismiss}
-          className="rounded px-3 py-1.5 text-sm text-white/60 transition hover:text-white"
+          className="rounded px-3 py-2 text-sm text-white/60 transition hover:text-white min-h-[44px]"
         >
           Agora não
         </button>
         <button
           onClick={handleInstall}
-          className="rounded px-4 py-1.5 text-sm font-medium text-white"
+          className="rounded px-4 py-2 text-sm font-medium text-white min-h-[44px]"
           style={{
             background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
           }}
@@ -82,10 +110,4 @@ export function InstallBanner({ variant = 'default' }: InstallBannerProps) {
       </div>
     </div>
   )
-}
-
-// Type for beforeinstallprompt event
-interface BeforeInstallPromptEvent extends Event {
-  prompt(): Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }

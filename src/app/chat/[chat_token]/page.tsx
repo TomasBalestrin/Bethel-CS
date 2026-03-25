@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import {
   Chat,
@@ -35,8 +35,23 @@ export default function MenteeChatPage() {
   const [channel, setChannel] = useState<ReturnType<StreamChat['channel']> | null>(null)
   const [specialistName, setSpecialistName] = useState('')
   const [menteeId, setMenteeId] = useState<string | null>(null)
-  const [pushRequested, setPushRequested] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [bottomPadding, setBottomPadding] = useState(0)
+  const pushRef = useRef(false)
+
+  // iOS keyboard padding via visualViewport
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+
+    function onResize() {
+      const offset = window.innerHeight - (vv?.height ?? window.innerHeight)
+      setBottomPadding(Math.max(0, offset))
+    }
+
+    vv.addEventListener('resize', onResize)
+    return () => vv.removeEventListener('resize', onResize)
+  }, [])
 
   useEffect(() => {
     let chatClient: StreamChat | null = null
@@ -65,7 +80,11 @@ export default function MenteeChatPage() {
 
         chatClient = StreamChat.getInstance(data.api_key)
 
-        if (chatClient.userID !== data.user_id) {
+        if (chatClient.userID && chatClient.userID !== data.user_id) {
+          await chatClient.disconnectUser()
+        }
+
+        if (!chatClient.userID) {
           await chatClient.connectUser(
             { id: data.user_id, name: data.mentee_name },
             data.token
@@ -94,32 +113,27 @@ export default function MenteeChatPage() {
 
   // Request push permission when mentee sends first message
   useEffect(() => {
-    if (!channel || !menteeId || pushRequested) return
+    if (!channel || !menteeId || pushRef.current) return
 
-    const handleMessage = () => {
-      if (!pushRequested) {
-        setPushRequested(true)
+    const handler = (event: { message?: { user?: { id?: string } } }) => {
+      if (event.message?.user?.id?.startsWith('mentee-') && !pushRef.current) {
+        pushRef.current = true
         subscribeToPush(menteeId)
       }
     }
 
-    channel.on('message.new', (event) => {
-      // Only trigger on mentee's own messages
-      if (event.message?.user?.id?.startsWith('mentee-')) {
-        handleMessage()
-      }
-    })
+    channel.on('message.new', handler)
 
     return () => {
-      channel.off('message.new', handleMessage)
+      channel.off('message.new', handler)
     }
-  }, [channel, menteeId, pushRequested])
+  }, [channel, menteeId])
 
   if (error) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-6 text-center">
+      <div className="flex min-h-screen flex-col items-center justify-center p-6 text-center" style={{ backgroundColor: '#060A16' }}>
         <Image src="/logo.png" alt="Bethel CS" width={48} height={48} className="mb-4" />
-        <p className="text-sm text-muted-foreground">{error}</p>
+        <p className="text-sm text-white/70">{error}</p>
       </div>
     )
   }
@@ -129,20 +143,29 @@ export default function MenteeChatPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background">
+    <div
+      className="flex flex-col bg-background"
+      style={{ height: '100dvh', paddingBottom: bottomPadding > 0 ? `${bottomPadding}px` : undefined }}
+    >
       {/* Header */}
-      <header className="flex items-center gap-3 border-b border-border bg-white px-4 py-3 shadow-sm">
-        <Image src="/logo.png" alt="Bethel CS" width={32} height={32} />
-        <div>
-          <h1 className="text-sm font-semibold text-foreground">Bethel CS</h1>
-          {specialistName && (
-            <p className="text-xs text-muted-foreground">{specialistName}</p>
-          )}
+      <header className="flex items-center justify-between shrink-0 px-4 py-3" style={{ backgroundColor: '#060A16' }}>
+        <div className="flex items-center gap-3">
+          <Image src="/logo.png" alt="Bethel CS" width={32} height={32} className="rounded-md" />
+          <div>
+            <h1 className="text-sm font-semibold text-white">Bethel CS</h1>
+            <p className="text-[11px] text-white/50">Seu canal direto com a equipe de CS</p>
+          </div>
         </div>
+        {specialistName && (
+          <div className="text-right">
+            <p className="text-xs font-medium text-white">{specialistName}</p>
+            <p className="text-[10px] text-white/40">Especialista</p>
+          </div>
+        )}
       </header>
 
       {/* Chat */}
-      <div className="bethel-chat-public flex-1" style={{ height: 'calc(100vh - 57px)' }}>
+      <div className="bethel-chat-public flex-1 min-h-0">
         <Chat client={client} theme="str-chat__theme-light">
           <Channel channel={channel}>
             <Window>

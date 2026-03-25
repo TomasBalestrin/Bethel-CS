@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Phone, Mail, Calendar, Star, AtSign } from 'lucide-react'
 import { MenteePanel } from '@/components/kanban/mentee-panel'
+import { useUnreadCounts } from '@/hooks/use-unread-counts'
 import { formatDateBR } from '@/lib/format'
 import type { Database } from '@/types/database'
 import type { MenteeWithStats } from '@/types/kanban'
@@ -26,6 +27,7 @@ interface MentoradosListProps {
 export function MentoradosList({ mentees: initialMentees }: MentoradosListProps) {
   const [menteeList, setMenteeList] = useState(initialMentees)
   const [search, setSearch] = useState('')
+  const unreadMap = useUnreadCounts()
   const [selectedMentee, setSelectedMentee] = useState<MenteeWithStats | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
 
@@ -66,19 +68,26 @@ export function MentoradosList({ mentees: initialMentees }: MentoradosListProps)
         />
       </div>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-6 grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         {filtered.map((m) => {
           const color = LEVEL_COLORS[m.priority_level] ?? LEVEL_COLORS[1]
           const location = [m.city, m.state].filter(Boolean).join(', ')
           const subtitle = [m.product_name, location].filter(Boolean).join(' · ')
           const instHandle = m.instagram?.replace(/^@/, '') || null
 
+          const unread = m.stream_channel_id ? (unreadMap[m.stream_channel_id] ?? 0) : 0
+
           return (
             <div
               key={m.id}
               onClick={() => handleCardClick(m)}
-              className="cursor-pointer rounded-lg border border-border/50 bg-card shadow-card animate-fade-in transition-all hover:shadow-md hover:border-accent/30"
+              className="relative cursor-pointer rounded-lg border border-border/50 bg-card shadow-card animate-fade-in transition-all hover:shadow-md hover:border-accent/30"
             >
+              {unread > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white shadow-sm">
+                  {unread > 99 ? '99+' : unread}
+                </span>
+              )}
               <div className="flex">
                 {/* Color bar */}
                 <div

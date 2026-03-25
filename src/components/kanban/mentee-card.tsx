@@ -15,10 +15,11 @@ const LEVEL_COLORS: Record<number, string> = {
 
 interface MenteeCardProps {
   mentee: MenteeWithStats
+  unreadCount?: number
   onClick?: (mentee: MenteeWithStats) => void
 }
 
-export function MenteeCard({ mentee, onClick }: MenteeCardProps) {
+export function MenteeCard({ mentee, unreadCount = 0, onClick }: MenteeCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: mentee.id,
@@ -44,8 +45,13 @@ export function MenteeCard({ mentee, onClick }: MenteeCardProps) {
       {...listeners}
       {...attributes}
       onClick={handleClick}
-      className="cursor-pointer rounded-lg border border-border/50 bg-card shadow-card transition-all hover:border-accent/30 hover:shadow-md active:cursor-grabbing animate-fade-in"
+      className="relative cursor-pointer rounded-lg border border-border/50 bg-card shadow-card transition-all hover:border-accent/30 hover:shadow-md active:cursor-grabbing animate-fade-in"
     >
+      {unreadCount > 0 && (
+        <span className="absolute -top-1.5 -right-1.5 z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white shadow-sm">
+          {unreadCount > 99 ? '99+' : unreadCount}
+        </span>
+      )}
       <div className="flex">
         {/* Color bar */}
         <div

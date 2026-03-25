@@ -13,12 +13,13 @@ type KanbanStage = Database['public']['Tables']['kanban_stages']['Row']
 interface KanbanColumnProps {
   stage: KanbanStage
   mentees: MenteeWithStats[]
+  unreadMap?: Record<string, number>
   onCardClick?: (mentee: MenteeWithStats) => void
   showAddButton?: boolean
   onAddClick?: () => void
 }
 
-export function KanbanColumn({ stage, mentees, onCardClick, showAddButton, onAddClick }: KanbanColumnProps) {
+export function KanbanColumn({ stage, mentees, unreadMap, onCardClick, showAddButton, onAddClick }: KanbanColumnProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: stage.id,
   })
@@ -26,7 +27,7 @@ export function KanbanColumn({ stage, mentees, onCardClick, showAddButton, onAdd
   return (
     <div
       className={cn(
-        'flex min-w-[260px] w-72 shrink-0 flex-col rounded-lg border border-border bg-muted/50',
+        'flex min-w-[280px] w-72 shrink-0 flex-col rounded-lg border border-border bg-muted/50',
         isOver && 'ring-2 ring-accent/50'
       )}
     >
@@ -47,6 +48,7 @@ export function KanbanColumn({ stage, mentees, onCardClick, showAddButton, onAdd
             <MenteeCard
               key={mentee.id}
               mentee={mentee}
+              unreadCount={mentee.stream_channel_id ? unreadMap?.[mentee.stream_channel_id] : 0}
               onClick={onCardClick}
             />
           ))}

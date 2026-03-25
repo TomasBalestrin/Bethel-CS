@@ -23,6 +23,21 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* Prevent iOS auto-zoom on inputs */
+  @media screen and (max-width: 767px) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
+  }
+
+  .scrollbar-none {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
@@ -79,6 +94,11 @@
 }
 
 /* Public chat page — full height */
+.bethel-chat-public {
+  display: flex;
+  flex-direction: column;
+}
+
 .bethel-chat-public .str-chat {
   --str-chat__primary-color: #1F3A7D;
   --str-chat__active-primary-color: #162d63;
@@ -87,10 +107,23 @@
   height: 100%;
 }
 
+.bethel-chat-public .str-chat__channel-header {
+  display: none;
+}
+
 .bethel-chat-public .str-chat__send-button {
   color: #1F3A7D;
 }
 
 .bethel-chat-public .str-chat__message-bubble {
   border-radius: 0.75rem;
+}
+
+.bethel-chat-public .str-chat__message-input {
+  border-top: 1px solid hsl(var(--border));
+}
+
+/* Ensure message input is never covered by mobile keyboard */
+.bethel-chat-public .str-chat__message-input-inner {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }

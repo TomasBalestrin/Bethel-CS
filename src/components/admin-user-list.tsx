@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { Shield, User, Plus, Pencil, Trash2, Package } from 'lucide-react'
+import { Shield, User, Plus, Pencil, Trash2, Package, MessageSquare, Wifi, WifiOff } from 'lucide-react'
 import {
   createUser,
   updateUser,
@@ -35,19 +35,21 @@ import type { Database, UserRole } from '@/types/database'
 
 type Profile = Database['public']['Tables']['profiles']['Row']
 type Product = Database['public']['Tables']['products']['Row']
+type WppInstance = Database['public']['Tables']['wpp_instances']['Row']
 
 interface AdminUserListProps {
   users: Profile[]
   products: Product[]
+  wppInstances: WppInstance[]
   currentUserId: string
 }
 
-export function AdminUserList({ users, products, currentUserId }: AdminUserListProps) {
+export function AdminUserList({ users, products, wppInstances, currentUserId }: AdminUserListProps) {
   return (
     <div>
       <h1 className="font-heading text-2xl font-bold text-foreground">Admin</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Gestão de usuários e produtos do sistema
+        Gestão de usuários, produtos e WhatsApp do sistema
       </p>
 
       <UsersSection users={users} currentUserId={currentUserId} />
@@ -55,6 +57,13 @@ export function AdminUserList({ users, products, currentUserId }: AdminUserListP
       <Separator className="my-8" />
 
       <ProductsSection products={products} />
+
+      <Separator className="my-8" />
+
+      <WhatsAppSection
+        specialists={users.filter((u) => u.role === 'especialista')}
+        instances={wppInstances}
+      />
     </div>
   )
 }
@@ -417,6 +426,176 @@ function ProductsSection({ products }: { products: Product[] }) {
               <Button type="submit" disabled={loading}>{loading ? 'Salvando...' : 'Salvar'}</Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════
+// WHATSAPP SECTION
+// ═══════════════════════════════════════
+
+function WhatsAppSection({ specialists, instances }: { specialists: Profile[]; instances: WppInstance[] }) {
+  const router = useRouter()
+  const [qrInstanceId, setQrInstanceId] = useState<string | null>(null)
+  const [qrSpecialistName, setQrSpecialistName] = useState('')
+  const [qrAscii, setQrAscii] = useState<string | null>(null)
+  const [qrConnected, setQrConnected] = useState(false)
+  const [qrLoading, setQrLoading] = useState(false)
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const instanceMap = new Map(instances.map((i) => [i.specialist_id, i]))
+
+  function openQR(specialist: Profile, instanceId: string) {
+    setQrSpecialistName(specialist.full_name)
+    setQrInstanceId(instanceId)
+    setQrAscii(null)
+    setQrConnected(false)
+    fetchQR(instanceId)
+  }
+
+  async function fetchQR(instanceId: string) {
+    setQrLoading(true)
+    try {
+      const res = await fetch(`/api/whatsapp/qrcode/${instanceId}`)
+      const data = await res.json()
+
+      if (data.status === true) {
+        setQrConnected(true)
+        stopPolling()
+        router.refresh()
+        return
+      }
+
+      setQrAscii(data.ascii || null)
+
+      // Start polling if not already
+      if (!pollingRef.current) {
+        pollingRef.current = setInterval(() => fetchQR(instanceId), 3000)
+      }
+    } catch {
+      setQrAscii(null)
+    } finally {
+      setQrLoading(false)
+    }
+  }
+
+  function stopPolling() {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current)
+      pollingRef.current = null
+    }
+  }
+
+  function closeQR() {
+    stopPolling()
+    setQrInstanceId(null)
+    setQrAscii(null)
+  }
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-4">
+        <MessageSquare className="h-5 w-5 text-green-600" />
+        <h2 className="font-heading text-xl font-semibold text-foreground">WhatsApp</h2>
+      </div>
+
+      <div className="space-y-3">
+        {specialists.map((specialist) => {
+          const instance = instanceMap.get(specialist.id)
+          const isConnected = instance?.status === 'connected'
+          const initials = specialist.full_name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
+
+          return (
+            <div key={specialist.id} className="flex items-center justify-between rounded-lg border border-border bg-card p-4 shadow-card">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-10 w-10">
+                  <AvatarImage src={specialist.avatar_url ?? undefined} />
+                  <AvatarFallback className="bg-accent text-accent-foreground text-xs font-medium">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-sm font-medium text-foreground">{specialist.full_name}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {instance ? (
+                      <>
+                        <Badge variant={isConnected ? 'success' : 'muted'} className="text-[10px]">
+                          {isConnected ? (
+                            <><Wifi className="h-3 w-3 mr-1" /> Conectado</>
+                          ) : (
+                            <><WifiOff className="h-3 w-3 mr-1" /> Desconectado</>
+                          )}
+                        </Badge>
+                        {instance.phone_number && (
+                          <span className="text-xs text-muted-foreground">{instance.phone_number}</span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Sem instância configurada</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                {instance && !isConnected && (
+                  <Button size="sm" variant="outline" onClick={() => openQR(specialist, instance.instance_id)}>
+                    Conectar
+                  </Button>
+                )}
+                {instance && isConnected && (
+                  <Button size="sm" variant="ghost" className="text-destructive" disabled>
+                    Desconectar
+                  </Button>
+                )}
+                {!instance && (
+                  <span className="text-xs text-muted-foreground">—</span>
+                )}
+              </div>
+            </div>
+          )
+        })}
+
+        {specialists.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-6">Nenhum especialista cadastrado</p>
+        )}
+      </div>
+
+      {/* QR Code Modal */}
+      <Dialog open={!!qrInstanceId} onOpenChange={(open) => { if (!open) closeQR() }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Conectar WhatsApp — {qrSpecialistName}</DialogTitle>
+            <DialogDescription>
+              Abra o WhatsApp &gt; Aparelhos conectados &gt; Conectar aparelho
+            </DialogDescription>
+          </DialogHeader>
+
+          {qrConnected ? (
+            <div className="flex flex-col items-center py-8">
+              <Wifi className="h-10 w-10 text-green-500 mb-3" />
+              <p className="text-sm font-medium text-foreground">WhatsApp conectado!</p>
+            </div>
+          ) : qrAscii ? (
+            <div className="flex justify-center overflow-auto">
+              <pre className="font-mono text-[4px] leading-none whitespace-pre">{qrAscii}</pre>
+            </div>
+          ) : qrLoading ? (
+            <div className="flex flex-col items-center py-8">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-muted border-t-accent" />
+              <p className="mt-2 text-xs text-muted-foreground">Gerando QR Code...</p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center py-8">
+              <p className="text-sm text-muted-foreground">QR Code não disponível. Tente novamente.</p>
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <Button variant="outline" onClick={closeQR}>Fechar</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

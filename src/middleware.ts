@@ -7,7 +7,11 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   // Public routes (no auth required)
-  if (pathname.startsWith('/form/')) {
+  if (
+    pathname.startsWith('/form/') ||
+    pathname.startsWith('/chat/') ||
+    pathname === '/api/stream/mentee-token'
+  ) {
     return supabaseResponse
   }
 

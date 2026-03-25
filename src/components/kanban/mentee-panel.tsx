@@ -35,6 +35,9 @@ import {
   DollarSign,
   ChevronRight,
   ArrowRight,
+  MessageSquare,
+  Copy,
+  Check,
 } from 'lucide-react'
 import { formatDateBR } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
@@ -64,7 +67,13 @@ import {
   updateMentee,
   deleteMentee,
 } from '@/lib/actions/panel-actions'
+import dynamic from 'next/dynamic'
 import type { MenteeWithStats } from '@/types/kanban'
+
+const TabChat = dynamic(
+  () => import('./tab-chat').then((mod) => ({ default: mod.TabChat })),
+  { ssr: false }
+)
 import type { Database, TestimonialCategory, EngagementType, CsActivityType, RevenueType } from '@/types/database'
 
 type Indication = Database['public']['Tables']['indications']['Row']
@@ -259,6 +268,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
 }) {
   const tabsRef = useRef<HTMLDivElement>(null)
   const [showOverflow, setShowOverflow] = useState(false)
+  const [chatUnread, setChatUnread] = useState(0)
 
   useEffect(() => {
     function check() {
@@ -293,13 +303,26 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
               { value: 'objectives', label: 'Objetivos' },
               { value: 'testimonials', label: 'Depoimentos' },
               { value: 'engagement', label: 'Engajamento' },
+              { value: 'chat', label: 'Chat' },
             ].map((tab) => (
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
                 className="whitespace-nowrap rounded-none border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-accent data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
               >
-                {tab.label}
+                {tab.value === 'chat' ? (
+                  <span className="flex items-center gap-1.5">
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    Chat
+                    {chatUnread > 0 && (
+                      <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-white">
+                        {chatUnread}
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  tab.label
+                )}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -329,6 +352,12 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
         <TabsContent value="objectives"><TabObjectives menteeId={mentee.id} /></TabsContent>
         <TabsContent value="testimonials"><TabTestimonials menteeId={mentee.id} /></TabsContent>
         <TabsContent value="engagement"><TabEngagement menteeId={mentee.id} /></TabsContent>
+        <TabsContent value="chat">
+          <TabChat
+            channelId={mentee.stream_channel_id}
+            onUnreadCountChange={setChatUnread}
+          />
+        </TabsContent>
       </ScrollArea>
     </Tabs>
   )
@@ -594,6 +623,14 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
         </div>
       </div>
 
+      {/* Link do Chat */}
+      {mentee.chat_token && (
+        <div className="border-t border-border/50 pt-4">
+          <SectionTitle>Link do Chat</SectionTitle>
+          <ChatLinkCopy chatToken={mentee.chat_token} />
+        </div>
+      )}
+
       {/* Transition to Mentorship button — admin only, initial kanban only */}
       {isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship && (
         <div className="border-t border-border/50 pt-4">
@@ -646,6 +683,32 @@ function ClienteFitToggle({ menteeId, initialValue }: { menteeId: string; initia
     >
       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${fit ? 'translate-x-6' : 'translate-x-1'}`} />
     </button>
+  )
+}
+
+function ChatLinkCopy({ chatToken }: { chatToken: string }) {
+  const [copied, setCopied] = useState(false)
+  const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/chat/${chatToken}`
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(url)
+    setCopied(true)
+    toast.success('Link copiado!')
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="flex items-center gap-2 py-2">
+      <Input
+        readOnly
+        value={url}
+        className="text-xs h-8 bg-muted/50 flex-1"
+        onFocus={(e) => e.target.select()}
+      />
+      <Button variant="outline" size="sm" className="h-8 px-2 shrink-0" onClick={handleCopy}>
+        {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+      </Button>
+    </div>
   )
 }
 

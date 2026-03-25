@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createStreamChannel } from '@/lib/stream/create-channel'
 import type { Database, KanbanType } from '@/types/database'
 
 type MenteeInsert = Database['public']['Tables']['mentees']['Insert']
@@ -53,6 +54,13 @@ export async function createMentee(input: CreateMenteeInput) {
     return { error: 'Etapas não encontradas' }
   }
 
+  // Get specialist profile for Stream
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, avatar_url')
+    .eq('id', user.id)
+    .single()
+
   const menteeData: MenteeInsert = {
     full_name: input.full_name,
     phone: input.phone,
@@ -76,10 +84,34 @@ export async function createMentee(input: CreateMenteeInput) {
     created_by: user.id,
   }
 
-  const { error } = await supabase.from('mentees').insert(menteeData)
+  const { data: newMentee, error } = await supabase
+    .from('mentees')
+    .insert(menteeData)
+    .select('id')
+    .single()
 
-  if (error) {
-    return { error: error.message }
+  if (error || !newMentee) {
+    return { error: error?.message ?? 'Erro ao criar mentorado' }
+  }
+
+  // Create Stream Chat channel for this mentee
+  try {
+    const channelId = await createStreamChannel({
+      menteeId: newMentee.id,
+      menteeName: input.full_name,
+      specialistId: user.id,
+      specialistName: profile?.full_name ?? 'Especialista',
+      specialistAvatar: profile?.avatar_url ?? undefined,
+    })
+
+    // Save channel ID in the database
+    await supabase
+      .from('mentees')
+      .update({ stream_channel_id: channelId })
+      .eq('id', newMentee.id)
+  } catch (err) {
+    // Channel creation failed — mentee was still created, log but don't block
+    console.error('Failed to create Stream channel:', err)
   }
 
   revalidatePath('/etapas-iniciais')

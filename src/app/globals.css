@@ -52,3 +52,45 @@
     display: none;
   }
 }
+
+/* ─── Stream Chat Bethel overrides ─── */
+.bethel-chat .str-chat {
+  --str-chat__primary-color: #1F3A7D;
+  --str-chat__active-primary-color: #162d63;
+  --str-chat__font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--str-chat__font-family);
+  height: 100%;
+}
+
+.bethel-chat .str-chat__channel-header {
+  display: none;
+}
+
+.bethel-chat .str-chat__message-bubble {
+  border-radius: 0.75rem;
+}
+
+.bethel-chat .str-chat__message-input {
+  border-top: 1px solid hsl(var(--border));
+}
+
+.bethel-chat .str-chat__send-button {
+  color: #1F3A7D;
+}
+
+/* Public chat page — full height */
+.bethel-chat-public .str-chat {
+  --str-chat__primary-color: #1F3A7D;
+  --str-chat__active-primary-color: #162d63;
+  --str-chat__font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--str-chat__font-family);
+  height: 100%;
+}
+
+.bethel-chat-public .str-chat__send-button {
+  color: #1F3A7D;
+}
+
+.bethel-chat-public .str-chat__message-bubble {
+  border-radius: 0.75rem;
+}

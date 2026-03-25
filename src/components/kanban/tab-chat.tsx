@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone } from 'lucide-react'
+import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, ChevronDown, ChevronRight, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { CallInterface } from './call-interface'
 import { toast } from 'sonner'
 import type { Database } from '@/types/database'
 
 type WppMessage = Database['public']['Tables']['wpp_messages']['Row']
+type CallRecord = Database['public']['Tables']['call_records']['Row']
 
 interface TabChatProps {
   menteeId: string
@@ -69,6 +70,11 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const [callData, setCallData] = useState<{ roomUrl: string; token: string; callId: string } | null>(null)
   const [callingLoading, setCallingLoading] = useState(false)
 
+  // Call history
+  const [callRecords, setCallRecords] = useState<CallRecord[]>([])
+  const [callsExpanded, setCallsExpanded] = useState(false)
+  const [playingRecording, setPlayingRecording] = useState<string | null>(null)
+
   // Audio recording
   const [recording, setRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
@@ -103,6 +109,15 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
         setIsAdmin(profile?.role === 'admin')
         setIsOwner(specialistId === user.id)
+
+        // Fetch call history
+        const { data: calls } = await supabase
+          .from('call_records')
+          .select('*')
+          .eq('mentee_id', menteeId)
+          .order('created_at', { ascending: false })
+          .limit(20)
+        if (calls) setCallRecords(calls)
 
         const targetId = specialistId
         if (!targetId) { setNoInstance(true); return }
@@ -437,6 +452,79 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         })}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Call history — collapsible */}
+      {callRecords.length > 0 && (
+        <div className="border-t border-border shrink-0">
+          <button
+            type="button"
+            onClick={() => setCallsExpanded(!callsExpanded)}
+            className="flex w-full items-center gap-2 px-4 py-2 text-xs text-muted-foreground hover:bg-muted/50 transition-colors"
+          >
+            {callsExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            <span className="label-xs">LIGAÇÕES ({callRecords.length})</span>
+          </button>
+
+          {callsExpanded && (
+            <div className="px-4 pb-2 space-y-1.5 max-h-[200px] overflow-y-auto">
+              {callRecords.map((call) => (
+                <div key={call.id} className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2 text-xs">
+                  <PhoneCall className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-foreground">
+                      {new Date(call.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      {' '}
+                      {new Date(call.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {call.duration_seconds != null && (
+                      <span className="text-muted-foreground ml-2">
+                        {Math.floor(call.duration_seconds / 60)}m {call.duration_seconds % 60}s
+                      </span>
+                    )}
+                  </div>
+                  {call.recording_status === 'ready' && call.recording_url && (
+                    <button
+                      onClick={() => setPlayingRecording(playingRecording === call.id ? null : call.id)}
+                      className="flex items-center gap-1 text-accent hover:underline shrink-0"
+                    >
+                      <Play className="h-3 w-3" /> Ouvir
+                    </button>
+                  )}
+                  {call.recording_status === 'processing' && (
+                    <span className="flex items-center gap-1 text-muted-foreground shrink-0">
+                      <Loader2 className="h-3 w-3 animate-spin" /> Processando...
+                    </span>
+                  )}
+                  {call.recording_status === 'pending' && call.ended_at && (
+                    <span className="text-muted-foreground shrink-0">Aguardando...</span>
+                  )}
+                  {call.recording_status === 'failed' && (
+                    <span className="text-destructive shrink-0">Falhou</span>
+                  )}
+                </div>
+              ))}
+
+              {/* Audio player modal */}
+              {playingRecording && (
+                <div className="rounded-lg bg-muted p-3">
+                  <audio
+                    controls
+                    autoPlay
+                    src={callRecords.find((c) => c.id === playingRecording)?.recording_url || ''}
+                    className="w-full"
+                  />
+                  <button
+                    onClick={() => setPlayingRecording(null)}
+                    className="mt-1 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Fechar player
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Input area — fixed bottom */}
       <div className="border-t border-border px-3 py-2 shrink-0 bg-background">

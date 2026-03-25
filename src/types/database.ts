@@ -453,34 +453,6 @@ export interface Database {
         }
         Relationships: []
       }
-      call_records: {
-        Row: {
-          id: string
-          mentee_id: string
-          duration_minutes: number
-          call_type: CallType
-          recorded_at: string
-          created_by: string | null
-          created_at: string
-        }
-        Insert: {
-          id?: string
-          mentee_id: string
-          duration_minutes: number
-          call_type: CallType
-          recorded_at: string
-          created_by?: string | null
-          created_at?: string
-        }
-        Update: {
-          mentee_id?: string
-          duration_minutes?: number
-          call_type?: CallType
-          recorded_at?: string
-          created_by?: string | null
-        }
-        Relationships: []
-      }
       cs_activities: {
         Row: {
           id: string

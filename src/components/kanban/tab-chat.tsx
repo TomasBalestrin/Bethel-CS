@@ -633,6 +633,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
 // ─── Message Content Renderer ───
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function MessageContent({ msg, menteeName }: { msg: WppMessage; menteeName: string }) {
   const content = msg.content || ''
   const mediaUrl = msg.media_url

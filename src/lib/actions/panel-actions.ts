@@ -44,6 +44,9 @@ export async function deleteMentee(menteeId: string) {
 
   if (profile?.role !== 'admin') return { error: 'Sem permissão' }
 
+  // Clear referrals pointing to this mentee
+  await supabase.from('mentees').update({ referred_by_mentee_id: null }).eq('referred_by_mentee_id', menteeId)
+
   // Delete related records first (cascade)
   const tables = [
     'attendances',
@@ -55,6 +58,10 @@ export async function deleteMentee(menteeId: string) {
     'testimonials',
     'engagement_records',
     'cs_activities',
+    'chat_metrics',
+    'wpp_messages',
+    'cancellations',
+    'push_subscriptions',
   ] as const
 
   for (const table of tables) {

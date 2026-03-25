@@ -11,6 +11,11 @@ export function InstallBanner({ variant = 'default' }: InstallBannerProps) {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
 
   useEffect(() => {
+    // Only show on mobile devices
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+      || window.innerWidth < 768
+    if (!isMobile) return
+
     // Don't show if already dismissed
     if (localStorage.getItem('pwa-dismissed') === 'true') return
 

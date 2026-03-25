@@ -190,10 +190,8 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
   const wppLink = `https://wa.me/${menteePhone.replace(/\D/g, '')}`
   const isDisconnected = instanceStatus !== 'connected'
-  const canSend = isOwner && !isDisconnected
-  const inputDisabledReason = !isOwner && isAdmin
-    ? 'Apenas o especialista pode responder'
-    : isDisconnected
+  const canSend = (isOwner || isAdmin) && !isDisconnected
+  const inputDisabledReason = isDisconnected
     ? 'WhatsApp desconectado — reconecte no Admin'
     : null
 

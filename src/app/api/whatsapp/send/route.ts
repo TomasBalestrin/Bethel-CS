@@ -18,12 +18,43 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'menteeId e message são obrigatórios' }, { status: 400 })
   }
 
-  // 2. Find specialist's WPP instance
-  const { data: instance } = await supabase
+  // 2. Find mentee + their specialist
+  const { data: mentee } = await supabase
+    .from('mentees')
+    .select('id, phone, created_by')
+    .eq('id', menteeId)
+    .single()
+
+  if (!mentee) {
+    return NextResponse.json({ error: 'Mentorado não encontrado' }, { status: 404 })
+  }
+
+  // 3. Find WPP instance — try logged-in user first, then mentee's specialist
+  let instance = null
+  let specialistId = user.id
+
+  const { data: ownInstance } = await supabase
     .from('wpp_instances')
-    .select('instance_id, status')
+    .select('instance_id, status, specialist_id')
     .eq('specialist_id', user.id)
     .single()
+
+  if (ownInstance) {
+    instance = ownInstance
+    specialistId = ownInstance.specialist_id
+  } else if (mentee.created_by && mentee.created_by !== user.id) {
+    // Admin sending — use the mentee's specialist instance
+    const { data: specialistInstance } = await supabase
+      .from('wpp_instances')
+      .select('instance_id, status, specialist_id')
+      .eq('specialist_id', mentee.created_by)
+      .single()
+
+    if (specialistInstance) {
+      instance = specialistInstance
+      specialistId = specialistInstance.specialist_id
+    }
+  }
 
   if (!instance) {
     return NextResponse.json({ error: 'Instância WhatsApp não configurada' }, { status: 404 })
@@ -33,34 +64,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'WhatsApp desconectado' }, { status: 400 })
   }
 
-  // 3. Find mentee phone
-  const { data: mentee } = await supabase
-    .from('mentees')
-    .select('id, phone')
-    .eq('id', menteeId)
-    .single()
-
-  if (!mentee) {
-    return NextResponse.json({ error: 'Mentorado não encontrado' }, { status: 404 })
-  }
-
-  // Normalize phone: ensure it has country code 55
+  // 4. Normalize phone
   let phone = mentee.phone.replace(/\D/g, '')
   if (!phone.startsWith('55')) {
     phone = '55' + phone
   }
 
-  // 4. Send via Next Apps
+  // 5. Send via Next Apps
   const result = await sendMessage(instance.instance_id, phone, message, type, imageUrl)
 
   if (!result.success) {
     return NextResponse.json({ error: result.error }, { status: 500 })
   }
 
-  // 5. Save to wpp_messages
+  // 6. Save to wpp_messages
   await supabase.from('wpp_messages').insert({
     mentee_id: menteeId,
-    specialist_id: user.id,
+    specialist_id: specialistId,
     instance_id: instance.instance_id,
     direction: 'outgoing',
     message_type: type || 'text',

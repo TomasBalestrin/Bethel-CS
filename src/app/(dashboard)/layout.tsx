@@ -4,6 +4,7 @@ import { AppSidebar } from '@/components/app-sidebar'
 import { Header } from '@/components/header'
 import { SplashScreen } from '@/components/splash-screen'
 import { PushPrompt } from '@/components/push-prompt'
+import { InstallBanner } from '@/components/install-banner'
 
 export default async function DashboardLayout({
   children,
@@ -34,6 +35,7 @@ export default async function DashboardLayout({
     <>
       <SplashScreen />
       <PushPrompt />
+      <InstallBanner />
       <div className="flex min-h-screen">
         <AppSidebar profile={profile} />
         <div className="flex flex-1 flex-col pl-[260px]">

@@ -14,6 +14,7 @@ import { Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import { SplashScreen } from '@/components/splash-screen'
 import { subscribeToPush } from '@/lib/push/subscribe'
+import { InstallBanner } from '@/components/install-banner'
 
 import 'stream-chat-react/dist/css/v2/index.css'
 
@@ -152,6 +153,8 @@ export default function MenteeChatPage() {
           </Channel>
         </Chat>
       </div>
+
+      <InstallBanner variant="chat" />
     </div>
   )
 }

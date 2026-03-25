@@ -75,7 +75,7 @@ export function MentoradosList({ mentees: initialMentees }: MentoradosListProps)
           const subtitle = [m.product_name, location].filter(Boolean).join(' · ')
           const instHandle = m.instagram?.replace(/^@/, '') || null
 
-          const unread = m.stream_channel_id ? (unreadMap[m.stream_channel_id] ?? 0) : 0
+          const unread = unreadMap[m.id] ?? 0
 
           return (
             <div

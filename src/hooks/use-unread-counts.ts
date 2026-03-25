@@ -1,11 +1,12 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { StreamChat } from 'stream-chat'
+import { createClient } from '@/lib/supabase/client'
 
 /**
- * Hook that connects to Stream Chat and returns unread message counts
- * keyed by stream_channel_id (e.g. "mentee-{uuid}").
+ * Hook that fetches unread WhatsApp message counts per mentee_id
+ * and listens for real-time changes via Supabase Realtime.
+ * Returns a map: { [menteeId]: unreadCount }
  */
 export function useUnreadCounts() {
   const [unreadMap, setUnreadMap] = useState<Record<string, number>>({})
@@ -15,63 +16,42 @@ export function useUnreadCounts() {
     if (initialized.current) return
     initialized.current = true
 
-    let client: StreamChat | null = null
+    const supabase = createClient()
 
-    async function init() {
-      try {
-        const res = await fetch('/api/stream/token')
-        if (!res.ok) return
-        const data = await res.json()
+    async function fetchUnread() {
+      const { data, error } = await supabase
+        .from('wpp_messages')
+        .select('mentee_id')
+        .eq('direction', 'incoming')
+        .eq('is_read', false)
 
-        client = StreamChat.getInstance(data.api_key)
+      if (error || !data) return
 
-        if (client.userID && client.userID !== data.user_id) {
-          await client.disconnectUser()
-        }
-
-        if (!client.userID) {
-          await client.connectUser(
-            { id: data.user_id, name: data.user_name },
-            data.token
-          )
-        }
-
-        // Query all channels the specialist is a member of
-        const channels = await client.queryChannels(
-          { type: 'messaging', members: { $in: [data.user_id] } },
-          { last_message_at: -1 },
-          { limit: 100 }
-        )
-
-        const map: Record<string, number> = {}
-        for (const ch of channels) {
-          const count = ch.countUnread()
-          if (count > 0 && ch.id) {
-            map[ch.id] = count
-          }
-        }
-        setUnreadMap(map)
-
-        // Listen for new messages and read events across all channels
-        const handleEvent = () => {
-          const updated: Record<string, number> = {}
-          for (const ch of channels) {
-            const count = ch.countUnread()
-            if (count > 0 && ch.id) {
-              updated[ch.id] = count
-            }
-          }
-          setUnreadMap(updated)
-        }
-
-        client.on('message.new', handleEvent)
-        client.on('message.read', handleEvent)
-      } catch (err) {
-        console.error('useUnreadCounts init error:', err)
+      const map: Record<string, number> = {}
+      for (const row of data) {
+        map[row.mentee_id] = (map[row.mentee_id] || 0) + 1
       }
+      setUnreadMap(map)
     }
 
-    init()
+    fetchUnread()
+
+    // Listen for new messages and read updates
+    const channel = supabase
+      .channel('wpp_unread_global')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'wpp_messages' },
+        () => {
+          // Re-fetch on any change
+          fetchUnread()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [])
 
   return unreadMap

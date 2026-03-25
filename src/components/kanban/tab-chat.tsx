@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import {
   Chat,
   Channel,
-  ChannelHeader,
   MessageList,
   MessageInput,
   Window,
@@ -26,76 +25,98 @@ export function TabChat({ menteeId, channelId, onUnreadCountChange, onChannelCre
   const [channel, setChannel] = useState<ReturnType<StreamChat['channel']> | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const initialized = useRef(false)
+  const onUnreadRef = useRef(onUnreadCountChange)
+  const onCreatedRef = useRef(onChannelCreated)
 
-  const init = useCallback(async () => {
-    let activeChannelId = channelId
-
-    // Auto-create channel if not configured
-    if (!activeChannelId) {
-      setCreating(true)
-      try {
-        const res = await fetch(`/api/admin/create-channel`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mentee_id: menteeId }),
-        })
-        if (!res.ok) throw new Error('Falha ao criar canal')
-        const data = await res.json()
-        activeChannelId = data.channel_id
-        onChannelCreated?.(activeChannelId!)
-      } catch (err) {
-        console.error('Channel creation error:', err)
-        setError('Erro ao criar canal de chat.')
-        setCreating(false)
-        return
-      }
-      setCreating(false)
-    }
-
-    try {
-      const res = await fetch('/api/stream/token')
-      if (!res.ok) throw new Error('Falha ao obter token')
-      const data = await res.json()
-
-      const chatClient = StreamChat.getInstance(data.api_key)
-
-      if (chatClient.userID !== data.user_id) {
-        await chatClient.connectUser(
-          { id: data.user_id, name: data.user_name },
-          data.token
-        )
-      }
-
-      const ch = chatClient.channel('messaging', activeChannelId!)
-      await ch.watch()
-
-      setClient(chatClient)
-      setChannel(ch)
-
-      // Initial unread count
-      const state = ch.state
-      onUnreadCountChange?.(state.unreadCount ?? 0)
-    } catch (err) {
-      console.error('Stream Chat init error:', err)
-      setError('Erro ao conectar ao chat.')
-    }
-  }, [channelId, menteeId, onUnreadCountChange, onChannelCreated])
+  // Keep refs in sync
+  onUnreadRef.current = onUnreadCountChange
+  onCreatedRef.current = onChannelCreated
 
   useEffect(() => {
+    if (initialized.current) return
+    initialized.current = true
+
+    let cancelled = false
+
+    async function init() {
+      let activeChannelId = channelId
+
+      // Auto-create channel if not configured
+      if (!activeChannelId) {
+        setCreating(true)
+        try {
+          const res = await fetch('/api/admin/create-channel', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mentee_id: menteeId }),
+          })
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}))
+            throw new Error(errData.error || 'Falha ao criar canal')
+          }
+          const data = await res.json()
+          activeChannelId = data.channel_id
+          onCreatedRef.current?.(activeChannelId!)
+        } catch (err) {
+          console.error('Channel creation error:', err)
+          if (!cancelled) {
+            setError('Erro ao criar canal de chat.')
+            setCreating(false)
+          }
+          return
+        }
+        if (!cancelled) setCreating(false)
+      }
+
+      try {
+        const res = await fetch('/api/stream/token')
+        if (!res.ok) throw new Error('Falha ao obter token')
+        const data = await res.json()
+
+        const chatClient = StreamChat.getInstance(data.api_key)
+
+        if (chatClient.userID && chatClient.userID !== data.user_id) {
+          await chatClient.disconnectUser()
+        }
+
+        if (!chatClient.userID) {
+          await chatClient.connectUser(
+            { id: data.user_id, name: data.user_name },
+            data.token
+          )
+        }
+
+        const ch = chatClient.channel('messaging', activeChannelId!)
+        await ch.watch()
+
+        if (!cancelled) {
+          setClient(chatClient)
+          setChannel(ch)
+
+          // Mark as read when opening
+          await ch.markRead()
+          onUnreadRef.current?.(0)
+        }
+      } catch (err) {
+        console.error('Stream Chat init error:', err)
+        if (!cancelled) setError('Erro ao conectar ao chat.')
+      }
+    }
+
     init()
 
     return () => {
-      // Don't disconnect — StreamChat.getInstance is a singleton
-      // and might be used by other tabs. Just cleanup channel watch.
+      cancelled = true
     }
-  }, [init])
+  }, [channelId, menteeId])
 
   // Listen for unread count changes
   useEffect(() => {
-    if (!channel || !onUnreadCountChange) return
+    if (!channel) return
 
     const handler = () => {
-      onUnreadCountChange(channel.state.unreadCount ?? 0)
+      onUnreadRef.current?.(channel.countUnread())
     }
 
     channel.on('message.new', handler)
@@ -105,7 +126,7 @@ export function TabChat({ menteeId, channelId, onUnreadCountChange, onChannelCre
       channel.off('message.new', handler)
       channel.off('message.read', handler)
     }
-  }, [channel, onUnreadCountChange])
+  }, [channel])
 
   if (error) {
     return (
@@ -127,11 +148,10 @@ export function TabChat({ menteeId, channelId, onUnreadCountChange, onChannelCre
   }
 
   return (
-    <div className="bethel-chat -mx-6 -mt-4 flex flex-col" style={{ height: 'calc(100vh - 260px)' }}>
+    <div className="bethel-chat -mx-4 -mt-4 sm:-mx-6 flex flex-col" style={{ height: 'calc(100vh - 260px)' }}>
       <Chat client={client} theme="str-chat__theme-light">
         <Channel channel={channel}>
           <Window>
-            <ChannelHeader />
             <MessageList />
             <MessageInput />
           </Window>

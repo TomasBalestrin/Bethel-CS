@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { NAV_ITEMS } from '@/lib/constants'
 import { SidebarNavItem } from '@/components/sidebar-nav-item'
-import { Menu, X } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { Menu, X, LogOut } from 'lucide-react'
 import type { Profile } from '@/types/auth'
 
 interface AppSidebarProps {
@@ -13,6 +15,14 @@ interface AppSidebarProps {
 
 export function AppSidebar({ profile }: AppSidebarProps) {
   const [open, setOpen] = useState(false)
+  const router = useRouter()
+  const supabase = createClient()
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
 
   const items = NAV_ITEMS.filter(
     (item) => !item.adminOnly || profile.role === 'admin'
@@ -84,6 +94,16 @@ export function AppSidebar({ profile }: AppSidebarProps) {
             </div>
           ))}
         </nav>
+        <div className="border-t border-white/10 p-3">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <LogOut className="h-4 w-4" />
+            Sair
+          </button>
+        </div>
       </aside>
     </>
   )

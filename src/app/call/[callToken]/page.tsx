@@ -1,14 +1,13 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { useParams, useSearchParams } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import DailyIframe from '@daily-co/daily-js'
 import { Mic, MicOff, PhoneOff, Phone, Loader2 } from 'lucide-react'
 import Image from 'next/image'
 
 export default function MenteeCallPage() {
   const params = useParams()
-  const searchParams = useSearchParams()
   const callToken = params.callToken as string
 
   const [status, setStatus] = useState<'loading' | 'ready' | 'connecting' | 'active' | 'ended' | 'error'>('loading')

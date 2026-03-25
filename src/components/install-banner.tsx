@@ -26,7 +26,7 @@ export function InstallBanner({ variant = 'default' }: InstallBannerProps) {
     // Don't show if already installed (standalone mode)
     if (window.matchMedia('(display-mode: standalone)').matches) return
     // iOS standalone check
-    if ((navigator as any).standalone === true) return
+    if ((navigator as unknown as { standalone?: boolean }).standalone === true) return
 
     const iosDevice = /iPhone|iPad|iPod/i.test(navigator.userAgent)
     setIsIOS(iosDevice)

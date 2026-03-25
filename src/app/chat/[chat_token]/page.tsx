@@ -35,7 +35,6 @@ export default function MenteeChatPage() {
   const [channel, setChannel] = useState<ReturnType<StreamChat['channel']> | null>(null)
   const [specialistName, setSpecialistName] = useState('')
   const [menteeId, setMenteeId] = useState<string | null>(null)
-  const [pushRequested, setPushRequested] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [bottomPadding, setBottomPadding] = useState(0)
   const pushRef = useRef(false)
@@ -119,7 +118,6 @@ export default function MenteeChatPage() {
     const handler = (event: { message?: { user?: { id?: string } } }) => {
       if (event.message?.user?.id?.startsWith('mentee-') && !pushRef.current) {
         pushRef.current = true
-        setPushRequested(true)
         subscribeToPush(menteeId)
       }
     }

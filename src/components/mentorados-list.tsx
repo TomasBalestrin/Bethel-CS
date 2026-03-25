@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Phone, Mail, Calendar, Star, AtSign, MessageCircle } from 'lucide-react'
+import { Phone, Mail, Calendar, Star, AtSign } from 'lucide-react'
 import { MenteePanel } from '@/components/kanban/mentee-panel'
 import { useUnreadCounts } from '@/hooks/use-unread-counts'
 import { formatDateBR } from '@/lib/format'

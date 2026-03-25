@@ -12,16 +12,19 @@ interface TabChatProps {
   menteeId: string
   menteePhone: string
   menteeName: string
+  specialistId: string | null
   onUnreadCountChange?: (count: number) => void
 }
 
-export function TabChat({ menteeId, menteePhone, menteeName, onUnreadCountChange }: TabChatProps) {
+export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnreadCountChange }: TabChatProps) {
   const [messages, setMessages] = useState<WppMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [input, setInput] = useState('')
   const [instanceStatus, setInstanceStatus] = useState<string | null>(null)
   const [noInstance, setNoInstance] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [isOwner, setIsOwner] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const onUnreadRef = useRef(onUnreadCountChange)
@@ -31,7 +34,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, onUnreadCountChange
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [])
 
-  // Fetch messages + instance status
+  // Fetch messages + instance status of the MENTEE'S specialist
   useEffect(() => {
     async function load() {
       try {
@@ -43,21 +46,39 @@ export function TabChat({ menteeId, menteePhone, menteeName, onUnreadCountChange
           onUnreadRef.current?.(0)
         }
 
-        // Fetch instance status
+        // Determine user role and ownership
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
-        if (user) {
-          const { data: instance } = await supabase
-            .from('wpp_instances')
-            .select('status')
-            .eq('specialist_id', user.id)
-            .single()
+        if (!user) return
 
-          if (instance) {
-            setInstanceStatus(instance.status)
-          } else {
-            setNoInstance(true)
-          }
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+
+        const userIsAdmin = profile?.role === 'admin'
+        const userIsOwner = specialistId === user.id
+        setIsAdmin(userIsAdmin)
+        setIsOwner(userIsOwner)
+
+        // Look up the instance of the mentee's specialist (not the logged-in user)
+        const targetSpecialistId = specialistId
+        if (!targetSpecialistId) {
+          setNoInstance(true)
+          return
+        }
+
+        const { data: instance } = await supabase
+          .from('wpp_instances')
+          .select('status')
+          .eq('specialist_id', targetSpecialistId)
+          .single()
+
+        if (instance) {
+          setInstanceStatus(instance.status)
+        } else {
+          setNoInstance(true)
         }
       } catch (err) {
         console.error('Chat load error:', err)
@@ -67,7 +88,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, onUnreadCountChange
     }
 
     load()
-  }, [menteeId])
+  }, [menteeId, specialistId])
 
   // Auto-scroll on messages change
   useEffect(() => {
@@ -91,12 +112,10 @@ export function TabChat({ menteeId, menteePhone, menteeName, onUnreadCountChange
         (payload) => {
           const newMsg = payload.new as WppMessage
           setMessages((prev) => {
-            // Avoid duplicates
             if (prev.some((m) => m.id === newMsg.id)) return prev
             return [...prev, newMsg]
           })
 
-          // If incoming, mark as read
           if (newMsg.direction === 'incoming') {
             supabase
               .from('wpp_messages')
@@ -120,11 +139,10 @@ export function TabChat({ menteeId, menteePhone, menteeName, onUnreadCountChange
     setSending(true)
     setInput('')
 
-    // Optimistic add
     const optimisticMsg: WppMessage = {
       id: `temp-${Date.now()}`,
       mentee_id: menteeId,
-      specialist_id: '',
+      specialist_id: specialistId || '',
       instance_id: '',
       message_id: null,
       direction: 'outgoing',
@@ -146,7 +164,6 @@ export function TabChat({ menteeId, menteePhone, menteeName, onUnreadCountChange
       })
 
       if (!res.ok) {
-        // Remove optimistic message on error
         setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id))
         const err = await res.json().catch(() => ({}))
         console.error('Send error:', err.error)
@@ -173,6 +190,12 @@ export function TabChat({ menteeId, menteePhone, menteeName, onUnreadCountChange
 
   const wppLink = `https://wa.me/${menteePhone.replace(/\D/g, '')}`
   const isDisconnected = instanceStatus !== 'connected'
+  const canSend = isOwner && !isDisconnected
+  const inputDisabledReason = !isOwner && isAdmin
+    ? 'Apenas o especialista pode responder'
+    : isDisconnected
+    ? 'WhatsApp desconectado — reconecte no Admin'
+    : null
 
   // No instance configured
   if (!loading && noInstance) {
@@ -247,7 +270,6 @@ export function TabChat({ menteeId, menteePhone, menteeName, onUnreadCountChange
                     : 'bg-muted text-foreground'
                 }`}
               >
-                {/* Media */}
                 {msg.message_type === 'image' && msg.media_url && (
                   <img
                     src={msg.media_url}
@@ -266,12 +288,10 @@ export function TabChat({ menteeId, menteePhone, menteeName, onUnreadCountChange
                   <p className="italic text-muted-foreground text-xs">(mídia não suportada no painel)</p>
                 )}
 
-                {/* Text content */}
                 {msg.content && (
                   <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                 )}
 
-                {/* Footer */}
                 <div className={`mt-1 flex items-center gap-1.5 text-[10px] ${
                   isOutgoing ? 'text-accent/60 justify-end' : 'text-muted-foreground'
                 }`}>
@@ -288,8 +308,8 @@ export function TabChat({ menteeId, menteePhone, menteeName, onUnreadCountChange
 
       {/* Input */}
       <div className="border-t border-border px-4 py-2.5">
-        {isDisconnected && (
-          <p className="text-[10px] text-destructive mb-1.5">WhatsApp desconectado — reconecte no Admin</p>
+        {inputDisabledReason && (
+          <p className="text-[10px] text-destructive mb-1.5">{inputDisabledReason}</p>
         )}
         <div className="flex items-end gap-2">
           <textarea
@@ -297,8 +317,8 @@ export function TabChat({ menteeId, menteePhone, menteeName, onUnreadCountChange
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Responder via WhatsApp..."
-            disabled={isDisconnected}
+            placeholder={canSend ? 'Responder via WhatsApp...' : inputDisabledReason || ''}
+            disabled={!canSend}
             rows={1}
             className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ minHeight: '38px', maxHeight: '120px' }}
@@ -306,7 +326,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, onUnreadCountChange
           <Button
             size="icon"
             onClick={handleSend}
-            disabled={!input.trim() || sending || isDisconnected}
+            disabled={!input.trim() || sending || !canSend}
             className="h-[38px] w-[38px] shrink-0"
           >
             <Send className="h-4 w-4" />

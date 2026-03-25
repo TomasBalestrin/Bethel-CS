@@ -36,6 +36,8 @@ import {
   ChevronRight,
   ArrowRight,
   MessageSquare,
+  Copy,
+  Check,
 } from 'lucide-react'
 import { formatDateBR } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
@@ -621,6 +623,14 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
         </div>
       </div>
 
+      {/* Link do Chat */}
+      {mentee.chat_token && (
+        <div className="border-t border-border/50 pt-4">
+          <SectionTitle>Link do Chat</SectionTitle>
+          <ChatLinkCopy chatToken={mentee.chat_token} />
+        </div>
+      )}
+
       {/* Transition to Mentorship button — admin only, initial kanban only */}
       {isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship && (
         <div className="border-t border-border/50 pt-4">
@@ -673,6 +683,32 @@ function ClienteFitToggle({ menteeId, initialValue }: { menteeId: string; initia
     >
       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${fit ? 'translate-x-6' : 'translate-x-1'}`} />
     </button>
+  )
+}
+
+function ChatLinkCopy({ chatToken }: { chatToken: string }) {
+  const [copied, setCopied] = useState(false)
+  const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/chat/${chatToken}`
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(url)
+    setCopied(true)
+    toast.success('Link copiado!')
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="flex items-center gap-2 py-2">
+      <Input
+        readOnly
+        value={url}
+        className="text-xs h-8 bg-muted/50 flex-1"
+        onFocus={(e) => e.target.select()}
+      />
+      <Button variant="outline" size="sm" className="h-8 px-2 shrink-0" onClick={handleCopy}>
+        {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+      </Button>
+    </div>
   )
 }
 

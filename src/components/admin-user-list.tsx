@@ -445,7 +445,66 @@ function WhatsAppSection({ specialists, instances }: { specialists: Profile[]; i
   const [qrLoading, setQrLoading] = useState(false)
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  // Configure/edit instance state
+  const [configSpecialist, setConfigSpecialist] = useState<Profile | null>(null)
+  const [configInstanceId, setConfigInstanceId] = useState('')
+  const [configPhone, setConfigPhone] = useState('')
+  const [configSaving, setConfigSaving] = useState(false)
+  const [editingInstance, setEditingInstance] = useState(false) // true = edit existing, false = new
+
   const instanceMap = new Map(instances.map((i) => [i.specialist_id, i]))
+
+  function openConfig(specialist: Profile) {
+    const existing = instanceMap.get(specialist.id)
+    if (existing) {
+      setConfigInstanceId(existing.instance_id)
+      setConfigPhone(existing.phone_number || '')
+      setEditingInstance(true)
+    } else {
+      setConfigInstanceId('')
+      setConfigPhone('')
+      setEditingInstance(false)
+    }
+    setConfigSpecialist(specialist)
+  }
+
+  async function handleSaveConfig(e: React.FormEvent) {
+    e.preventDefault()
+    if (!configSpecialist || !configInstanceId.trim()) return
+    setConfigSaving(true)
+
+    try {
+      const supabase = (await import('@/lib/supabase/client')).createClient()
+      const existing = instanceMap.get(configSpecialist.id)
+
+      if (existing) {
+        // Update
+        await supabase
+          .from('wpp_instances')
+          .update({
+            instance_id: configInstanceId.trim(),
+            phone_number: configPhone.trim() || null,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', existing.id)
+      } else {
+        // Insert
+        await supabase.from('wpp_instances').insert({
+          specialist_id: configSpecialist.id,
+          instance_id: configInstanceId.trim(),
+          phone_number: configPhone.trim() || null,
+          status: 'connected',
+        })
+      }
+
+      setConfigSpecialist(null)
+      router.refresh()
+    } catch (err) {
+      console.error('Save instance error:', err)
+    } finally {
+      setConfigSaving(false)
+    }
+  }
 
   function openQR(specialist: Profile, instanceId: string) {
     setQrSpecialistName(specialist.full_name)
@@ -470,7 +529,6 @@ function WhatsAppSection({ specialists, instances }: { specialists: Profile[]; i
 
       setQrAscii(data.ascii || null)
 
-      // Start polling if not already
       if (!pollingRef.current) {
         pollingRef.current = setInterval(() => fetchQR(instanceId), 3000)
       }
@@ -531,6 +589,7 @@ function WhatsAppSection({ specialists, instances }: { specialists: Profile[]; i
                         {instance.phone_number && (
                           <span className="text-xs text-muted-foreground">{instance.phone_number}</span>
                         )}
+                        <span className="text-[10px] text-muted-foreground/60">{instance.instance_id}</span>
                       </>
                     ) : (
                       <span className="text-xs text-muted-foreground">Sem instância configurada</span>
@@ -539,19 +598,21 @@ function WhatsAppSection({ specialists, instances }: { specialists: Profile[]; i
                 </div>
               </div>
 
-              <div>
+              <div className="flex items-center gap-2">
                 {instance && !isConnected && (
                   <Button size="sm" variant="outline" onClick={() => openQR(specialist, instance.instance_id)}>
                     Conectar
                   </Button>
                 )}
-                {instance && isConnected && (
-                  <Button size="sm" variant="ghost" className="text-destructive" disabled>
-                    Desconectar
+                {instance && (
+                  <Button size="sm" variant="ghost" onClick={() => openConfig(specialist)}>
+                    <Pencil className="h-3 w-3" />
                   </Button>
                 )}
                 {!instance && (
-                  <span className="text-xs text-muted-foreground">—</span>
+                  <Button size="sm" variant="outline" onClick={() => openConfig(specialist)}>
+                    Configurar
+                  </Button>
                 )}
               </div>
             </div>
@@ -562,6 +623,41 @@ function WhatsAppSection({ specialists, instances }: { specialists: Profile[]; i
           <p className="text-sm text-muted-foreground text-center py-6">Nenhum especialista cadastrado</p>
         )}
       </div>
+
+      {/* Configure/Edit Instance Modal */}
+      <Dialog open={!!configSpecialist} onOpenChange={(open) => { if (!open) setConfigSpecialist(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{editingInstance ? 'Editar' : 'Configurar'} WhatsApp — {configSpecialist?.full_name}</DialogTitle>
+            <DialogDescription>Vincule uma instância do Next Apps a este especialista.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSaveConfig} className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="wpp-instance-id">Instance ID *</Label>
+              <Input
+                id="wpp-instance-id"
+                value={configInstanceId}
+                onChange={(e) => setConfigInstanceId(e.target.value)}
+                placeholder="ex: 55_e54016"
+                required
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="wpp-phone">Telefone do WhatsApp</Label>
+              <Input
+                id="wpp-phone"
+                value={configPhone}
+                onChange={(e) => setConfigPhone(e.target.value)}
+                placeholder="ex: +55 11 99999-0000"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button type="button" variant="outline" onClick={() => setConfigSpecialist(null)}>Cancelar</Button>
+              <Button type="submit" disabled={configSaving}>{configSaving ? 'Salvando...' : 'Salvar'}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* QR Code Modal */}
       <Dialog open={!!qrInstanceId} onOpenChange={(open) => { if (!open) closeQR() }}>

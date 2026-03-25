@@ -328,10 +328,17 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
           </TabsList>
         </div>
         {showOverflow && (
-          <div className="absolute right-0 top-0 bottom-0 flex items-center pointer-events-none">
-            <div className="w-8 h-full bg-gradient-to-l from-background to-transparent" />
-            <ChevronRight size={14} className="text-muted-foreground -ml-4" />
-          </div>
+          <button
+            type="button"
+            className="absolute right-0 top-0 bottom-0 flex items-center cursor-pointer z-10"
+            onClick={() => {
+              const el = tabsRef.current
+              if (el) el.scrollBy({ left: 150, behavior: 'smooth' })
+            }}
+          >
+            <div className="w-10 h-full bg-gradient-to-l from-background to-transparent" />
+            <ChevronRight size={16} className="text-muted-foreground -ml-5 animate-pulse" />
+          </button>
         )}
       </div>
       <ScrollArea className="flex-1 px-6 py-4">

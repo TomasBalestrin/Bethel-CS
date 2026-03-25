@@ -12,6 +12,7 @@ import {
 import { StreamChat } from 'stream-chat'
 import { Loader2 } from 'lucide-react'
 import Image from 'next/image'
+import { SplashScreen } from '@/components/splash-screen'
 
 import 'stream-chat-react/dist/css/v2/index.css'
 
@@ -96,12 +97,7 @@ export default function MenteeChatPage() {
   }
 
   if (!client || !channel) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        <p className="mt-2 text-xs text-muted-foreground">Conectando ao chat...</p>
-      </div>
-    )
+    return <SplashScreen subtitle="Carregando seu chat..." />
   }
 
   return (

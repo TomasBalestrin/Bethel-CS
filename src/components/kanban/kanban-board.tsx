@@ -49,7 +49,7 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const [mentees, setMentees] = useState<MenteeWithStats[]>(initialMentees)
   const [activeId, setActiveId] = useState<string | null>(null)
-  const unreadMap = useUnreadCounts()
+  const { unreadMap, lastMessageMap } = useUnreadCounts()
 
   useEffect(() => {
     setMentees(initialMentees)
@@ -154,7 +154,28 @@ export function KanbanBoard({
   }
 
   const getMenteesForStage = (stageId: string) =>
-    mentees.filter((m) => m.current_stage_id === stageId)
+    mentees
+      .filter((m) => m.current_stage_id === stageId)
+      .sort((a, b) => {
+        // 1. Unread messages first
+        const unreadA = unreadMap[a.id] ?? 0
+        const unreadB = unreadMap[b.id] ?? 0
+        if (unreadA > 0 && unreadB === 0) return -1
+        if (unreadA === 0 && unreadB > 0) return 1
+
+        // 2. By last message (most recent first)
+        const lastA = lastMessageMap[a.id] || ''
+        const lastB = lastMessageMap[b.id] || ''
+        if (lastA || lastB) {
+          if (lastA && !lastB) return -1
+          if (!lastA && lastB) return 1
+          if (lastA > lastB) return -1
+          if (lastA < lastB) return 1
+        }
+
+        // 3. By created_at DESC
+        return b.created_at > a.created_at ? 1 : -1
+      })
 
   return (
     <div>

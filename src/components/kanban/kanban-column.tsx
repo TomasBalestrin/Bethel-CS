@@ -48,7 +48,7 @@ export function KanbanColumn({ stage, mentees, unreadMap, onCardClick, showAddBu
             <MenteeCard
               key={mentee.id}
               mentee={mentee}
-              unreadCount={mentee.stream_channel_id ? unreadMap?.[mentee.stream_channel_id] : 0}
+              unreadCount={unreadMap?.[mentee.id] ?? 0}
               onClick={onCardClick}
             />
           ))}

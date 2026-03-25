@@ -23,15 +23,17 @@ export default async function AdminPage() {
     redirect('/')
   }
 
-  const [{ data: users }, { data: products }] = await Promise.all([
+  const [{ data: users }, { data: products }, { data: wppInstances }] = await Promise.all([
     supabase.from('profiles').select('*').order('full_name'),
     supabase.from('products').select('*').order('name'),
+    supabase.from('wpp_instances').select('*'),
   ])
 
   return (
     <AdminUserList
       users={users ?? []}
       products={products ?? []}
+      wppInstances={wppInstances ?? []}
       currentUserId={user.id}
     />
   )

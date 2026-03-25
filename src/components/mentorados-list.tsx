@@ -27,7 +27,7 @@ interface MentoradosListProps {
 export function MentoradosList({ mentees: initialMentees }: MentoradosListProps) {
   const [menteeList, setMenteeList] = useState(initialMentees)
   const [search, setSearch] = useState('')
-  const unreadMap = useUnreadCounts()
+  const { unreadMap } = useUnreadCounts()
   const [selectedMentee, setSelectedMentee] = useState<MenteeWithStats | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
 
@@ -75,7 +75,7 @@ export function MentoradosList({ mentees: initialMentees }: MentoradosListProps)
           const subtitle = [m.product_name, location].filter(Boolean).join(' · ')
           const instHandle = m.instagram?.replace(/^@/, '') || null
 
-          const unread = m.stream_channel_id ? (unreadMap[m.stream_channel_id] ?? 0) : 0
+          const unread = unreadMap[m.id] ?? 0
 
           return (
             <div

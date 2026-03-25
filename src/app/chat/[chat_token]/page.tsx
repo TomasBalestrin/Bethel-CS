@@ -10,7 +10,6 @@ import {
   Window,
 } from 'stream-chat-react'
 import { StreamChat } from 'stream-chat'
-import { Loader2 } from 'lucide-react'
 import Image from 'next/image'
 import { SplashScreen } from '@/components/splash-screen'
 import { subscribeToPush } from '@/lib/push/subscribe'

@@ -98,6 +98,8 @@ export interface Database {
           current_stage_id: string | null
           kanban_type: KanbanType
           action_plan_token: string
+          chat_token: string
+          stream_channel_id: string | null
           cliente_fit: boolean
           status: MenteeStatus
           created_by: string | null
@@ -126,6 +128,8 @@ export interface Database {
           current_stage_id?: string | null
           kanban_type?: KanbanType
           action_plan_token?: string
+          chat_token?: string
+          stream_channel_id?: string | null
           cliente_fit?: boolean
           status?: MenteeStatus
           created_by?: string | null
@@ -152,10 +156,46 @@ export interface Database {
           referred_by_mentee_id?: string | null
           current_stage_id?: string | null
           kanban_type?: KanbanType
+          chat_token?: string
+          stream_channel_id?: string | null
           cliente_fit?: boolean
           status?: MenteeStatus
           created_by?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      chat_metrics: {
+        Row: {
+          id: string
+          mentee_id: string
+          specialist_id: string | null
+          date: string
+          messages_from_mentee: number
+          messages_from_specialist: number
+          first_response_minutes: number | null
+          avg_response_minutes: number | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          mentee_id: string
+          specialist_id?: string | null
+          date: string
+          messages_from_mentee?: number
+          messages_from_specialist?: number
+          first_response_minutes?: number | null
+          avg_response_minutes?: number | null
+          created_at?: string
+        }
+        Update: {
+          mentee_id?: string
+          specialist_id?: string | null
+          date?: string
+          messages_from_mentee?: number
+          messages_from_specialist?: number
+          first_response_minutes?: number | null
+          avg_response_minutes?: number | null
         }
         Relationships: []
       }

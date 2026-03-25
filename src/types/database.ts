@@ -33,6 +33,7 @@ export interface Database {
           full_name: string
           role: UserRole
           avatar_url: string | null
+          wpp_phone: string | null
           created_at: string
           updated_at: string
         }
@@ -41,6 +42,7 @@ export interface Database {
           full_name: string
           role: UserRole
           avatar_url?: string | null
+          wpp_phone?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -49,6 +51,7 @@ export interface Database {
           full_name?: string
           role?: UserRole
           avatar_url?: string | null
+          wpp_phone?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -560,6 +563,80 @@ export interface Database {
           p256dh?: string
           auth?: string
           user_agent?: string | null
+        }
+        Relationships: []
+      }
+      wpp_instances: {
+        Row: {
+          id: string
+          specialist_id: string
+          instance_id: string
+          phone_number: string | null
+          status: 'connected' | 'disconnected' | 'connecting'
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          specialist_id: string
+          instance_id: string
+          phone_number?: string | null
+          status?: 'connected' | 'disconnected' | 'connecting'
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          specialist_id?: string
+          instance_id?: string
+          phone_number?: string | null
+          status?: 'connected' | 'disconnected' | 'connecting'
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      wpp_messages: {
+        Row: {
+          id: string
+          mentee_id: string
+          specialist_id: string
+          instance_id: string
+          message_id: string | null
+          direction: 'incoming' | 'outgoing'
+          message_type: 'text' | 'image' | 'audio' | 'video' | 'document' | 'location' | 'sticker'
+          content: string | null
+          media_url: string | null
+          sender_name: string | null
+          is_read: boolean
+          sent_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          mentee_id: string
+          specialist_id: string
+          instance_id: string
+          message_id?: string | null
+          direction: 'incoming' | 'outgoing'
+          message_type: 'text' | 'image' | 'audio' | 'video' | 'document' | 'location' | 'sticker'
+          content?: string | null
+          media_url?: string | null
+          sender_name?: string | null
+          is_read?: boolean
+          sent_at: string
+          created_at?: string
+        }
+        Update: {
+          mentee_id?: string
+          specialist_id?: string
+          instance_id?: string
+          message_id?: string | null
+          direction?: 'incoming' | 'outgoing'
+          message_type?: 'text' | 'image' | 'audio' | 'video' | 'document' | 'location' | 'sticker'
+          content?: string | null
+          media_url?: string | null
+          sender_name?: string | null
+          is_read?: boolean
+          sent_at?: string
         }
         Relationships: []
       }

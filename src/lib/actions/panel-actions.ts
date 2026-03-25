@@ -93,6 +93,38 @@ export async function addIndication(
   return { error: null }
 }
 
+export async function updateIndication(
+  recordId: string,
+  data: { indicated_name: string; indicated_phone: string }
+) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await supabase
+    .from('indications')
+    .update({ indicated_name: data.indicated_name, indicated_phone: data.indicated_phone })
+    .eq('id', recordId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/etapas-iniciais')
+  revalidatePath('/etapas-mentoria')
+  return { error: null }
+}
+
+export async function deleteIndication(recordId: string) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await supabase.from('indications').delete().eq('id', recordId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/etapas-iniciais')
+  revalidatePath('/etapas-mentoria')
+  return { error: null }
+}
+
 export async function addIntensivoRecord(
   menteeId: string,
   data: {
@@ -113,6 +145,48 @@ export async function addIntensivoRecord(
     indication_name: data.indication_name || null,
     indication_phone: data.indication_phone || null,
   })
+
+  if (error) return { error: error.message }
+  revalidatePath('/etapas-iniciais')
+  revalidatePath('/etapas-mentoria')
+  return { error: null }
+}
+
+export async function updateIntensivoRecord(
+  recordId: string,
+  data: {
+    participated?: boolean
+    participation_date?: string
+    indication_name?: string
+    indication_phone?: string
+  }
+) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await supabase
+    .from('intensivo_records')
+    .update({
+      participated: data.participated ?? false,
+      participation_date: data.participation_date || null,
+      indication_name: data.indication_name || null,
+      indication_phone: data.indication_phone || null,
+    })
+    .eq('id', recordId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/etapas-iniciais')
+  revalidatePath('/etapas-mentoria')
+  return { error: null }
+}
+
+export async function deleteIntensivoRecord(recordId: string) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await supabase.from('intensivo_records').delete().eq('id', recordId)
 
   if (error) return { error: error.message }
   revalidatePath('/etapas-iniciais')
@@ -212,6 +286,42 @@ export async function addObjective(
     achieved_at: data.achieved_at || null,
     created_by: user.id,
   })
+
+  if (error) return { error: error.message }
+  revalidatePath('/etapas-iniciais')
+  revalidatePath('/etapas-mentoria')
+  return { error: null }
+}
+
+export async function updateObjective(
+  recordId: string,
+  data: { title: string; description?: string; achieved_at?: string }
+) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await supabase
+    .from('objectives')
+    .update({
+      title: data.title,
+      description: data.description || null,
+      achieved_at: data.achieved_at || null,
+    })
+    .eq('id', recordId)
+
+  if (error) return { error: error.message }
+  revalidatePath('/etapas-iniciais')
+  revalidatePath('/etapas-mentoria')
+  return { error: null }
+}
+
+export async function deleteObjective(recordId: string) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await supabase.from('objectives').delete().eq('id', recordId)
 
   if (error) return { error: error.message }
   revalidatePath('/etapas-iniciais')

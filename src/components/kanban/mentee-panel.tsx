@@ -52,11 +52,17 @@ import {
 import { toast } from 'sonner'
 import {
   addIndication,
+  updateIndication,
+  deleteIndication,
   addIntensivoRecord,
+  updateIntensivoRecord,
+  deleteIntensivoRecord,
   addRevenueRecord,
   updateRevenueRecord,
   deleteRevenueRecord,
   addObjective,
+  updateObjective,
+  deleteObjective,
   addTestimonial,
   updateTestimonial,
   deleteTestimonial,
@@ -297,13 +303,11 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
             {[
               { value: 'info', label: 'Info' },
               { value: 'action-plan', label: 'Plano' },
-              { value: 'indications', label: 'Indicações' },
-              { value: 'intensivo', label: 'Intensivo' },
-              { value: 'revenue', label: 'Receita' },
               { value: 'objectives', label: 'Objetivos' },
+              { value: 'revenue', label: 'Receita' },
               { value: 'testimonials', label: 'Depoimentos' },
-              { value: 'engagement', label: 'Engajamento' },
               { value: 'chat', label: 'Chat' },
+              { value: 'engagement', label: 'Engajamento' },
             ].map((tab) => (
               <TabsTrigger
                 key={tab.value}
@@ -353,10 +357,8 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
           />
         </TabsContent>
         <TabsContent value="action-plan"><TabActionPlan mentee={mentee} /></TabsContent>
-        <TabsContent value="indications"><TabIndications menteeId={mentee.id} /></TabsContent>
-        <TabsContent value="intensivo"><TabIntensivo menteeId={mentee.id} /></TabsContent>
-        <TabsContent value="revenue"><TabRevenue menteeId={mentee.id} /></TabsContent>
         <TabsContent value="objectives"><TabObjectives menteeId={mentee.id} /></TabsContent>
+        <TabsContent value="revenue"><TabRevenue menteeId={mentee.id} /></TabsContent>
         <TabsContent value="testimonials"><TabTestimonials menteeId={mentee.id} /></TabsContent>
         <TabsContent value="engagement"><TabEngagement menteeId={mentee.id} /></TabsContent>
         <TabsContent value="chat">
@@ -941,152 +943,7 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
   )
 }
 
-// ─── Tab 3: Indicações ───
-function TabIndications({ menteeId }: { menteeId: string }) {
-  const [items, setItems] = useState<Indication[]>([])
-  const [showForm, setShowForm] = useState(false)
-  const [name, setName] = useState('')
-  const [phone, setPhone] = useState('')
-  const [loading, setLoading] = useState(false)
-  const supabase = createClient()
-
-  const fetchData = useCallback(() => {
-    supabase
-      .from('indications')
-      .select('*')
-      .eq('mentee_id', menteeId)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => { if (data) setItems(data) })
-  }, [menteeId, supabase])
-
-  useEffect(() => { fetchData() }, [fetchData])
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    await addIndication(menteeId, name, phone)
-    setName(''); setPhone(''); setShowForm(false); setLoading(false)
-    fetchData()
-  }
-
-  return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <p className="label-xs">Indicações ({items.length})</p>
-        <Button size="sm" variant="outline" onClick={() => setShowForm(!showForm)}>
-          <Plus className="mr-1 h-3 w-3" /> Registrar
-        </Button>
-      </div>
-      {showForm && (
-        <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-border bg-muted/50 p-4">
-          <div className="space-y-1">
-            <Label htmlFor="ind-name">Nome do indicado *</Label>
-            <Input id="ind-name" value={name} onChange={(e) => setName(e.target.value)} required />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="ind-phone">Telefone *</Label>
-            <Input id="ind-phone" value={phone} onChange={(e) => setPhone(e.target.value)} required />
-          </div>
-          <Button type="submit" size="sm" disabled={loading}>
-            {loading ? 'Salvando...' : 'Salvar'}
-          </Button>
-        </form>
-      )}
-      {items.map((item) => (
-        <div key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
-          <p className="font-medium text-foreground">{item.indicated_name}</p>
-          <p className="text-muted-foreground">{item.indicated_phone}</p>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ─── Tab 4: Intensivo ───
-function TabIntensivo({ menteeId }: { menteeId: string }) {
-  const [items, setItems] = useState<IntensivoRecord[]>([])
-  const [showForm, setShowForm] = useState(false)
-  const [participated, setParticipated] = useState(false)
-  const [participationDate, setParticipationDate] = useState('')
-  const [indName, setIndName] = useState('')
-  const [indPhone, setIndPhone] = useState('')
-  const [loading, setLoading] = useState(false)
-  const supabase = createClient()
-
-  const fetchData = useCallback(() => {
-    supabase
-      .from('intensivo_records')
-      .select('*')
-      .eq('mentee_id', menteeId)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => { if (data) setItems(data) })
-  }, [menteeId, supabase])
-
-  useEffect(() => { fetchData() }, [fetchData])
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    await addIntensivoRecord(menteeId, {
-      participated,
-      participation_date: participationDate || undefined,
-      indication_name: indName || undefined,
-      indication_phone: indPhone || undefined,
-    })
-    setParticipated(false); setParticipationDate(''); setIndName(''); setIndPhone('')
-    setShowForm(false); setLoading(false)
-    fetchData()
-  }
-
-  return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <p className="label-xs">Intensivo ({items.length})</p>
-        <Button size="sm" variant="outline" onClick={() => setShowForm(!showForm)}>
-          <Plus className="mr-1 h-3 w-3" /> Registrar
-        </Button>
-      </div>
-      {showForm && (
-        <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-border bg-muted/50 p-4">
-          <div className="flex items-center gap-2">
-            <input type="checkbox" id="int-part" checked={participated} onChange={(e) => setParticipated(e.target.checked)} className="h-4 w-4 rounded border-input" />
-            <Label htmlFor="int-part">Participou</Label>
-          </div>
-          {participated && (
-            <div className="space-y-1">
-              <Label htmlFor="int-date">Data de participação</Label>
-              <Input id="int-date" type="date" value={participationDate} onChange={(e) => setParticipationDate(e.target.value)} />
-            </div>
-          )}
-          <div className="space-y-1">
-            <Label htmlFor="int-name">Nome indicação intensivo</Label>
-            <Input id="int-name" value={indName} onChange={(e) => setIndName(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="int-phone">Telefone indicação</Label>
-            <Input id="int-phone" value={indPhone} onChange={(e) => setIndPhone(e.target.value)} />
-          </div>
-          <Button type="submit" size="sm" disabled={loading}>
-            {loading ? 'Salvando...' : 'Salvar'}
-          </Button>
-        </form>
-      )}
-      {items.map((item) => (
-        <div key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
-          <div className="flex items-center gap-2">
-            {item.participated ? <Badge variant="success">Participou</Badge> : <Badge variant="muted">Não participou</Badge>}
-            {item.participation_date && <span className="text-muted-foreground text-xs">{formatDateBR(item.participation_date)}</span>}
-          </div>
-          {item.indication_name && (
-            <p className="mt-1 text-muted-foreground">Indicação: {item.indication_name} — {item.indication_phone}</p>
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ─── Tab 5: Receita Nova ───
+// ─── Tab: Receita Nova ───
 function TabRevenue({ menteeId }: { menteeId: string }) {
   const [items, setItems] = useState<RevenueRecord[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -1317,74 +1174,332 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
   )
 }
 
-// ─── Tab 6: Objetivos ───
+// ─── Tab: Objetivos (unified: Objetivos + Indicações CS + Intensivo) ───
 function TabObjectives({ menteeId }: { menteeId: string }) {
-  const [items, setItems] = useState<Objective[]>([])
-  const [showForm, setShowForm] = useState(false)
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [achievedAt, setAchievedAt] = useState('')
-  const [loading, setLoading] = useState(false)
+  // Objectives state
+  const [objectives, setObjectives] = useState<Objective[]>([])
+  const [showObjForm, setShowObjForm] = useState(false)
+  const [editingObjId, setEditingObjId] = useState<string | null>(null)
+  const [objTitle, setObjTitle] = useState('')
+  const [objDescription, setObjDescription] = useState('')
+  const [objAchievedAt, setObjAchievedAt] = useState('')
+  const [objLoading, setObjLoading] = useState(false)
+  const [confirmDeleteObj, setConfirmDeleteObj] = useState<string | null>(null)
+
+  // Indications state
+  const [indications, setIndications] = useState<Indication[]>([])
+  const [showIndForm, setShowIndForm] = useState(false)
+  const [editingIndId, setEditingIndId] = useState<string | null>(null)
+  const [indName, setIndName] = useState('')
+  const [indPhone, setIndPhone] = useState('')
+  const [indLoading, setIndLoading] = useState(false)
+  const [confirmDeleteInd, setConfirmDeleteInd] = useState<string | null>(null)
+
+  // Intensivo state
+  const [intensivos, setIntensivos] = useState<IntensivoRecord[]>([])
+  const [showIntForm, setShowIntForm] = useState(false)
+  const [editingIntId, setEditingIntId] = useState<string | null>(null)
+  const [intParticipated, setIntParticipated] = useState(false)
+  const [intDate, setIntDate] = useState('')
+  const [intIndName, setIntIndName] = useState('')
+  const [intIndPhone, setIntIndPhone] = useState('')
+  const [intLoading, setIntLoading] = useState(false)
+  const [confirmDeleteInt, setConfirmDeleteInt] = useState<string | null>(null)
+
   const supabase = createClient()
 
-  const fetchData = useCallback(() => {
-    supabase
-      .from('objectives')
-      .select('*')
-      .eq('mentee_id', menteeId)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => { if (data) setItems(data) })
+  const fetchAll = useCallback(() => {
+    supabase.from('objectives').select('*').eq('mentee_id', menteeId)
+      .order('created_at', { ascending: false }).then(({ data }) => { if (data) setObjectives(data) })
+    supabase.from('indications').select('*').eq('mentee_id', menteeId)
+      .order('created_at', { ascending: false }).then(({ data }) => { if (data) setIndications(data) })
+    supabase.from('intensivo_records').select('*').eq('mentee_id', menteeId)
+      .order('created_at', { ascending: false }).then(({ data }) => { if (data) setIntensivos(data) })
   }, [menteeId, supabase])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => { fetchAll() }, [fetchAll])
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    await addObjective(menteeId, {
-      title,
-      description: description || undefined,
-      achieved_at: achievedAt || undefined,
-    })
-    setTitle(''); setDescription(''); setAchievedAt('')
-    setShowForm(false); setLoading(false)
-    fetchData()
+  // ─── Objectives handlers ───
+  function openEditObj(obj: Objective) {
+    setEditingObjId(obj.id); setObjTitle(obj.title); setObjDescription(obj.description || ''); setObjAchievedAt(obj.achieved_at || '')
+    setShowObjForm(true)
+  }
+  function resetObjForm() {
+    setEditingObjId(null); setObjTitle(''); setObjDescription(''); setObjAchievedAt(''); setShowObjForm(false)
+  }
+  async function handleSubmitObj(e: React.FormEvent) {
+    e.preventDefault(); setObjLoading(true)
+    if (editingObjId) {
+      await updateObjective(editingObjId, { title: objTitle, description: objDescription || undefined, achieved_at: objAchievedAt || undefined })
+    } else {
+      await addObjective(menteeId, { title: objTitle, description: objDescription || undefined, achieved_at: objAchievedAt || undefined })
+    }
+    resetObjForm(); setObjLoading(false); fetchAll()
+  }
+  async function handleDeleteObj(id: string) {
+    await deleteObjective(id); setConfirmDeleteObj(null); fetchAll()
+  }
+
+  // ─── Indications handlers ───
+  function openEditInd(ind: Indication) {
+    setEditingIndId(ind.id); setIndName(ind.indicated_name); setIndPhone(ind.indicated_phone)
+    setShowIndForm(true)
+  }
+  function resetIndForm() {
+    setEditingIndId(null); setIndName(''); setIndPhone(''); setShowIndForm(false)
+  }
+  async function handleSubmitInd(e: React.FormEvent) {
+    e.preventDefault(); setIndLoading(true)
+    if (editingIndId) {
+      await updateIndication(editingIndId, { indicated_name: indName, indicated_phone: indPhone })
+    } else {
+      await addIndication(menteeId, indName, indPhone)
+    }
+    resetIndForm(); setIndLoading(false); fetchAll()
+  }
+  async function handleDeleteInd(id: string) {
+    await deleteIndication(id); setConfirmDeleteInd(null); fetchAll()
+  }
+
+  // ─── Intensivo handlers ───
+  function openEditInt(rec: IntensivoRecord) {
+    setEditingIntId(rec.id); setIntParticipated(rec.participated); setIntDate(rec.participation_date || '')
+    setIntIndName(rec.indication_name || ''); setIntIndPhone(rec.indication_phone || '')
+    setShowIntForm(true)
+  }
+  function resetIntForm() {
+    setEditingIntId(null); setIntParticipated(false); setIntDate(''); setIntIndName(''); setIntIndPhone(''); setShowIntForm(false)
+  }
+  async function handleSubmitInt(e: React.FormEvent) {
+    e.preventDefault(); setIntLoading(true)
+    const data = { participated: intParticipated, participation_date: intDate || undefined, indication_name: intIndName || undefined, indication_phone: intIndPhone || undefined }
+    if (editingIntId) {
+      await updateIntensivoRecord(editingIntId, data)
+    } else {
+      await addIntensivoRecord(menteeId, data)
+    }
+    resetIntForm(); setIntLoading(false); fetchAll()
+  }
+  async function handleDeleteInt(id: string) {
+    await deleteIntensivoRecord(id); setConfirmDeleteInt(null); fetchAll()
   }
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <p className="label-xs">Objetivos ({items.length})</p>
-        <Button size="sm" variant="outline" onClick={() => setShowForm(!showForm)}>
-          <Plus className="mr-1 h-3 w-3" /> Registrar
-        </Button>
-      </div>
-      {showForm && (
-        <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-border bg-muted/50 p-4">
-          <div className="space-y-1">
-            <Label htmlFor="obj-title">Título *</Label>
-            <Input id="obj-title" value={title} onChange={(e) => setTitle(e.target.value)} required />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="obj-desc">Descrição</Label>
-            <Textarea id="obj-desc" value={description} onChange={(e) => setDescription(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="obj-date">Data de conquista</Label>
-            <Input id="obj-date" type="date" value={achievedAt} onChange={(e) => setAchievedAt(e.target.value)} />
-          </div>
-          <Button type="submit" size="sm" disabled={loading}>
-            {loading ? 'Salvando...' : 'Salvar'}
+    <div className="space-y-6 animate-fade-in">
+      {/* ═══ SEÇÃO 1: Objetivos ═══ */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="label-xs uppercase">Objetivos ({objectives.length})</p>
+          <Button size="sm" variant="outline" onClick={() => { resetObjForm(); setShowObjForm(!showObjForm) }}>
+            <Plus className="mr-1 h-3 w-3" /> Registrar objetivo
           </Button>
-        </form>
-      )}
-      {items.map((item) => (
-        <div key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
-          <p className="font-medium text-foreground">{item.title}</p>
-          {item.description && <p className="mt-1 text-muted-foreground">{item.description}</p>}
-          {item.achieved_at && <p className="mt-1 text-xs text-muted-foreground">{formatDateBR(item.achieved_at)}</p>}
         </div>
-      ))}
+
+        {/* Objective form dialog */}
+        <Dialog open={showObjForm} onOpenChange={(open) => { if (!open) resetObjForm() }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingObjId ? 'Editar objetivo' : 'Novo objetivo'}</DialogTitle>
+              <DialogDescription>Registre um objetivo atingido pelo mentorado.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmitObj} className="space-y-3">
+              <div className="space-y-1">
+                <Label htmlFor="obj-title">Título *</Label>
+                <Input id="obj-title" value={objTitle} onChange={(e) => setObjTitle(e.target.value)} required />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="obj-desc">Descrição</Label>
+                <Textarea id="obj-desc" value={objDescription} onChange={(e) => setObjDescription(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="obj-date">Data de conquista</Label>
+                <Input id="obj-date" type="date" value={objAchievedAt} onChange={(e) => setObjAchievedAt(e.target.value)} />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={resetObjForm}>Cancelar</Button>
+                <Button type="submit" disabled={objLoading}>{objLoading ? 'Salvando...' : 'Salvar'}</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {objectives.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+            <Users className="h-8 w-8 mb-2 opacity-40" />
+            <p className="text-sm">Nenhum registro ainda</p>
+          </div>
+        )}
+        {objectives.map((item) => (
+          <div key={item.id} className="group rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:bg-muted/30">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="font-medium text-foreground">{item.title}</p>
+                {item.description && <p className="mt-1 text-muted-foreground">{item.description}</p>}
+                {item.achieved_at && <p className="mt-1 text-xs text-muted-foreground">{formatDateBR(item.achieved_at)}</p>}
+              </div>
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditObj(item)}><Pencil className="h-3 w-3" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteObj(item.id)}><Trash2 className="h-3 w-3" /></Button>
+              </div>
+            </div>
+          </div>
+        ))}
+        {/* Confirm delete objective */}
+        <Dialog open={!!confirmDeleteObj} onOpenChange={() => setConfirmDeleteObj(null)}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Excluir objetivo?</DialogTitle><DialogDescription>Esta ação não pode ser desfeita.</DialogDescription></DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setConfirmDeleteObj(null)}>Cancelar</Button>
+              <Button variant="destructive" onClick={() => confirmDeleteObj && handleDeleteObj(confirmDeleteObj)}>Excluir</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Separator className="border-border/50" />
+
+      {/* ═══ SEÇÃO 2: Indicações CS ═══ */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="label-xs uppercase">Indicações CS ({indications.length})</p>
+          <Button size="sm" variant="outline" onClick={() => { resetIndForm(); setShowIndForm(!showIndForm) }}>
+            <Plus className="mr-1 h-3 w-3" /> Registrar indicação
+          </Button>
+        </div>
+
+        <Dialog open={showIndForm} onOpenChange={(open) => { if (!open) resetIndForm() }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingIndId ? 'Editar indicação' : 'Nova indicação'}</DialogTitle>
+              <DialogDescription>Registre uma indicação feita pelo mentorado.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmitInd} className="space-y-3">
+              <div className="space-y-1">
+                <Label htmlFor="ind-name">Nome do indicado *</Label>
+                <Input id="ind-name" value={indName} onChange={(e) => setIndName(e.target.value)} required />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="ind-phone">Telefone *</Label>
+                <Input id="ind-phone" value={indPhone} onChange={(e) => setIndPhone(e.target.value)} required />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={resetIndForm}>Cancelar</Button>
+                <Button type="submit" disabled={indLoading}>{indLoading ? 'Salvando...' : 'Salvar'}</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {indications.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+            <Users className="h-8 w-8 mb-2 opacity-40" />
+            <p className="text-sm">Nenhum registro ainda</p>
+          </div>
+        )}
+        {indications.map((item) => (
+          <div key={item.id} className="group rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:bg-muted/30">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="font-medium text-foreground">{item.indicated_name}</p>
+                <p className="text-muted-foreground">{item.indicated_phone}</p>
+              </div>
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditInd(item)}><Pencil className="h-3 w-3" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteInd(item.id)}><Trash2 className="h-3 w-3" /></Button>
+              </div>
+            </div>
+          </div>
+        ))}
+        <Dialog open={!!confirmDeleteInd} onOpenChange={() => setConfirmDeleteInd(null)}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Excluir indicação?</DialogTitle><DialogDescription>Esta ação não pode ser desfeita.</DialogDescription></DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setConfirmDeleteInd(null)}>Cancelar</Button>
+              <Button variant="destructive" onClick={() => confirmDeleteInd && handleDeleteInd(confirmDeleteInd)}>Excluir</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <Separator className="border-border/50" />
+
+      {/* ═══ SEÇÃO 3: Intensivo ═══ */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="label-xs uppercase">Intensivo ({intensivos.length})</p>
+          <Button size="sm" variant="outline" onClick={() => { resetIntForm(); setShowIntForm(!showIntForm) }}>
+            <Plus className="mr-1 h-3 w-3" /> Registrar
+          </Button>
+        </div>
+
+        <Dialog open={showIntForm} onOpenChange={(open) => { if (!open) resetIntForm() }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{editingIntId ? 'Editar registro' : 'Novo registro intensivo'}</DialogTitle>
+              <DialogDescription>Registre participação ou indicação para o intensivo.</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmitInt} className="space-y-3">
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="int-part" checked={intParticipated} onChange={(e) => setIntParticipated(e.target.checked)} className="h-4 w-4 rounded border-input" />
+                <Label htmlFor="int-part">Participou</Label>
+              </div>
+              {intParticipated && (
+                <div className="space-y-1">
+                  <Label htmlFor="int-date">Data de participação</Label>
+                  <Input id="int-date" type="date" value={intDate} onChange={(e) => setIntDate(e.target.value)} />
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label htmlFor="int-ind-name">Nome indicação intensivo</Label>
+                <Input id="int-ind-name" value={intIndName} onChange={(e) => setIntIndName(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="int-ind-phone">Telefone indicação</Label>
+                <Input id="int-ind-phone" value={intIndPhone} onChange={(e) => setIntIndPhone(e.target.value)} />
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={resetIntForm}>Cancelar</Button>
+                <Button type="submit" disabled={intLoading}>{intLoading ? 'Salvando...' : 'Salvar'}</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {intensivos.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+            <Users className="h-8 w-8 mb-2 opacity-40" />
+            <p className="text-sm">Nenhum registro ainda</p>
+          </div>
+        )}
+        {intensivos.map((item) => (
+          <div key={item.id} className="group rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:bg-muted/30">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  {item.participated ? <Badge variant="success">Participou</Badge> : <Badge variant="muted">Não participou</Badge>}
+                  {item.participation_date && <span className="text-muted-foreground text-xs">{formatDateBR(item.participation_date)}</span>}
+                </div>
+                {item.indication_name && (
+                  <p className="mt-1 text-muted-foreground">Indicação: {item.indication_name} — {item.indication_phone}</p>
+                )}
+              </div>
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditInt(item)}><Pencil className="h-3 w-3" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteInt(item.id)}><Trash2 className="h-3 w-3" /></Button>
+              </div>
+            </div>
+          </div>
+        ))}
+        <Dialog open={!!confirmDeleteInt} onOpenChange={() => setConfirmDeleteInt(null)}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Excluir registro?</DialogTitle><DialogDescription>Esta ação não pode ser desfeita.</DialogDescription></DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setConfirmDeleteInt(null)}>Cancelar</Button>
+              <Button variant="destructive" onClick={() => confirmDeleteInt && handleDeleteInt(confirmDeleteInt)}>Excluir</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   )
 }

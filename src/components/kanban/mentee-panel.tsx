@@ -354,6 +354,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
         <TabsContent value="engagement"><TabEngagement menteeId={mentee.id} /></TabsContent>
         <TabsContent value="chat">
           <TabChat
+            menteeId={mentee.id}
             channelId={mentee.stream_channel_id}
             onUnreadCountChange={setChatUnread}
           />

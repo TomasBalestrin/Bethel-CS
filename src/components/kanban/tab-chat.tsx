@@ -15,19 +15,41 @@ import { Loader2 } from 'lucide-react'
 import 'stream-chat-react/dist/css/v2/index.css'
 
 interface TabChatProps {
+  menteeId: string
   channelId: string | null
   onUnreadCountChange?: (count: number) => void
+  onChannelCreated?: (channelId: string) => void
 }
 
-export function TabChat({ channelId, onUnreadCountChange }: TabChatProps) {
+export function TabChat({ menteeId, channelId, onUnreadCountChange, onChannelCreated }: TabChatProps) {
   const [client, setClient] = useState<StreamChat | null>(null)
   const [channel, setChannel] = useState<ReturnType<StreamChat['channel']> | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
 
   const init = useCallback(async () => {
-    if (!channelId) {
-      setError('Canal de chat não configurado para este mentorado.')
-      return
+    let activeChannelId = channelId
+
+    // Auto-create channel if not configured
+    if (!activeChannelId) {
+      setCreating(true)
+      try {
+        const res = await fetch(`/api/admin/create-channel`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mentee_id: menteeId }),
+        })
+        if (!res.ok) throw new Error('Falha ao criar canal')
+        const data = await res.json()
+        activeChannelId = data.channel_id
+        onChannelCreated?.(activeChannelId!)
+      } catch (err) {
+        console.error('Channel creation error:', err)
+        setError('Erro ao criar canal de chat.')
+        setCreating(false)
+        return
+      }
+      setCreating(false)
     }
 
     try {
@@ -44,7 +66,7 @@ export function TabChat({ channelId, onUnreadCountChange }: TabChatProps) {
         )
       }
 
-      const ch = chatClient.channel('messaging', channelId)
+      const ch = chatClient.channel('messaging', activeChannelId!)
       await ch.watch()
 
       setClient(chatClient)
@@ -57,7 +79,7 @@ export function TabChat({ channelId, onUnreadCountChange }: TabChatProps) {
       console.error('Stream Chat init error:', err)
       setError('Erro ao conectar ao chat.')
     }
-  }, [channelId, onUnreadCountChange])
+  }, [channelId, menteeId, onUnreadCountChange, onChannelCreated])
 
   useEffect(() => {
     init()
@@ -97,7 +119,9 @@ export function TabChat({ channelId, onUnreadCountChange }: TabChatProps) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        <p className="mt-2 text-xs text-muted-foreground">Conectando ao chat...</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {creating ? 'Criando canal de chat...' : 'Conectando ao chat...'}
+        </p>
       </div>
     )
   }

@@ -5,6 +5,7 @@ const withPWA = withPWAInit({
   disable: process.env.NODE_ENV === 'development',
   register: true,
   skipWaiting: true,
+  importScripts: ['/sw-push-listener.js'],
   runtimeCaching: [
     // Static assets — CacheFirst 7 days
     {

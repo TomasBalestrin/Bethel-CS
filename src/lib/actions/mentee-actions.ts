@@ -111,3 +111,36 @@ export async function moveMentee(menteeId: string, newStageId: string) {
   revalidatePath('/etapas-mentoria')
   return { error: null }
 }
+
+export async function transitionToMentorship(menteeId: string) {
+  const supabase = createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  // Get the first stage of the mentorship kanban
+  const { data: firstStage } = await supabase
+    .from('kanban_stages')
+    .select('id')
+    .eq('type', 'mentorship')
+    .order('position')
+    .limit(1)
+    .single()
+
+  if (!firstStage) return { error: 'Etapas de mentoria não encontradas' }
+
+  const { error } = await supabase
+    .from('mentees')
+    .update({
+      kanban_type: 'mentorship' as KanbanType,
+      current_stage_id: firstStage.id,
+    })
+    .eq('id', menteeId)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/etapas-iniciais')
+  revalidatePath('/etapas-mentoria')
+  revalidatePath('/mentorados')
+  return { error: null }
+}

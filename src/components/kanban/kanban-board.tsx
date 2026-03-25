@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -11,12 +11,21 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core'
 import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog'
+import { Plus, Rocket, ChevronRight } from 'lucide-react'
+import { toast } from 'sonner'
 import { KanbanColumn } from './kanban-column'
 import { MenteeCard } from './mentee-card'
 import { CreateMenteeDialog } from './create-mentee-dialog'
 import { MenteePanel } from './mentee-panel'
-import { moveMentee } from '@/lib/actions/mentee-actions'
+import { moveMentee, transitionToMentorship } from '@/lib/actions/mentee-actions'
 import type { MenteeWithStats } from '@/types/kanban'
 import type { Database, KanbanType } from '@/types/database'
 
@@ -40,13 +49,32 @@ export function KanbanBoard({
   const [mentees, setMentees] = useState<MenteeWithStats[]>(initialMentees)
   const [activeId, setActiveId] = useState<string | null>(null)
 
-  // Sync local state when server data changes (e.g. after router.refresh())
   useEffect(() => {
     setMentees(initialMentees)
   }, [initialMentees])
+
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedMentee, setSelectedMentee] = useState<MenteeWithStats | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
+
+  // Transition modal state
+  const [transitionMentee, setTransitionMentee] = useState<MenteeWithStats | null>(null)
+  const [transitioning, setTransitioning] = useState(false)
+
+  // Scroll overflow detection
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [showScrollHint, setShowScrollHint] = useState(false)
+
+  useEffect(() => {
+    function check() {
+      const el = scrollRef.current
+      if (!el) return
+      setShowScrollHint(el.scrollWidth > el.clientWidth + 2)
+    }
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [stages])
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -59,6 +87,11 @@ export function KanbanBoard({
   const activeMentee = activeId
     ? mentees.find((m) => m.id === activeId)
     : null
+
+  // The last stage (for detecting transition trigger)
+  const lastStage = stages.length > 0 ? stages[stages.length - 1] : null
+  // The first stage (for the "+ Adicionar" button)
+  const firstStage = stages.length > 0 ? stages[0] : null
 
   const handleDragStart = useCallback((event: DragStartEvent) => {
     setActiveId(String(event.active.id))
@@ -77,6 +110,7 @@ export function KanbanBoard({
       const mentee = mentees.find((m) => m.id === menteeId)
       if (!mentee || mentee.current_stage_id === newStageId) return
 
+      // Optimistic update
       const previousMentees = [...mentees]
       setMentees((prev) =>
         prev.map((m) =>
@@ -87,15 +121,35 @@ export function KanbanBoard({
       const result = await moveMentee(menteeId, newStageId)
       if (result.error) {
         setMentees(previousMentees)
+        return
+      }
+
+      // Check if dropped on last stage → trigger transition modal (only for initial kanban)
+      if (kanbanType === 'initial' && lastStage && newStageId === lastStage.id) {
+        setTransitionMentee({ ...mentee, current_stage_id: newStageId })
       }
     },
-    [mentees]
+    [mentees, kanbanType, lastStage]
   )
 
   const handleCardClick = useCallback((mentee: MenteeWithStats) => {
     setSelectedMentee(mentee)
     setPanelOpen(true)
   }, [])
+
+  async function handleTransitionConfirm() {
+    if (!transitionMentee) return
+    setTransitioning(true)
+    const result = await transitionToMentorship(transitionMentee.id)
+    setTransitioning(false)
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      toast.success(`${transitionMentee.full_name} foi enviado para Etapas Mentoria`)
+      setMentees((prev) => prev.filter((m) => m.id !== transitionMentee.id))
+    }
+    setTransitionMentee(null)
+  }
 
   const getMenteesForStage = (stageId: string) =>
     mentees.filter((m) => m.current_stage_id === stageId)
@@ -106,7 +160,7 @@ export function KanbanBoard({
         <h1 className="font-heading text-2xl font-bold text-foreground">
           {title}
         </h1>
-        <Button onClick={() => setDialogOpen(true)}>
+        <Button onClick={() => setDialogOpen(true)} className="hidden sm:inline-flex">
           <Plus className="mr-2 h-4 w-4" />
           Novo Mentorado
         </Button>
@@ -117,21 +171,49 @@ export function KanbanBoard({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {stages.map((stage) => (
-            <KanbanColumn
-              key={stage.id}
-              stage={stage}
-              mentees={getMenteesForStage(stage.id)}
-              onCardClick={handleCardClick}
-            />
-          ))}
+        <div className="relative">
+          <div
+            ref={scrollRef}
+            className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin"
+            onScroll={() => {
+              const el = scrollRef.current
+              if (!el) return
+              setShowScrollHint(el.scrollLeft + el.clientWidth < el.scrollWidth - 2)
+            }}
+          >
+            {stages.map((stage, idx) => (
+              <KanbanColumn
+                key={stage.id}
+                stage={stage}
+                mentees={getMenteesForStage(stage.id)}
+                onCardClick={handleCardClick}
+                showAddButton={idx === 0 && firstStage?.id === stage.id}
+                onAddClick={() => setDialogOpen(true)}
+              />
+            ))}
+          </div>
+          {showScrollHint && (
+            <div className="absolute right-0 top-0 bottom-4 flex items-center pointer-events-none">
+              <div className="w-10 h-full bg-gradient-to-l from-background to-transparent" />
+              <ChevronRight size={16} className="text-muted-foreground -ml-5" />
+            </div>
+          )}
         </div>
 
         <DragOverlay>
           {activeMentee ? <MenteeCard mentee={activeMentee} /> : null}
         </DragOverlay>
       </DndContext>
+
+      {/* Mobile FAB */}
+      <button
+        type="button"
+        onClick={() => setDialogOpen(true)}
+        className="fixed bottom-6 right-6 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-white shadow-lg transition-transform hover:scale-105 active:scale-95 sm:hidden"
+        aria-label="Novo Mentorado"
+      >
+        <Plus className="h-6 w-6" />
+      </button>
 
       <CreateMenteeDialog
         open={dialogOpen}
@@ -152,7 +234,40 @@ export function KanbanBoard({
           setMentees((prev) => prev.map((m) => m.id === updated.id ? updated : m))
           setSelectedMentee(updated)
         }}
+        onTransitionToMentorship={kanbanType === 'initial' ? (mentee) => {
+          setTransitionMentee(mentee)
+        } : undefined}
       />
+
+      {/* Transition confirmation modal */}
+      <Dialog open={!!transitionMentee} onOpenChange={(open) => { if (!open) setTransitionMentee(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10">
+                <Rocket className="h-5 w-5 text-accent" />
+              </div>
+              <DialogTitle className="text-lg">Mentorado pronto para avançar?</DialogTitle>
+            </div>
+            <DialogDescription className="text-sm">
+              {transitionMentee?.full_name} concluiu as Etapas Iniciais.
+              Deseja enviá-lo para Etapas Mentoria?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setTransitionMentee(null)}>
+              Não, manter aqui
+            </Button>
+            <Button
+              onClick={handleTransitionConfirm}
+              disabled={transitioning}
+              className="bg-gradient-to-r from-accent to-accent/80 text-white"
+            >
+              {transitioning ? 'Enviando...' : 'Sim, avançar →'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -1,12 +1,12 @@
 -- Etapa 2: Stream Chat — colunas em mentees + tabela chat_metrics
 
--- 1. Adicionar colunas de chat em mentees
+-- 1. Adicionar colunas de chat em mentees (idempotente)
 alter table public.mentees
-  add column chat_token uuid default gen_random_uuid() unique not null,
-  add column stream_channel_id text;
+  add column if not exists chat_token uuid default gen_random_uuid() unique not null,
+  add column if not exists stream_channel_id text;
 
 -- 2. Tabela de métricas diárias de chat
-create table public.chat_metrics (
+create table if not exists public.chat_metrics (
   id uuid primary key default gen_random_uuid(),
   mentee_id uuid not null references public.mentees(id) on delete cascade,
   specialist_id uuid references public.profiles(id),
@@ -22,24 +22,17 @@ create table public.chat_metrics (
 -- 3. RLS para chat_metrics
 alter table public.chat_metrics enable row level security;
 
-create policy "Authenticated users can read chat_metrics"
-  on public.chat_metrics for select
-  to authenticated
-  using (true);
-
-create policy "Authenticated users can insert chat_metrics"
-  on public.chat_metrics for insert
-  to authenticated
-  with check (true);
-
-create policy "Authenticated users can update chat_metrics"
-  on public.chat_metrics for update
-  to authenticated
-  using (true);
-
--- 4. Permitir acesso anon ao chat_token para a rota pública /chat/[chat_token]
--- O mentorado não faz login; a rota pública consulta mentees pelo chat_token via service role,
--- então não precisa de policy anon para mentees.
-
--- 5. Permitir que o webhook (service role) insira/atualize chat_metrics
--- Service role bypassa RLS, então nenhuma policy adicional necessária.
+do $$ begin
+  if not exists (select 1 from pg_policies where policyname = 'Authenticated users can read chat_metrics') then
+    create policy "Authenticated users can read chat_metrics"
+      on public.chat_metrics for select to authenticated using (true);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Authenticated users can insert chat_metrics') then
+    create policy "Authenticated users can insert chat_metrics"
+      on public.chat_metrics for insert to authenticated with check (true);
+  end if;
+  if not exists (select 1 from pg_policies where policyname = 'Authenticated users can update chat_metrics') then
+    create policy "Authenticated users can update chat_metrics"
+      on public.chat_metrics for update to authenticated using (true);
+  end if;
+end $$;

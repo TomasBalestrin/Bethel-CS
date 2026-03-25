@@ -115,7 +115,8 @@ export default function MenteeChatPage() {
   useEffect(() => {
     if (!channel || !menteeId || pushRef.current) return
 
-    const handler = (event: { message?: { user?: { id?: string } } }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handler = (event: any) => {
       if (event.message?.user?.id?.startsWith('mentee-') && !pushRef.current) {
         pushRef.current = true
         subscribeToPush(menteeId)

@@ -366,6 +366,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
             menteeId={mentee.id}
             menteePhone={mentee.phone}
             menteeName={mentee.full_name}
+            specialistId={mentee.created_by}
             onUnreadCountChange={setChatUnread}
           />
         </TabsContent>

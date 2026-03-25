@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Loader2, Send, MessageSquare, ExternalLink } from 'lucide-react'
+import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { Database } from '@/types/database'
 
@@ -16,6 +16,37 @@ interface TabChatProps {
   onUnreadCountChange?: (count: number) => void
 }
 
+// ─── Helpers ───
+
+function formatTime(dateStr: string) {
+  return new Date(dateStr).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatDate(dateStr: string) {
+  const d = new Date(dateStr)
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+
+  if (d.toDateString() === today.toDateString()) return 'Hoje'
+  if (d.toDateString() === yesterday.toDateString()) return 'Ontem'
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+function isImageUrl(text: string) {
+  return /\.(jpg|jpeg|png|gif|webp)(\?|$)/i.test(text)
+}
+
+function isAudioUrl(text: string) {
+  return /\.(ogg|mp3|wav|m4a|opus)(\?|$)/i.test(text)
+}
+
+function getDateKey(dateStr: string) {
+  return new Date(dateStr).toDateString()
+}
+
+// ─── Component ───
+
 export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnreadCountChange }: TabChatProps) {
   const [messages, setMessages] = useState<WppMessage[]>([])
   const [loading, setLoading] = useState(true)
@@ -25,138 +56,164 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const [noInstance, setNoInstance] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [isOwner, setIsOwner] = useState(false)
+
+  // File attachment
+  const [attachedFile, setAttachedFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Audio recording
+  const [recording, setRecording] = useState(false)
+  const [recordingTime, setRecordingTime] = useState(0)
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
+  const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const onUnreadRef = useRef(onUnreadCountChange)
   onUnreadRef.current = onUnreadCountChange
 
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
   }, [])
 
-  // Fetch messages + instance status of the MENTEE'S specialist
+  // ─── Load messages + instance ───
   useEffect(() => {
     async function load() {
       try {
-        // Fetch messages
         const res = await fetch(`/api/whatsapp/messages/${menteeId}`)
         if (res.ok) {
-          const data = await res.json()
-          setMessages(data)
+          setMessages(await res.json())
           onUnreadRef.current?.(0)
         }
 
-        // Determine user role and ownership
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return
 
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single()
+        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        setIsAdmin(profile?.role === 'admin')
+        setIsOwner(specialistId === user.id)
 
-        const userIsAdmin = profile?.role === 'admin'
-        const userIsOwner = specialistId === user.id
-        setIsAdmin(userIsAdmin)
-        setIsOwner(userIsOwner)
-
-        // Look up the instance of the mentee's specialist (not the logged-in user)
-        const targetSpecialistId = specialistId
-        if (!targetSpecialistId) {
-          setNoInstance(true)
-          return
-        }
+        const targetId = specialistId
+        if (!targetId) { setNoInstance(true); return }
 
         const { data: instance } = await supabase
-          .from('wpp_instances')
-          .select('status')
-          .eq('specialist_id', targetSpecialistId)
-          .single()
+          .from('wpp_instances').select('status').eq('specialist_id', targetId).single()
 
-        if (instance) {
-          setInstanceStatus(instance.status)
-        } else {
-          setNoInstance(true)
-        }
+        if (instance) setInstanceStatus(instance.status)
+        else setNoInstance(true)
       } catch (err) {
         console.error('Chat load error:', err)
       } finally {
         setLoading(false)
       }
     }
-
     load()
   }, [menteeId, specialistId])
 
-  // Auto-scroll on messages change
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages, scrollToBottom])
+  useEffect(() => { scrollToBottom() }, [messages, scrollToBottom])
 
-  // Supabase Realtime for new messages
+  // ─── Realtime ───
   useEffect(() => {
     const supabase = createClient()
-
     const channel = supabase
       .channel(`wpp_messages:mentee_id=eq.${menteeId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'wpp_messages',
-          filter: `mentee_id=eq.${menteeId}`,
-        },
-        (payload) => {
-          const newMsg = payload.new as WppMessage
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === newMsg.id)) return prev
-            return [...prev, newMsg]
-          })
-
-          if (newMsg.direction === 'incoming') {
-            supabase
-              .from('wpp_messages')
-              .update({ is_read: true })
-              .eq('id', newMsg.id)
-              .then(() => {})
-          }
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'wpp_messages',
+        filter: `mentee_id=eq.${menteeId}`,
+      }, (payload) => {
+        const newMsg = payload.new as WppMessage
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === newMsg.id)) return prev
+          return [...prev, newMsg]
+        })
+        if (newMsg.direction === 'incoming') {
+          supabase.from('wpp_messages').update({ is_read: true }).eq('id', newMsg.id).then(() => {})
         }
-      )
+      })
       .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    return () => { supabase.removeChannel(channel) }
   }, [menteeId])
 
+  // ─── Upload to Supabase Storage ───
+  async function uploadFile(file: File | Blob, filename: string): Promise<string | null> {
+    const supabase = createClient()
+    const ext = filename.split('.').pop() || 'bin'
+    const path = `${menteeId}/${Date.now()}_${filename}`
+
+    const { error } = await supabase.storage
+      .from('chat-attachments')
+      .upload(path, file, { contentType: file.type || `application/${ext}` })
+
+    if (error) {
+      console.error('Upload error:', error)
+      return null
+    }
+
+    const { data: { publicUrl } } = supabase.storage.from('chat-attachments').getPublicUrl(path)
+    return publicUrl
+  }
+
+  // ─── Send message ───
   async function handleSend() {
-    const text = input.trim()
-    if (!text || sending) return
+    let text = input.trim()
+    if ((!text && !attachedFile && !audioBlob) || sending || uploading) return
 
     setSending(true)
-    setInput('')
-
-    const optimisticMsg: WppMessage = {
-      id: `temp-${Date.now()}`,
-      mentee_id: menteeId,
-      specialist_id: specialistId || '',
-      instance_id: '',
-      message_id: null,
-      direction: 'outgoing',
-      message_type: 'text',
-      content: text,
-      media_url: null,
-      sender_name: 'Você',
-      is_read: true,
-      sent_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-    }
-    setMessages((prev) => [...prev, optimisticMsg])
+    setUploading(true)
 
     try {
+      // Handle file attachment
+      if (attachedFile) {
+        const url = await uploadFile(attachedFile, attachedFile.name)
+        if (url) {
+          text = `📎 Arquivo: ${attachedFile.name}\n${url}`
+        } else {
+          setSending(false); setUploading(false)
+          return
+        }
+        setAttachedFile(null)
+      }
+
+      // Handle audio
+      if (audioBlob) {
+        const url = await uploadFile(audioBlob, `audio_${Date.now()}.ogg`)
+        if (url) {
+          text = `🎤 Áudio: ${url}`
+        } else {
+          setSending(false); setUploading(false)
+          return
+        }
+        setAudioBlob(null)
+        setAudioUrl(null)
+      }
+
+      setUploading(false)
+      if (!text) { setSending(false); return }
+
+      setInput('')
+
+      // Optimistic
+      const optimistic: WppMessage = {
+        id: `temp-${Date.now()}`,
+        mentee_id: menteeId,
+        specialist_id: specialistId || '',
+        instance_id: '',
+        message_id: null,
+        direction: 'outgoing',
+        message_type: 'text',
+        content: text,
+        media_url: null,
+        sender_name: 'Você',
+        is_read: true,
+        sent_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      }
+      setMessages((prev) => [...prev, optimistic])
+
       const res = await fetch('/api/whatsapp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -164,16 +221,55 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
       })
 
       if (!res.ok) {
-        setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id))
-        const err = await res.json().catch(() => ({}))
-        console.error('Send error:', err.error)
+        setMessages((prev) => prev.filter((m) => m.id !== optimistic.id))
       }
     } catch {
-      setMessages((prev) => prev.filter((m) => m.id !== optimisticMsg.id))
+      // Revert handled above
     } finally {
       setSending(false)
+      setUploading(false)
       textareaRef.current?.focus()
     }
+  }
+
+  // ─── Audio recording ───
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
+      const chunks: Blob[] = []
+
+      recorder.ondataavailable = (e) => chunks.push(e.data)
+      recorder.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop())
+        const blob = new Blob(chunks, { type: 'audio/ogg' })
+        setAudioBlob(blob)
+        setAudioUrl(URL.createObjectURL(blob))
+      }
+
+      recorder.start()
+      mediaRecorderRef.current = recorder
+      setRecording(true)
+      setRecordingTime(0)
+      recordingTimerRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000)
+    } catch {
+      console.error('Microphone access denied')
+    }
+  }
+
+  function stopRecording() {
+    mediaRecorderRef.current?.stop()
+    setRecording(false)
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current)
+      recordingTimerRef.current = null
+    }
+  }
+
+  function cancelAudio() {
+    setAudioBlob(null)
+    if (audioUrl) URL.revokeObjectURL(audioUrl)
+    setAudioUrl(null)
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -183,26 +279,25 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
     }
   }
 
-  function formatTime(dateStr: string) {
-    const d = new Date(dateStr)
-    return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  // Auto-resize textarea
+  function handleInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setInput(e.target.value)
+    const el = e.target
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
   }
 
   const wppLink = `https://wa.me/${menteePhone.replace(/\D/g, '')}`
   const isDisconnected = instanceStatus !== 'connected'
   const canSend = (isOwner || isAdmin) && !isDisconnected
-  const inputDisabledReason = isDisconnected
-    ? 'WhatsApp desconectado — reconecte no Admin'
-    : null
+  const inputDisabledReason = isDisconnected ? 'WhatsApp desconectado — reconecte no Admin' : null
 
-  // No instance configured
+  // ─── Empty states ───
   if (!loading && noInstance) {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <MessageSquare className="h-10 w-10 text-muted-foreground/40 mb-3" />
-        <p className="text-sm text-muted-foreground">
-          Configure o WhatsApp no módulo Admin para ativar o chat
-        </p>
+        <p className="text-sm text-muted-foreground">Configure o WhatsApp no módulo Admin para ativar o chat</p>
       </div>
     )
   }
@@ -216,86 +311,72 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
     )
   }
 
+  // ─── Render ───
   return (
     <div className="-mx-4 -mt-4 sm:-mx-6 flex flex-col" style={{ height: 'calc(100vh - 260px)' }}>
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">{menteeName}</p>
-            <a
-              href={wppLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 text-xs text-accent hover:underline"
-            >
-              {menteePhone}
-              <ExternalLink className="h-3 w-3" />
-            </a>
-          </div>
+      {/* Header — fixed top */}
+      <div className="flex items-center justify-between border-b border-border px-4 py-2.5 shrink-0 bg-background">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-foreground truncate">{menteeName}</p>
+          <a href={wppLink} target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-1 text-xs text-accent hover:underline">
+            {menteePhone}<ExternalLink className="h-3 w-3" />
+          </a>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span
-            className={`h-2 w-2 rounded-full ${
-              instanceStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'
-            }`}
-          />
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className={`h-2 w-2 rounded-full ${instanceStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'}`} />
           <span className="text-[10px] text-muted-foreground">
             {instanceStatus === 'connected' ? 'Conectado' : 'Desconectado'}
           </span>
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2 min-h-0">
+      {/* Messages — scrollable */}
+      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1 min-h-0">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <MessageSquare className="h-8 w-8 text-muted-foreground/30 mb-2" />
             <p className="text-xs text-muted-foreground">Nenhuma mensagem ainda</p>
           </div>
         )}
-        {messages.map((msg) => {
+        {messages.map((msg, idx) => {
           const isOutgoing = msg.direction === 'outgoing'
+          const prevMsg = messages[idx - 1]
+          const showDateSeparator = !prevMsg || getDateKey(msg.sent_at) !== getDateKey(prevMsg.sent_at)
+
           return (
-            <div
-              key={msg.id}
-              className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[75%] rounded-xl px-3 py-2 text-sm ${
-                  isOutgoing
-                    ? 'bg-accent/10 text-foreground'
-                    : 'bg-muted text-foreground'
-                }`}
-              >
-                {msg.message_type === 'image' && msg.media_url && (
-                  <img
-                    src={msg.media_url}
-                    alt="Imagem"
-                    className="mb-1.5 max-w-full rounded-lg"
-                    loading="lazy"
-                  />
-                )}
-                {msg.message_type === 'audio' && msg.media_url && (
-                  <audio controls className="mb-1.5 max-w-full" src={msg.media_url} />
-                )}
-                {msg.message_type === 'video' && msg.media_url && (
-                  <video controls className="mb-1.5 max-w-full rounded-lg" src={msg.media_url} />
-                )}
-                {!['text', 'image', 'audio', 'video'].includes(msg.message_type) && !msg.content && (
-                  <p className="italic text-muted-foreground text-xs">(mídia não suportada no painel)</p>
-                )}
+            <div key={msg.id}>
+              {/* Date separator */}
+              {showDateSeparator && (
+                <div className="flex items-center justify-center my-3">
+                  <span className="rounded-full bg-muted px-3 py-0.5 text-[10px] text-muted-foreground">
+                    {formatDate(msg.sent_at)}
+                  </span>
+                </div>
+              )}
 
-                {msg.content && (
-                  <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                )}
+              <div className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} mb-1`}>
+                <div className="max-w-[75%]">
+                  {/* Sender name — incoming only */}
+                  {!isOutgoing && (
+                    <p className="text-[10px] text-muted-foreground mb-0.5 px-1">
+                      {msg.sender_name || menteeName}
+                    </p>
+                  )}
 
-                <div className={`mt-1 flex items-center gap-1.5 text-[10px] ${
-                  isOutgoing ? 'text-accent/60 justify-end' : 'text-muted-foreground'
-                }`}>
-                  <span>{isOutgoing ? 'Você' : msg.sender_name || menteeName}</span>
-                  <span>·</span>
-                  <span>{formatTime(msg.sent_at)}</span>
+                  <div className={`rounded-xl px-3 py-2 text-sm ${
+                    isOutgoing
+                      ? 'bg-accent/15 text-foreground rounded-tr-sm'
+                      : 'bg-muted text-foreground rounded-tl-sm'
+                  }`}>
+                    {/* Media rendering */}
+                    <MessageContent msg={msg} menteeName={menteeName} />
+                  </div>
+
+                  {/* Time */}
+                  <p className={`text-[10px] text-muted-foreground/60 mt-0.5 px-1 ${isOutgoing ? 'text-right' : ''}`}>
+                    {formatTime(msg.sent_at)}
+                  </p>
                 </div>
               </div>
             </div>
@@ -304,33 +385,175 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="border-t border-border px-4 py-2.5">
+      {/* Input area — fixed bottom */}
+      <div className="border-t border-border px-3 py-2 shrink-0 bg-background">
         {inputDisabledReason && (
           <p className="text-[10px] text-destructive mb-1.5">{inputDisabledReason}</p>
         )}
-        <div className="flex items-end gap-2">
-          <textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={canSend ? 'Responder via WhatsApp...' : inputDisabledReason || ''}
-            disabled={!canSend}
-            rows={1}
-            className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ minHeight: '38px', maxHeight: '120px' }}
-          />
-          <Button
-            size="icon"
-            onClick={handleSend}
-            disabled={!input.trim() || sending || !canSend}
-            className="h-[38px] w-[38px] shrink-0"
-          >
-            <Send className="h-4 w-4" />
-          </Button>
-        </div>
+
+        {/* File preview */}
+        {attachedFile && (
+          <div className="flex items-center gap-2 mb-2 rounded-lg bg-muted px-3 py-2 text-sm">
+            <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
+            <span className="truncate flex-1">{attachedFile.name}</span>
+            <button onClick={() => setAttachedFile(null)}><X className="h-4 w-4 text-muted-foreground hover:text-foreground" /></button>
+          </div>
+        )}
+
+        {/* Audio preview */}
+        {audioUrl && !recording && (
+          <div className="flex items-center gap-2 mb-2 rounded-lg bg-muted px-3 py-2">
+            <audio controls src={audioUrl} className="h-8 flex-1" />
+            <Button size="sm" onClick={handleSend} disabled={sending || uploading}>
+              {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+            </Button>
+            <button onClick={cancelAudio}><X className="h-4 w-4 text-muted-foreground hover:text-foreground" /></button>
+          </div>
+        )}
+
+        {/* Recording indicator */}
+        {recording && (
+          <div className="flex items-center gap-3 mb-2 rounded-lg bg-destructive/10 px-3 py-2">
+            <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
+            <span className="text-sm text-destructive font-medium">
+              {Math.floor(recordingTime / 60).toString().padStart(2, '0')}:{(recordingTime % 60).toString().padStart(2, '0')}
+            </span>
+            <div className="flex-1" />
+            <Button size="sm" variant="destructive" onClick={stopRecording}>
+              <Square className="h-3 w-3 mr-1" /> Parar
+            </Button>
+          </div>
+        )}
+
+        {/* Input bar */}
+        {!audioUrl && !recording && (
+          <div className="flex items-end gap-1.5">
+            {/* Attachment */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) setAttachedFile(file)
+                e.target.value = ''
+              }}
+            />
+            <Button
+              size="icon" variant="ghost"
+              className="h-9 w-9 shrink-0 text-muted-foreground"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={!canSend}
+            >
+              <Paperclip className="h-4 w-4" />
+            </Button>
+
+            {/* Audio */}
+            <Button
+              size="icon" variant="ghost"
+              className="h-9 w-9 shrink-0 text-muted-foreground"
+              onClick={startRecording}
+              disabled={!canSend}
+            >
+              <Mic className="h-4 w-4" />
+            </Button>
+
+            {/* Text input */}
+            <textarea
+              ref={textareaRef}
+              value={input}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+              placeholder={canSend ? 'Mensagem...' : inputDisabledReason || ''}
+              disabled={!canSend || uploading}
+              rows={1}
+              className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ minHeight: '36px', maxHeight: '120px' }}
+            />
+
+            {/* Send */}
+            <Button
+              size="icon"
+              onClick={handleSend}
+              disabled={(!input.trim() && !attachedFile) || sending || uploading || !canSend}
+              className="h-9 w-9 shrink-0"
+            >
+              {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   )
+}
+
+// ─── Message Content Renderer ───
+
+function MessageContent({ msg, menteeName }: { msg: WppMessage; menteeName: string }) {
+  const content = msg.content || ''
+  const mediaUrl = msg.media_url
+
+  // Image from media_url
+  if (msg.message_type === 'image' && mediaUrl) {
+    return (
+      <>
+        <a href={mediaUrl} target="_blank" rel="noopener noreferrer">
+          <img src={mediaUrl} alt="Imagem" className="max-w-full rounded-lg mb-1" loading="lazy" />
+        </a>
+        {content && <p className="whitespace-pre-wrap break-words">{content}</p>}
+      </>
+    )
+  }
+
+  // Audio from media_url
+  if ((msg.message_type === 'audio' && mediaUrl) || content.startsWith('🎤')) {
+    const src = mediaUrl || content.split('\n').pop()?.trim() || ''
+    return <audio controls src={src} className="max-w-full" />
+  }
+
+  // Video
+  if (msg.message_type === 'video' && mediaUrl) {
+    return <video controls src={mediaUrl} className="max-w-full rounded-lg" />
+  }
+
+  // File attachment (text message with 📎)
+  if (content.startsWith('📎')) {
+    const lines = content.split('\n')
+    const name = lines[0].replace('📎 Arquivo: ', '')
+    const url = lines[1]?.trim()
+    return (
+      <div className="flex items-center gap-2">
+        <FileDown className="h-5 w-5 text-accent shrink-0" />
+        <div className="min-w-0">
+          <p className="text-sm font-medium truncate">{name}</p>
+          {url && (
+            <a href={url} target="_blank" rel="noopener noreferrer"
+              className="text-xs text-accent hover:underline">Download</a>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Image URL in text content
+  if (isImageUrl(content)) {
+    return (
+      <a href={content} target="_blank" rel="noopener noreferrer">
+        <img src={content} alt="Imagem" className="max-w-full rounded-lg" loading="lazy" />
+      </a>
+    )
+  }
+
+  // Audio URL in text content
+  if (isAudioUrl(content)) {
+    return <audio controls src={content} className="max-w-full" />
+  }
+
+  // Unsupported media type with no text
+  if (!['text', 'image', 'audio', 'video'].includes(msg.message_type) && !content) {
+    return <p className="italic text-muted-foreground text-xs">(mídia não suportada)</p>
+  }
+
+  // Default: plain text
+  return <p className="whitespace-pre-wrap break-words">{content}</p>
 }

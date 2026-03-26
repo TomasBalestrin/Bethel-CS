@@ -564,7 +564,7 @@ export interface Database {
           ended_at?: string | null
           duration_seconds?: number | null
           recording_url?: string | null
-          recording_status?: 'pending' | 'processing' | 'ready' | 'failed'
+          recording_status?: 'pending' | 'processing' | 'ready' | 'failed' | 'unavailable'
           created_at?: string
         }
         Update: {
@@ -576,7 +576,7 @@ export interface Database {
           ended_at?: string | null
           duration_seconds?: number | null
           recording_url?: string | null
-          recording_status?: 'pending' | 'processing' | 'ready' | 'failed'
+          recording_status?: 'pending' | 'processing' | 'ready' | 'failed' | 'unavailable'
         }
         Relationships: []
       }

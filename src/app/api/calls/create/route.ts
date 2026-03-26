@@ -58,12 +58,12 @@ export async function POST(request: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin
   const menteeLink = `${appUrl}/call/${mentee.call_token}?room=${room.name}`
 
-  // Send WPP notification
-  const targetSpecialistId = mentee.created_by || user.id
+  // Send WPP notification — find any connected instance
   const { data: instance } = await supabase
     .from('wpp_instances')
     .select('instance_id, status')
-    .eq('specialist_id', targetSpecialistId)
+    .eq('status', 'connected')
+    .limit(1)
     .single()
 
   if (instance?.status === 'connected') {

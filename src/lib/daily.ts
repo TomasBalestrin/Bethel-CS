@@ -8,7 +8,19 @@ const DAILY_DOMAIN = process.env.NEXT_PUBLIC_DAILY_DOMAIN || ''
 
 export async function createRoom(): Promise<{ name: string; url: string }> {
   console.log('[Daily] createRoom - API key exists:', !!DAILY_API_KEY, 'length:', DAILY_API_KEY?.length)
-  console.log('[Daily] createRoom - domain:', DAILY_DOMAIN)
+
+  const body = {
+    privacy: 'private',
+    properties: {
+      max_participants: 2,
+      exp: Math.floor(Date.now() / 1000) + 7200,
+      enable_recording: 'cloud',
+      start_video_off: true,
+      start_audio_off: false,
+    },
+  }
+
+  console.log('[Daily] createRoom - request body:', JSON.stringify(body))
 
   const res = await fetch('https://api.daily.co/v1/rooms', {
     method: 'POST',
@@ -16,16 +28,7 @@ export async function createRoom(): Promise<{ name: string; url: string }> {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${DAILY_API_KEY}`,
     },
-    body: JSON.stringify({
-      properties: {
-        max_participants: 2,
-        exp: Math.floor(Date.now() / 1000) + 7200,
-        enable_recording: 'cloud',
-        enable_chat: false,
-        enable_screenshare: false,
-        start_video_off: true,
-      },
-    }),
+    body: JSON.stringify(body),
   })
 
   console.log('[Daily] createRoom - response status:', res.status)

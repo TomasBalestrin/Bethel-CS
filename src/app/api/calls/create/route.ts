@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  const { menteeId } = await request.json()
+  const { menteeId, forceNew } = await request.json()
   if (!menteeId) return NextResponse.json({ error: 'menteeId obrigatório' }, { status: 400 })
 
   // Get mentee info
@@ -20,6 +20,42 @@ export async function POST(request: NextRequest) {
 
   if (!mentee) return NextResponse.json({ error: 'Mentorado não encontrado' }, { status: 404 })
 
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin
+
+  // Check for existing active call (unless forceNew)
+  if (!forceNew) {
+    const { data: existingCall } = await supabase
+      .from('call_records')
+      .select('*')
+      .eq('mentee_id', menteeId)
+      .is('ended_at', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (existingCall) {
+      console.log('[Calls/Create] Reusing existing call:', existingCall.daily_room_name)
+      const token = await createMeetingToken(existingCall.daily_room_name, true)
+      const menteeLink = `${appUrl}/call/${mentee.call_token}?room=${existingCall.daily_room_name}`
+
+      return NextResponse.json({
+        callId: existingCall.id,
+        roomUrl: existingCall.daily_room_url,
+        roomName: existingCall.daily_room_name,
+        token,
+        menteeLink,
+        reused: true,
+      })
+    }
+  } else {
+    // End all existing active calls for this mentee
+    await supabase
+      .from('call_records')
+      .update({ ended_at: new Date().toISOString() })
+      .eq('mentee_id', menteeId)
+      .is('ended_at', null)
+  }
+
   // Get specialist name
   const { data: profile } = await supabase
     .from('profiles')
@@ -30,7 +66,7 @@ export async function POST(request: NextRequest) {
   const specialistName = profile?.full_name || 'Seu especialista'
 
   // Create Daily room
-  console.log('[Calls/Create] Starting for mentee:', mentee.full_name, 'by user:', user.id)
+  console.log('[Calls/Create] Creating new room for mentee:', mentee.full_name)
   let room
   try {
     room = await createRoom()
@@ -55,10 +91,9 @@ export async function POST(request: NextRequest) {
     .single()
 
   // Build mentee link
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin
   const menteeLink = `${appUrl}/call/${mentee.call_token}?room=${room.name}`
 
-  // Send WPP notification — find any connected instance
+  // Send WPP notification
   const { data: instance } = await supabase
     .from('wpp_instances')
     .select('instance_id, status')
@@ -78,9 +113,6 @@ export async function POST(request: NextRequest) {
   }
 
   const roomUrl = room.url || getRoomUrl(room.name)
-  console.log('[Calls/Create] room.url from Daily:', room.url)
-  console.log('[Calls/Create] getRoomUrl:', getRoomUrl(room.name))
-  console.log('[Calls/Create] Using roomUrl:', roomUrl)
 
   return NextResponse.json({
     callId: callRecord?.id,
@@ -88,5 +120,6 @@ export async function POST(request: NextRequest) {
     roomName: room.name,
     token: specialistToken,
     menteeLink,
+    reused: false,
   })
 }

@@ -85,7 +85,7 @@ export const CallInterface = memo(function CallInterface({
   useEffect(() => {
     if (!roomUrl || !token) return
 
-    const call = getOrCreateCall()
+    const call = getOrCreateCall(roomUrl)
 
     // If already joined (remount), just update state
     const meetingState = call.meetingState()

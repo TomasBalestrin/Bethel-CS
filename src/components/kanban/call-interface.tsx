@@ -38,22 +38,64 @@ export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, 
     const call = DailyIframe.createCallObject({ audioSource: true, videoSource: false })
     callRef.current = call
 
-    call.on('joined-meeting', () => setStatus('waiting'))
+    call.on('joined-meeting', () => {
+      console.log('[Call] Local joined meeting')
+      setStatus('waiting')
 
+      // Check if remote participants already in room
+      const participants = call.participants()
+      const remoteCount = Object.values(participants).filter((p) => !p.local).length
+      if (remoteCount > 0) {
+        setStatus('active')
+        startTimer()
+      }
+    })
+
+    // participant-joined fires when a new participant connects
     call.on('participant-joined', (event) => {
+      console.log('[Call] participant-joined', event?.participant?.user_id, 'local:', event?.participant?.local)
       if (event?.participant && !event.participant.local) {
         setStatus('active')
         startTimer()
       }
     })
 
-    call.on('participant-left', (event) => {
-      if (event?.participant && !event.participant.local) {
-        handleEnd()
+    // participant-updated fires when participant state changes (audio/video toggle etc)
+    call.on('participant-updated', () => {
+      const participants = call.participants()
+      const remoteCount = Object.values(participants).filter((p) => !p.local).length
+      if (remoteCount > 0) {
+        setStatus((prev) => {
+          if (prev === 'waiting' || prev === 'connecting') {
+            startTimer()
+            return 'active'
+          }
+          return prev
+        })
       }
     })
 
-    call.on('error', () => handleEnd())
+    call.on('participant-left', (event) => {
+      console.log('[Call] participant-left', event?.participant?.user_id, 'local:', event?.participant?.local)
+      if (event?.participant && !event.participant.local) {
+        // Check if any remote participants remain
+        const participants = call.participants()
+        const remoteCount = Object.values(participants).filter((p) => !p.local).length
+        if (remoteCount === 0) {
+          handleEnd()
+        }
+      }
+    })
+
+    call.on('left-meeting', () => {
+      console.log('[Call] left-meeting')
+      handleEnd()
+    })
+
+    call.on('error', (err) => {
+      console.error('[Call] error', err)
+      handleEnd()
+    })
 
     call.join({ url: roomUrl, token })
 

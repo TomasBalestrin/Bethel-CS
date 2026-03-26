@@ -52,10 +52,11 @@ export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, 
     if (!call) return
     try {
       const participants = call.participants()
-      const remote = Object.values(participants).filter((p) => !p.local).length
+      const remote = Object.values(participants).filter((p: Record<string, unknown>) => !p.local).length
+      console.log('[Call] poll remoteCount:', remote, 'participants:', Object.keys(participants).length)
       setRemoteCount(remote)
-    } catch {
-      // call may be destroyed
+    } catch (err) {
+      console.warn('[Call] participants() failed:', err)
     }
   }, [])
 
@@ -119,8 +120,8 @@ export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, 
       setEnded(true)
     })
 
-    // Polling fallback every 3s
-    const poll = setInterval(updateRemoteCount, 3000)
+    // Polling fallback every 2s
+    const poll = setInterval(updateRemoteCount, 2000)
 
     return () => {
       clearInterval(poll)

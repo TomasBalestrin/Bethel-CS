@@ -2,8 +2,16 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, ChevronDown, ChevronRight, Play } from 'lucide-react'
+import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
+import { Separator } from '@/components/ui/separator'
 import { CallInterface } from './call-interface'
 import { toast } from 'sonner'
 import type { Database } from '@/types/database'
@@ -67,12 +75,12 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
   // Call state
   const [inCall, setInCall] = useState(false)
-  const [callData, setCallData] = useState<{ roomUrl: string; token: string; callId: string } | null>(null)
+  const [callData, setCallData] = useState<{ roomUrl: string; token: string; callId: string; menteeLink: string } | null>(null)
   const [callingLoading, setCallingLoading] = useState(false)
 
   // Call history
   const [callRecords, setCallRecords] = useState<CallRecord[]>([])
-  const [callsExpanded, setCallsExpanded] = useState(false)
+  const [callsModalOpen, setCallsModalOpen] = useState(false)
   const [playingRecording, setPlayingRecording] = useState<string | null>(null)
 
   // Audio recording
@@ -265,7 +273,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
       })
       if (!res.ok) throw new Error('Falha ao criar ligação')
       const data = await res.json()
-      setCallData({ roomUrl: data.roomUrl, token: data.token, callId: data.callId })
+      setCallData({ roomUrl: data.roomUrl, token: data.token, callId: data.callId, menteeLink: data.menteeLink })
       setInCall(true)
       toast.success(`Link enviado para ${menteeName} via WhatsApp`)
     } catch (err) {
@@ -357,7 +365,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
   // ─── Render ───
   return (
-    <div className="-mx-4 -mt-4 sm:-mx-6 flex flex-col" style={{ height: 'calc(100vh - 260px)' }}>
+    <div className="-mx-4 -mt-4 sm:-mx-6 flex flex-col" style={{ height: 'calc(100dvh - 260px)' }}>
       {/* Header — fixed top */}
       <div className="flex items-center justify-between border-b border-border px-4 py-2.5 shrink-0 bg-background">
         <div className="min-w-0">
@@ -380,6 +388,16 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
               Ligar
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 gap-1.5 text-xs"
+            onClick={() => setCallsModalOpen(true)}
+            disabled={callRecords.length === 0}
+          >
+            <PhoneCall className="h-3 w-3" />
+            Ligações {callRecords.length > 0 && `(${callRecords.length})`}
+          </Button>
           <span className={`h-2 w-2 rounded-full ${instanceStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'}`} />
           <span className="text-[10px] text-muted-foreground">
             {instanceStatus === 'connected' ? 'Conectado' : 'Desconectado'}
@@ -394,6 +412,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           token={callData.token}
           callId={callData.callId}
           menteeName={menteeName}
+          menteeLink={callData.menteeLink}
           onEnd={() => { setInCall(false); setCallData(null) }}
         />
       )}
@@ -453,82 +472,6 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         })}
         <div ref={messagesEndRef} />
       </div>
-
-      {/* Call history — collapsible */}
-      {callRecords.length > 0 && (
-        <div className="border-t border-border shrink-0">
-          <button
-            type="button"
-            onClick={() => setCallsExpanded(!callsExpanded)}
-            className="flex w-full items-center gap-2 px-4 py-2 text-xs text-muted-foreground hover:bg-muted/50 transition-colors"
-          >
-            {callsExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-            <span className="label-xs">LIGAÇÕES ({callRecords.length})</span>
-          </button>
-
-          {callsExpanded && (
-            <div className="px-4 pb-2 space-y-1.5 max-h-[200px] overflow-y-auto">
-              {callRecords.map((call) => (
-                <div key={call.id} className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2 text-xs">
-                  <PhoneCall className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-foreground">
-                      {new Date(call.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                      {' '}
-                      {new Date(call.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                    {call.duration_seconds != null && (
-                      <span className="text-muted-foreground ml-2">
-                        {Math.floor(call.duration_seconds / 60)}m {call.duration_seconds % 60}s
-                      </span>
-                    )}
-                  </div>
-                  {call.recording_status === 'ready' && call.recording_url && (
-                    <button
-                      onClick={() => setPlayingRecording(playingRecording === call.id ? null : call.id)}
-                      className="flex items-center gap-1 text-accent hover:underline shrink-0"
-                    >
-                      <Play className="h-3 w-3" /> Ouvir
-                    </button>
-                  )}
-                  {call.recording_status === 'processing' && (
-                    <span className="flex items-center gap-1 text-muted-foreground shrink-0">
-                      <Loader2 className="h-3 w-3 animate-spin" /> Processando...
-                    </span>
-                  )}
-                  {call.recording_status === 'pending' && call.ended_at && (
-                    <span className="text-muted-foreground shrink-0">Aguardando...</span>
-                  )}
-                  {call.recording_status === 'failed' && (
-                    <span className="text-destructive shrink-0">Falhou</span>
-                  )}
-                  {call.recording_status === 'unavailable' && (
-                    <span className="text-muted-foreground shrink-0 text-[10px]">Gravação disponível em breve</span>
-                  )}
-                </div>
-              ))}
-
-              {/* Audio player modal */}
-              {playingRecording && (
-                <div className="rounded-lg bg-muted p-3">
-                  <audio
-                    controls
-                    autoPlay
-                    src={callRecords.find((c) => c.id === playingRecording)?.recording_url || ''}
-                    className="w-full"
-                  />
-                  <button
-                    onClick={() => setPlayingRecording(null)}
-                    className="mt-1 text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Fechar player
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Input area — fixed bottom */}
       <div className="border-t border-border px-3 py-2 shrink-0 bg-background">
@@ -630,6 +573,91 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
       </div>
       </>
       )}
+
+      {/* Call history modal */}
+      <Dialog open={callsModalOpen} onOpenChange={(open) => { if (!open) { setCallsModalOpen(false); setPlayingRecording(null) } }}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>Histórico de Ligações — {menteeName}</DialogTitle>
+            <DialogDescription>{callRecords.length} ligação{callRecords.length !== 1 ? 'ões' : ''} registrada{callRecords.length !== 1 ? 's' : ''}</DialogDescription>
+          </DialogHeader>
+
+          <div className="overflow-y-auto max-h-[55vh] space-y-0">
+            {callRecords.map((call, idx) => (
+              <div key={call.id}>
+                {idx > 0 && <Separator className="my-3" />}
+                <div className="space-y-2">
+                  {/* Header: date + duration */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium text-foreground">
+                        {new Date(call.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        {' às '}
+                        {new Date(call.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    {call.duration_seconds != null && (
+                      <span className="text-xs text-muted-foreground">
+                        Duração: {Math.floor(call.duration_seconds / 60)}min
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Recording */}
+                  <div className="pl-6 space-y-1.5">
+                    <p className="text-xs text-muted-foreground">Gravação:</p>
+                    {call.recording_status === 'ready' && call.recording_url && (
+                      <div>
+                        <button
+                          onClick={() => setPlayingRecording(playingRecording === call.id ? null : call.id)}
+                          className="flex items-center gap-1.5 text-sm text-accent hover:underline"
+                        >
+                          <Play className="h-3.5 w-3.5" />
+                          {playingRecording === call.id ? 'Fechar player' : 'Ouvir gravação'}
+                        </button>
+                        {playingRecording === call.id && (
+                          <audio
+                            controls
+                            autoPlay
+                            src={call.recording_url}
+                            className="w-full mt-2"
+                          />
+                        )}
+                      </div>
+                    )}
+                    {call.recording_status === 'processing' && (
+                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Processando gravação...
+                      </span>
+                    )}
+                    {call.recording_status === 'unavailable' && (
+                      <span className="text-xs text-muted-foreground">Gravação indisponível</span>
+                    )}
+                    {call.recording_status === 'pending' && (
+                      <span className="text-xs text-muted-foreground">Aguardando gravação...</span>
+                    )}
+                    {call.recording_status === 'failed' && (
+                      <span className="text-xs text-destructive">Gravação falhou</span>
+                    )}
+
+                    {/* Transcription placeholder */}
+                    <p className="text-xs text-muted-foreground mt-1">Transcrição:</p>
+                    <p className="text-xs text-muted-foreground/60 italic">Em breve — disponível após upgrade do plano</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between pt-2 border-t border-border">
+            <p className="text-[10px] text-muted-foreground">Transcrição automática disponível em breve</p>
+            <Button variant="outline" size="sm" onClick={() => { setCallsModalOpen(false); setPlayingRecording(null) }}>
+              Fechar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

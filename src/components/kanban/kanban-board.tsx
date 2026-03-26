@@ -179,8 +179,8 @@ export function KanbanBoard({
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="font-heading text-2xl font-bold text-foreground">
+      <div className="mb-4 sm:mb-6 flex items-center justify-between">
+        <h1 className="font-heading text-xl sm:text-2xl font-bold text-foreground">
           {title}
         </h1>
         <Button onClick={() => setDialogOpen(true)} className="hidden sm:inline-flex">
@@ -197,7 +197,7 @@ export function KanbanBoard({
         <div className="relative">
           <div
             ref={scrollRef}
-            className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin"
+            className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 scrollbar-thin px-0.5"
             style={{ WebkitOverflowScrolling: 'touch' }}
             onScroll={() => {
               const el = scrollRef.current

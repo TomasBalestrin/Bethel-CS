@@ -166,7 +166,11 @@ export function MenteePanel({ mentee, open, onOpenChange, onMenteeDeleted, onMen
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full max-w-full p-0 sm:min-w-[580px] sm:max-w-[680px]">
+      <SheetContent className="w-full max-w-full p-0 sm:min-w-[580px] sm:max-w-[680px] h-[95dvh] sm:h-full rounded-t-2xl sm:rounded-none">
+        {/* Mobile drag handle */}
+        <div className="flex justify-center pt-2 pb-1 sm:hidden">
+          <div className="h-1 w-10 rounded-full bg-muted-foreground/30" />
+        </div>
         <SheetHeader className="px-4 pt-4 pb-3 sm:px-6 sm:pt-6 sm:pb-4">
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0">

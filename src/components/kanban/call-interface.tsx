@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import DailyIframe from '@daily-co/daily-js'
-import { Mic, MicOff, PhoneOff, Loader2 } from 'lucide-react'
+import { Mic, MicOff, PhoneOff, Loader2, Copy, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface CallInterfaceProps {
@@ -10,13 +10,15 @@ interface CallInterfaceProps {
   token: string
   callId: string
   menteeName: string
+  menteeLink: string
   onEnd: () => void
 }
 
-export function CallInterface({ roomUrl, token, callId, menteeName, onEnd }: CallInterfaceProps) {
+export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, onEnd }: CallInterfaceProps) {
   const [status, setStatus] = useState<'connecting' | 'waiting' | 'active' | 'ended'>('connecting')
   const [muted, setMuted] = useState(false)
   const [seconds, setSeconds] = useState(0)
+  const [copied, setCopied] = useState(false)
   const callRef = useRef<ReturnType<typeof DailyIframe.createCallObject> | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -125,6 +127,31 @@ export function CallInterface({ roomUrl, token, callId, menteeName, onEnd }: Cal
           <span className="text-sm text-muted-foreground">Ligação encerrada</span>
         )}
       </div>
+
+      {/* Mentee link — show while waiting */}
+      {(status === 'waiting' || status === 'connecting') && menteeLink && (
+        <div className="mt-6 w-full max-w-sm rounded-lg bg-muted/50 border border-border p-3 space-y-2">
+          <p className="text-xs text-muted-foreground font-medium">Link para o mentorado:</p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 text-[11px] text-foreground bg-background rounded px-2 py-1.5 truncate border border-border">
+              {menteeLink}
+            </code>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 shrink-0 gap-1 text-xs"
+              onClick={() => {
+                navigator.clipboard.writeText(menteeLink)
+                setCopied(true)
+                setTimeout(() => setCopied(false), 2000)
+              }}
+            >
+              {copied ? <><Check className="h-3 w-3" /> Copiado!</> : <><Copy className="h-3 w-3" /> Copiar</>}
+            </Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground">Envie este link para o mentorado entrar na ligação</p>
+        </div>
+      )}
 
       {/* Controls */}
       {status !== 'ended' && (

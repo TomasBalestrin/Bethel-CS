@@ -126,7 +126,7 @@ export function CreateMenteeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden w-[95vw] sm:w-full rounded-2xl sm:rounded-lg">
         <DialogHeader>
           <DialogTitle>Novo Mentorado</DialogTitle>
           <DialogDescription>

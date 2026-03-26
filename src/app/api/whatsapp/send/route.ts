@@ -29,32 +29,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Mentorado não encontrado' }, { status: 404 })
   }
 
-  // 3. Find WPP instance — try logged-in user first, then mentee's specialist
-  let instance = null
-  let specialistId = user.id
-
-  const { data: ownInstance } = await supabase
+  // 3. Find any connected WPP instance
+  const { data: instance } = await supabase
     .from('wpp_instances')
     .select('instance_id, status, specialist_id')
-    .eq('specialist_id', user.id)
+    .eq('status', 'connected')
+    .limit(1)
     .single()
 
-  if (ownInstance) {
-    instance = ownInstance
-    specialistId = ownInstance.specialist_id
-  } else if (mentee.created_by && mentee.created_by !== user.id) {
-    // Admin sending — use the mentee's specialist instance
-    const { data: specialistInstance } = await supabase
-      .from('wpp_instances')
-      .select('instance_id, status, specialist_id')
-      .eq('specialist_id', mentee.created_by)
-      .single()
-
-    if (specialistInstance) {
-      instance = specialistInstance
-      specialistId = specialistInstance.specialist_id
-    }
-  }
+  const specialistId = instance?.specialist_id || user.id
 
   if (!instance) {
     return NextResponse.json({ error: 'Instância WhatsApp não configurada' }, { status: 404 })

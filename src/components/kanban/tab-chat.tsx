@@ -385,7 +385,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
               size="sm"
               variant="outline"
               className="h-8 gap-1.5 text-xs"
-              onClick={handleCall}
+              onClick={() => handleCall()}
               disabled={callingLoading || inCall}
             >
               {callingLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Phone className="h-3 w-3" />}

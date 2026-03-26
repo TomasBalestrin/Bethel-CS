@@ -52,7 +52,7 @@ export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, 
     if (!call) return
     try {
       const participants = call.participants()
-      const remote = Object.values(participants).filter((p: Record<string, unknown>) => !p.local).length
+      const remote = Object.values(participants).filter((p) => !p.local).length
       console.log('[Call] poll remoteCount:', remote, 'participants:', Object.keys(participants).length)
       setRemoteCount(remote)
     } catch (err) {

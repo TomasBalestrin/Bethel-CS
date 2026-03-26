@@ -75,7 +75,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
   // Call state
   const [inCall, setInCall] = useState(false)
-  const [callData, setCallData] = useState<{ roomUrl: string; token: string; callId: string } | null>(null)
+  const [callData, setCallData] = useState<{ roomUrl: string; token: string; callId: string; menteeLink: string } | null>(null)
   const [callingLoading, setCallingLoading] = useState(false)
 
   // Call history
@@ -273,7 +273,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
       })
       if (!res.ok) throw new Error('Falha ao criar ligação')
       const data = await res.json()
-      setCallData({ roomUrl: data.roomUrl, token: data.token, callId: data.callId })
+      setCallData({ roomUrl: data.roomUrl, token: data.token, callId: data.callId, menteeLink: data.menteeLink })
       setInCall(true)
       toast.success(`Link enviado para ${menteeName} via WhatsApp`)
     } catch (err) {
@@ -412,6 +412,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           token={callData.token}
           callId={callData.callId}
           menteeName={menteeName}
+          menteeLink={callData.menteeLink}
           onEnd={() => { setInCall(false); setCallData(null) }}
         />
       )}

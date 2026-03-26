@@ -11,7 +11,7 @@ type DailyCall = ReturnType<typeof DailyIframe.createCallObject>
 
 export function CallPortal() {
   const {
-    isActive, roomUrl, token, callId, menteeName, menteeLink,
+    isActive, roomUrl, token, menteeName, menteeLink,
     status, muted, seconds, remoteCount,
     endCall, setStatus, setMuted, setSeconds, setRemoteCount,
   } = useCallStore()

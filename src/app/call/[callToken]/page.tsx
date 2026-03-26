@@ -12,7 +12,7 @@ export default function MenteeCallPage() {
 
   const [status, setStatus] = useState<'loading' | 'ready' | 'connecting' | 'active' | 'ended' | 'error'>('loading')
   const [specialistName, setSpecialistName] = useState('')
-  const [roomName, setRoomName] = useState('')
+  const [roomUrl, setRoomUrl] = useState('')
   const [token, setToken] = useState('')
   const [muted, setMuted] = useState(false)
   const [seconds, setSeconds] = useState(0)
@@ -20,7 +20,7 @@ export default function MenteeCallPage() {
   const callRef = useRef<ReturnType<typeof DailyIframe.createCallObject> | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Fetch token
+  // Fetch token + roomUrl from API
   useEffect(() => {
     async function init() {
       try {
@@ -32,8 +32,9 @@ export default function MenteeCallPage() {
           return
         }
         const data = await res.json()
+        console.log('[Mentee] API response:', { roomName: data.roomName, roomUrl: data.roomUrl, specialistName: data.specialistName })
         setToken(data.token)
-        setRoomName(data.roomName)
+        setRoomUrl(data.roomUrl)
         setSpecialistName(data.specialistName)
         setStatus('ready')
       } catch {
@@ -57,20 +58,18 @@ export default function MenteeCallPage() {
   }
 
   async function joinCall() {
+    if (!roomUrl || !token) return
     setStatus('connecting')
 
-    const dailyDomain = process.env.NEXT_PUBLIC_DAILY_DOMAIN || ''
-    const url = `https://${dailyDomain}/${roomName}`
+    console.log('[Mentee] Joining room:', roomUrl)
 
     const call = DailyIframe.createCallObject({ audioSource: true, videoSource: false })
     callRef.current = call
 
-    call.on('joined-meeting', () => setStatus('active'))
-
-    call.on('participant-joined', (event) => {
-      if (event?.participant && !event.participant.local) {
-        startTimer()
-      }
+    call.on('joined-meeting', () => {
+      console.log('[Mentee] joined-meeting')
+      setStatus('active')
+      startTimer()
     })
 
     call.on('participant-left', (event) => {
@@ -79,20 +78,27 @@ export default function MenteeCallPage() {
       }
     })
 
-    call.on('error', () => handleEnd())
+    call.on('error', (e) => {
+      console.error('[Mentee] error:', e)
+      handleEnd()
+    })
 
-    // Start timer immediately on join (specialist is likely already there)
-    call.on('joined-meeting', () => startTimer())
-
-    await call.join({ url, token })
+    try {
+      await call.join({ url: roomUrl, token })
+      console.log('[Mentee] join() resolved')
+    } catch (err) {
+      console.error('[Mentee] join() failed:', err)
+      setError('Erro ao entrar na ligação')
+      setStatus('error')
+    }
   }
 
   async function handleEnd() {
     stopTimer()
     setStatus('ended')
     if (callRef.current) {
-      await callRef.current.leave().catch(() => {})
-      callRef.current.destroy()
+      try { await callRef.current.leave() } catch { /* */ }
+      try { callRef.current.destroy() } catch { /* */ }
       callRef.current = null
     }
   }
@@ -108,20 +114,17 @@ export default function MenteeCallPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center" style={{ backgroundColor: '#060A16' }}>
-      {/* Logo */}
       <div className="mb-8">
         <Image src="/logo.png" alt="Bethel CS" width={48} height={48} className="mx-auto" />
         <p className="mt-2 text-sm text-white/60 text-center">Bethel CS</p>
       </div>
 
-      {/* Error */}
       {status === 'error' && (
         <div className="text-center">
           <p className="text-white/70 text-sm">{error}</p>
         </div>
       )}
 
-      {/* Loading */}
       {status === 'loading' && (
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-white/40 mx-auto" />
@@ -129,13 +132,11 @@ export default function MenteeCallPage() {
         </div>
       )}
 
-      {/* Ready — show join button */}
       {status === 'ready' && (
         <div className="text-center">
           <p className="text-white/60 text-sm">Ligação com</p>
           <h1 className="text-xl font-semibold text-white mt-1">{specialistName}</h1>
           <p className="text-white/40 text-xs mt-1">está te chamando</p>
-
           <button
             onClick={joinCall}
             className="mt-8 flex items-center justify-center gap-2 rounded-full bg-green-600 hover:bg-green-500 transition-colors text-white font-medium px-8 py-4 text-lg mx-auto"
@@ -146,7 +147,6 @@ export default function MenteeCallPage() {
         </div>
       )}
 
-      {/* Connecting */}
       {status === 'connecting' && (
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin text-white/40 mx-auto" />
@@ -154,14 +154,11 @@ export default function MenteeCallPage() {
         </div>
       )}
 
-      {/* Active call */}
       {status === 'active' && (
         <div className="text-center">
           <p className="text-white/60 text-sm">Em ligação com</p>
           <h1 className="text-xl font-semibold text-white mt-1">{specialistName}</h1>
-
           <p className="text-3xl font-mono text-white mt-6 tabular">{formatTimer}</p>
-
           <div className="mt-10 flex items-center justify-center gap-6">
             <button
               onClick={toggleMute}
@@ -171,7 +168,6 @@ export default function MenteeCallPage() {
             >
               {muted ? <MicOff className="h-5 w-5 text-white" /> : <Mic className="h-5 w-5 text-white" />}
             </button>
-
             <button
               onClick={handleEnd}
               className="rounded-full h-14 w-14 flex items-center justify-center bg-red-600 hover:bg-red-500 transition-colors"
@@ -182,7 +178,6 @@ export default function MenteeCallPage() {
         </div>
       )}
 
-      {/* Ended */}
       {status === 'ended' && (
         <div className="text-center">
           <PhoneOff className="h-10 w-10 text-white/30 mx-auto" />

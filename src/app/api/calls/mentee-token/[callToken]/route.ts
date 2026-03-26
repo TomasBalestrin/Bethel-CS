@@ -22,7 +22,7 @@ export async function GET(
   // Find active call (no ended_at)
   const { data: call } = await supabase
     .from('call_records')
-    .select('daily_room_name, specialist_id')
+    .select('daily_room_name, daily_room_url, specialist_id')
     .eq('mentee_id', mentee.id)
     .is('ended_at', null)
     .order('created_at', { ascending: false })
@@ -49,6 +49,7 @@ export async function GET(
   return NextResponse.json({
     token,
     roomName: call.daily_room_name,
+    roomUrl: call.daily_room_url,
     specialistName,
   })
 }

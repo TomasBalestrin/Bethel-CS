@@ -502,6 +502,9 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                   {call.recording_status === 'failed' && (
                     <span className="text-destructive shrink-0">Falhou</span>
                   )}
+                  {call.recording_status === 'unavailable' && (
+                    <span className="text-muted-foreground shrink-0 text-[10px]">Gravação disponível em breve</span>
+                  )}
                 </div>
               ))}
 

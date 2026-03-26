@@ -262,19 +262,24 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   }
 
   // ─── Start call ───
-  async function handleCall() {
+  async function handleCall(forceNew = false) {
     setCallingLoading(true)
     try {
       const res = await fetch('/api/calls/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ menteeId }),
+        body: JSON.stringify({ menteeId, forceNew }),
       })
       if (!res.ok) throw new Error('Falha ao criar ligação')
       const data = await res.json()
+      destroyCall() // ensure clean state
       setCallData({ roomUrl: data.roomUrl, token: data.token, callId: data.callId, menteeLink: data.menteeLink })
       setInCall(true)
-      toast.success(`Link enviado para ${menteeName} via WhatsApp`)
+      if (data.reused) {
+        toast.success('Ligação em andamento — reconectando')
+      } else {
+        toast.success(`Link enviado para ${menteeName} via WhatsApp`)
+      }
     } catch (err) {
       console.error('Call error:', err)
       toast.error('Erro ao iniciar ligação')

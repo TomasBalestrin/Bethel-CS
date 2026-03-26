@@ -15,15 +15,21 @@ interface CallInterfaceProps {
 }
 
 export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, onEnd }: CallInterfaceProps) {
-  const [status, setStatus] = useState<'connecting' | 'waiting' | 'active' | 'ended'>('connecting')
+  const [joined, setJoined] = useState(false)
+  const [remoteCount, setRemoteCount] = useState(0)
   const [muted, setMuted] = useState(false)
   const [seconds, setSeconds] = useState(0)
+  const [ended, setEnded] = useState(false)
   const [copied, setCopied] = useState(false)
   const callRef = useRef<ReturnType<typeof DailyIframe.createCallObject> | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const timerStarted = useRef(false)
+
+  const isActive = remoteCount > 0 && joined
 
   const startTimer = useCallback(() => {
-    if (timerRef.current) return
+    if (timerStarted.current) return
+    timerStarted.current = true
     timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000)
   }, [])
 
@@ -34,100 +40,102 @@ export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, 
     }
   }, [])
 
+  // Start timer when active
+  useEffect(() => {
+    if (isActive) startTimer()
+  }, [isActive, startTimer])
+
+  function updateRemoteCount() {
+    const call = callRef.current
+    if (!call) return
+    try {
+      const participants = call.participants()
+      const remote = Object.values(participants).filter((p) => !p.local).length
+      console.log('[Call] updateRemoteCount:', remote)
+      setRemoteCount(remote)
+    } catch {
+      // participants() can throw if call is destroyed
+    }
+  }
+
   useEffect(() => {
     if (!roomUrl || !token) {
-      console.warn('[Call] Missing roomUrl or token:', { roomUrl, hasToken: !!token })
+      console.warn('[Call] Missing roomUrl or token')
       return
     }
 
-    let call: ReturnType<typeof DailyIframe.createCallObject> | null = null
+    let destroyed = false
 
     async function startCall() {
       try {
-        console.log('[Call] Creating call object...')
-        console.log('[Call] roomUrl:', roomUrl)
-        console.log('[Call] token length:', token?.length)
-
-        call = DailyIframe.createCallObject({ audioSource: true, videoSource: false })
+        console.log('[Call] Creating call object, roomUrl:', roomUrl)
+        const call = DailyIframe.createCallObject({ audioSource: true, videoSource: false })
         callRef.current = call
 
         call.on('joining-meeting', () => console.log('[Call] joining-meeting...'))
 
         call.on('joined-meeting', () => {
-          console.log('[Call] joined-meeting SUCCESS')
-          setStatus('waiting')
-
-          if (!call) return
-          const participants = call.participants()
-          const remoteCount = Object.values(participants).filter((p) => !p.local).length
-          console.log('[Call] Remote participants on join:', remoteCount)
-          if (remoteCount > 0) {
-            setStatus('active')
-            startTimer()
+          console.log('[Call] joined-meeting')
+          if (!destroyed) {
+            setJoined(true)
+            updateRemoteCount()
           }
         })
 
         call.on('participant-joined', (event) => {
           console.log('[Call] participant-joined', event?.participant?.session_id, 'local:', event?.participant?.local)
-          if (event?.participant && !event.participant.local) {
-            setStatus('active')
-            startTimer()
-          }
+          if (!destroyed) updateRemoteCount()
         })
 
-        call.on('participant-updated', () => {
-          if (!call) return
-          const participants = call.participants()
-          const remoteCount = Object.values(participants).filter((p) => !p.local).length
-          if (remoteCount > 0) {
-            setStatus((prev) => {
-              if (prev === 'waiting' || prev === 'connecting') {
-                startTimer()
-                return 'active'
-              }
-              return prev
-            })
-          }
+        call.on('participant-updated', (event) => {
+          if (!destroyed) updateRemoteCount()
         })
 
         call.on('participant-left', (event) => {
-          console.log('[Call] participant-left', event?.participant?.session_id, 'local:', event?.participant?.local)
-          if (event?.participant && !event.participant.local && call) {
-            const participants = call.participants()
-            const remoteCount = Object.values(participants).filter((p) => !p.local).length
-            if (remoteCount === 0) {
-              handleEnd()
-            }
-          }
+          console.log('[Call] participant-left', event?.participant?.session_id)
+          if (!destroyed) updateRemoteCount()
         })
 
         call.on('left-meeting', () => {
           console.log('[Call] left-meeting')
-          handleEnd()
+          if (!destroyed) handleEnd()
         })
 
         call.on('error', (err) => {
-          console.error('[Call] error event:', err)
-          handleEnd()
+          console.error('[Call] error:', err)
+          if (!destroyed) handleEnd()
         })
 
-        console.log('[Call] Calling join()...')
-        const joinResult = await call.join({ url: roomUrl, token })
-        console.log('[Call] join() returned:', joinResult)
+        console.log('[Call] Joining...')
+        await call.join({ url: roomUrl, token })
+        console.log('[Call] join() completed')
 
+        // Poll remote count every 2s as fallback
+        const pollInterval = setInterval(() => {
+          if (!destroyed && callRef.current) {
+            updateRemoteCount()
+          }
+        }, 2000)
+
+        // Clean up poll on unmount
+        return () => clearInterval(pollInterval)
       } catch (err) {
-        console.error('[Call] join() threw error:', err)
-        setStatus('ended')
+        console.error('[Call] join failed:', err)
+        if (!destroyed) setEnded(true)
       }
     }
 
-    startCall()
+    let pollCleanup: (() => void) | undefined
+    startCall().then((cleanup) => { pollCleanup = cleanup })
 
     return () => {
+      destroyed = true
       stopTimer()
-      if (call) {
-        call.leave().catch(() => {})
-        call.destroy()
+      if (pollCleanup) pollCleanup()
+      if (callRef.current) {
+        callRef.current.leave().catch(() => {})
+        callRef.current.destroy()
+        callRef.current = null
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -135,7 +143,7 @@ export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, 
 
   async function handleEnd() {
     stopTimer()
-    setStatus('ended')
+    setEnded(true)
 
     if (callRef.current) {
       await callRef.current.leave().catch(() => {})
@@ -143,7 +151,6 @@ export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, 
       callRef.current = null
     }
 
-    // End call on server
     await fetch('/api/calls/end', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -162,16 +169,15 @@ export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, 
 
   const formatTimer = `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`
 
+  const status = ended ? 'ended' : !joined ? 'connecting' : isActive ? 'active' : 'waiting'
+
   return (
     <div className="flex flex-col items-center justify-center h-full bg-background py-8">
-      {/* Header */}
       <p className="text-sm text-muted-foreground">Ligação com</p>
       <h2 className="text-xl font-semibold text-foreground mt-1">{menteeName}</h2>
 
-      {/* Timer */}
       <p className="text-2xl font-mono text-foreground mt-4 tabular">{formatTimer}</p>
 
-      {/* Status */}
       <div className="mt-6 flex items-center gap-2">
         {status === 'connecting' && (
           <>
@@ -196,7 +202,6 @@ export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, 
         )}
       </div>
 
-      {/* Mentee link — show while waiting */}
       {(status === 'waiting' || status === 'connecting') && menteeLink && (
         <div className="mt-6 w-full max-w-sm rounded-lg bg-muted/50 border border-border p-3 space-y-2">
           <p className="text-xs text-muted-foreground font-medium">Link para o mentorado:</p>
@@ -221,7 +226,6 @@ export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, 
         </div>
       )}
 
-      {/* Controls */}
       {status !== 'ended' && (
         <div className="mt-10 flex items-center gap-6">
           <Button

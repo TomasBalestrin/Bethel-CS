@@ -10,6 +10,10 @@ export async function middleware(request: NextRequest) {
   if (
     pathname.startsWith('/form/') ||
     pathname.startsWith('/chat/') ||
+    pathname.startsWith('/call/') ||
+    pathname.startsWith('/api/whatsapp/webhook') ||
+    pathname.startsWith('/api/calls/recording-ready') ||
+    pathname.startsWith('/api/calls/mentee-token/') ||
     pathname === '/api/stream/mentee-token'
   ) {
     return supabaseResponse

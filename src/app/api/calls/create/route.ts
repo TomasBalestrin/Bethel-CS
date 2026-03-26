@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
       specialist_id: user.id,
       daily_room_name: room.name,
       daily_room_url: room.url,
+      recording_status: 'unavailable',
       started_at: new Date().toISOString(),
     })
     .select('id')

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import { Toaster } from 'sonner'
 import { cn } from '@/lib/utils'
+import { CallPortal } from '@/components/call-portal'
 import './globals.css'
 
 const geistSans = localFont({
@@ -45,6 +46,7 @@ export default function RootLayout({
     <html lang="pt-BR" className={cn(geistSans.variable, geistBody.variable)}>
       <body>
         {children}
+        <CallPortal />
         <Toaster position="bottom-right" richColors />
       </body>
     </html>

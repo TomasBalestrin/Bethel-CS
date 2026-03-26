@@ -12,8 +12,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
-import { CallInterface } from './call-interface'
-import { destroyCall } from '@/lib/daily-call'
+import { useCallStore } from '@/store/call-store'
 import { toast } from 'sonner'
 import type { Database } from '@/types/database'
 
@@ -74,9 +73,8 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Call state
-  const [inCall, setInCall] = useState(false)
-  const [callData, setCallData] = useState<{ roomUrl: string; token: string; callId: string; menteeLink: string } | null>(null)
+  // Call state (global store)
+  const callStore = useCallStore()
   const [callingLoading, setCallingLoading] = useState(false)
 
   // Call history
@@ -272,9 +270,14 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
       })
       if (!res.ok) throw new Error('Falha ao criar ligação')
       const data = await res.json()
-      destroyCall() // ensure clean state
-      setCallData({ roomUrl: data.roomUrl, token: data.token, callId: data.callId, menteeLink: data.menteeLink })
-      setInCall(true)
+      callStore.startCall({
+        roomUrl: data.roomUrl,
+        roomName: data.roomName,
+        token: data.token,
+        callId: data.callId,
+        menteeName,
+        menteeLink: data.menteeLink,
+      })
       if (data.reused) {
         toast.success('Ligação em andamento — reconectando')
       } else {
@@ -386,7 +389,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
               variant="outline"
               className="h-8 gap-1.5 text-xs"
               onClick={() => handleCall()}
-              disabled={callingLoading || inCall}
+              disabled={callingLoading || callStore.isActive}
             >
               {callingLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Phone className="h-3 w-3" />}
               Ligar
@@ -409,21 +412,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         </div>
       </div>
 
-      {/* Call interface — replaces messages when in call */}
-      {inCall && callData && (
-        <CallInterface
-          roomUrl={callData.roomUrl}
-          token={callData.token}
-          callId={callData.callId}
-          menteeName={menteeName}
-          menteeLink={callData.menteeLink}
-          onEnd={() => { destroyCall(); setInCall(false); setCallData(null) }}
-        />
-      )}
-
-      {/* Messages — scrollable (hidden during call) */}
-      {!inCall && (
-      <>
+      {/* Messages — scrollable */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1 min-h-0">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
@@ -575,8 +564,6 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           </div>
         )}
       </div>
-      </>
-      )}
 
       {/* Call history modal */}
       <Dialog open={callsModalOpen} onOpenChange={(open) => { if (!open) { setCallsModalOpen(false); setPlayingRecording(null) } }}>

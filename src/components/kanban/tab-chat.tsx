@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import { CallInterface } from './call-interface'
+import { destroyCall } from '@/lib/daily-call'
 import { toast } from 'sonner'
 import type { Database } from '@/types/database'
 
@@ -413,7 +414,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           callId={callData.callId}
           menteeName={menteeName}
           menteeLink={callData.menteeLink}
-          onEnd={() => { setInCall(false); setCallData(null) }}
+          onEnd={() => { destroyCall(); setInCall(false); setCallData(null) }}
         />
       )}
 

@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState, useRef, useCallback } from 'react'
-import DailyIframe from '@daily-co/daily-js'
+import { useEffect, useState, useRef, useCallback, memo } from 'react'
 import { Mic, MicOff, PhoneOff, Loader2, Copy, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { getOrCreateCall, destroyCall, getActiveCall } from '@/lib/daily-call'
 
 interface CallInterfaceProps {
   roomUrl: string
@@ -14,7 +14,14 @@ interface CallInterfaceProps {
   onEnd: () => void
 }
 
-export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, onEnd }: CallInterfaceProps) {
+export const CallInterface = memo(function CallInterface({
+  roomUrl,
+  token,
+  callId,
+  menteeName,
+  menteeLink,
+  onEnd,
+}: CallInterfaceProps) {
   const [joined, setJoined] = useState(false)
   const [remoteCount, setRemoteCount] = useState(0)
   const [muted, setMuted] = useState(false)
@@ -22,18 +29,12 @@ export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, 
   const [ended, setEnded] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  const callRef = useRef<ReturnType<typeof DailyIframe.createCallObject> | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timerStarted = useRef(false)
   const endedRef = useRef(false)
-  const roomUrlRef = useRef(roomUrl)
-  const tokenRef = useRef(token)
   const callIdRef = useRef(callId)
   const onEndRef = useRef(onEnd)
 
-  // Keep refs in sync without causing re-renders
-  roomUrlRef.current = roomUrl
-  tokenRef.current = token
   callIdRef.current = callId
   onEndRef.current = onEnd
 
@@ -48,15 +49,14 @@ export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, 
   }, [isActive])
 
   const updateRemoteCount = useCallback(() => {
-    const call = callRef.current
+    const call = getActiveCall()
     if (!call) return
     try {
       const participants = call.participants()
       const remote = Object.values(participants).filter((p) => !p.local).length
-      console.log('[Call] poll remoteCount:', remote, 'participants:', Object.keys(participants).length)
       setRemoteCount(remote)
-    } catch (err) {
-      console.warn('[Call] participants() failed:', err)
+    } catch {
+      // call may be destroyed
     }
   }, [])
 
@@ -70,13 +70,7 @@ export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, 
     }
 
     setEnded(true)
-
-    const call = callRef.current
-    if (call) {
-      try { await call.leave() } catch { /* ignore */ }
-      try { call.destroy() } catch { /* ignore */ }
-      callRef.current = null
-    }
+    destroyCall()
 
     fetch('/api/calls/end', {
       method: 'POST',
@@ -87,21 +81,32 @@ export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, 
     setTimeout(() => onEndRef.current(), 1500)
   }, [])
 
-  // Single useEffect — empty deps — runs once on mount
+  // Single mount — join call using singleton
   useEffect(() => {
-    const url = roomUrlRef.current
-    const tok = tokenRef.current
+    if (!roomUrl || !token) return
 
-    if (!url || !tok) {
-      console.warn('[Call] Missing roomUrl or token')
+    const call = getOrCreateCall()
+
+    // If already joined (remount), just update state
+    const meetingState = call.meetingState()
+    if (meetingState === 'joined-meeting') {
+      console.log('[Call] Already joined, restoring state')
+      setJoined(true)
+      updateRemoteCount()
       return
     }
 
-    console.log('[Call] Creating call object, url:', url)
-    const call = DailyIframe.createCallObject({ audioSource: true, videoSource: false })
-    callRef.current = call
+    if (meetingState === 'joining-meeting') {
+      console.log('[Call] Already joining, waiting...')
+      call.on('joined-meeting', () => {
+        setJoined(true)
+        updateRemoteCount()
+      })
+      return
+    }
 
-    call.on('joining-meeting', () => console.log('[Call] joining-meeting'))
+    console.log('[Call] Joining room:', roomUrl)
+
     call.on('joined-meeting', () => {
       console.log('[Call] joined-meeting')
       setJoined(true)
@@ -110,34 +115,41 @@ export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, 
     call.on('participant-joined', () => updateRemoteCount())
     call.on('participant-updated', () => updateRemoteCount())
     call.on('participant-left', () => updateRemoteCount())
-    call.on('left-meeting', () => { console.log('[Call] left-meeting'); doEnd() })
-    call.on('error', (e) => { console.error('[Call] error', e); doEnd() })
+    call.on('left-meeting', () => {
+      console.log('[Call] left-meeting')
+      if (!endedRef.current) doEnd()
+    })
+    call.on('error', (e) => {
+      console.error('[Call] error:', e)
+      if (!endedRef.current) doEnd()
+    })
 
-    call.join({ url, token: tok }).then(() => {
+    call.join({ url: roomUrl, token }).then(() => {
       console.log('[Call] join() resolved')
     }).catch((err) => {
       console.error('[Call] join() failed:', err)
       setEnded(true)
     })
 
-    // Polling fallback every 2s
-    const poll = setInterval(updateRemoteCount, 2000)
-
-    return () => {
-      clearInterval(poll)
-      if (timerRef.current) clearInterval(timerRef.current)
-      const c = callRef.current
-      if (c) {
-        try { c.leave() } catch { /* */ }
-        try { c.destroy() } catch { /* */ }
-        callRef.current = null
-      }
-    }
+    // DO NOT destroy call on unmount — singleton persists
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Polling fallback every 2s
+  useEffect(() => {
+    const poll = setInterval(updateRemoteCount, 2000)
+    return () => clearInterval(poll)
+  }, [updateRemoteCount])
+
+  // Cleanup timer on unmount (but NOT the call)
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+  }, [])
+
   function toggleMute() {
-    const call = callRef.current
+    const call = getActiveCall()
     if (!call) return
     const next = !muted
     call.setLocalAudio(!next)
@@ -194,4 +206,4 @@ export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, 
       )}
     </div>
   )
-}
+})

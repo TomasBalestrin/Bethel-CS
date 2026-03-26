@@ -30,7 +30,14 @@ export async function POST(request: NextRequest) {
   const specialistName = profile?.full_name || 'Seu especialista'
 
   // Create Daily room
-  const room = await createRoom()
+  console.log('[Calls/Create] Starting for mentee:', mentee.full_name, 'by user:', user.id)
+  let room
+  try {
+    room = await createRoom()
+  } catch (err) {
+    console.error('[Calls/Create] createRoom failed:', err)
+    return NextResponse.json({ error: String(err) }, { status: 500 })
+  }
   const specialistToken = await createMeetingToken(room.name, true)
 
   // Save call record

@@ -87,7 +87,7 @@ export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, 
           if (!destroyed) updateRemoteCount()
         })
 
-        call.on('participant-updated', (event) => {
+        call.on('participant-updated', () => {
           if (!destroyed) updateRemoteCount()
         })
 

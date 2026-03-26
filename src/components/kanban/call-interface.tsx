@@ -35,74 +35,100 @@ export function CallInterface({ roomUrl, token, callId, menteeName, menteeLink, 
   }, [])
 
   useEffect(() => {
-    const call = DailyIframe.createCallObject({ audioSource: true, videoSource: false })
-    callRef.current = call
+    if (!roomUrl || !token) {
+      console.warn('[Call] Missing roomUrl or token:', { roomUrl, hasToken: !!token })
+      return
+    }
 
-    call.on('joined-meeting', () => {
-      console.log('[Call] Local joined meeting')
-      setStatus('waiting')
+    let call: ReturnType<typeof DailyIframe.createCallObject> | null = null
 
-      // Check if remote participants already in room
-      const participants = call.participants()
-      const remoteCount = Object.values(participants).filter((p) => !p.local).length
-      if (remoteCount > 0) {
-        setStatus('active')
-        startTimer()
-      }
-    })
+    async function startCall() {
+      try {
+        console.log('[Call] Creating call object...')
+        console.log('[Call] roomUrl:', roomUrl)
+        console.log('[Call] token length:', token?.length)
 
-    // participant-joined fires when a new participant connects
-    call.on('participant-joined', (event) => {
-      console.log('[Call] participant-joined', event?.participant?.user_id, 'local:', event?.participant?.local)
-      if (event?.participant && !event.participant.local) {
-        setStatus('active')
-        startTimer()
-      }
-    })
+        call = DailyIframe.createCallObject({ audioSource: true, videoSource: false })
+        callRef.current = call
 
-    // participant-updated fires when participant state changes (audio/video toggle etc)
-    call.on('participant-updated', () => {
-      const participants = call.participants()
-      const remoteCount = Object.values(participants).filter((p) => !p.local).length
-      if (remoteCount > 0) {
-        setStatus((prev) => {
-          if (prev === 'waiting' || prev === 'connecting') {
+        call.on('joining-meeting', () => console.log('[Call] joining-meeting...'))
+
+        call.on('joined-meeting', () => {
+          console.log('[Call] joined-meeting SUCCESS')
+          setStatus('waiting')
+
+          if (!call) return
+          const participants = call.participants()
+          const remoteCount = Object.values(participants).filter((p) => !p.local).length
+          console.log('[Call] Remote participants on join:', remoteCount)
+          if (remoteCount > 0) {
+            setStatus('active')
             startTimer()
-            return 'active'
           }
-          return prev
         })
-      }
-    })
 
-    call.on('participant-left', (event) => {
-      console.log('[Call] participant-left', event?.participant?.user_id, 'local:', event?.participant?.local)
-      if (event?.participant && !event.participant.local) {
-        // Check if any remote participants remain
-        const participants = call.participants()
-        const remoteCount = Object.values(participants).filter((p) => !p.local).length
-        if (remoteCount === 0) {
+        call.on('participant-joined', (event) => {
+          console.log('[Call] participant-joined', event?.participant?.session_id, 'local:', event?.participant?.local)
+          if (event?.participant && !event.participant.local) {
+            setStatus('active')
+            startTimer()
+          }
+        })
+
+        call.on('participant-updated', () => {
+          if (!call) return
+          const participants = call.participants()
+          const remoteCount = Object.values(participants).filter((p) => !p.local).length
+          if (remoteCount > 0) {
+            setStatus((prev) => {
+              if (prev === 'waiting' || prev === 'connecting') {
+                startTimer()
+                return 'active'
+              }
+              return prev
+            })
+          }
+        })
+
+        call.on('participant-left', (event) => {
+          console.log('[Call] participant-left', event?.participant?.session_id, 'local:', event?.participant?.local)
+          if (event?.participant && !event.participant.local && call) {
+            const participants = call.participants()
+            const remoteCount = Object.values(participants).filter((p) => !p.local).length
+            if (remoteCount === 0) {
+              handleEnd()
+            }
+          }
+        })
+
+        call.on('left-meeting', () => {
+          console.log('[Call] left-meeting')
           handleEnd()
-        }
+        })
+
+        call.on('error', (err) => {
+          console.error('[Call] error event:', err)
+          handleEnd()
+        })
+
+        console.log('[Call] Calling join()...')
+        const joinResult = await call.join({ url: roomUrl, token })
+        console.log('[Call] join() returned:', joinResult)
+
+      } catch (err) {
+        console.error('[Call] join() threw error:', err)
+        setStatus('ended')
       }
-    })
+    }
 
-    call.on('left-meeting', () => {
-      console.log('[Call] left-meeting')
-      handleEnd()
-    })
-
-    call.on('error', (err) => {
-      console.error('[Call] error', err)
-      handleEnd()
-    })
-
-    call.join({ url: roomUrl, token })
+    startCall()
 
     return () => {
       stopTimer()
-      call.leave().catch(() => {})
-      call.destroy()
+      if (call) {
+        call.leave().catch(() => {})
+        call.destroy()
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomUrl, token])

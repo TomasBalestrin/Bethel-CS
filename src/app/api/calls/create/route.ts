@@ -77,9 +77,14 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  const roomUrl = room.url || getRoomUrl(room.name)
+  console.log('[Calls/Create] room.url from Daily:', room.url)
+  console.log('[Calls/Create] getRoomUrl:', getRoomUrl(room.name))
+  console.log('[Calls/Create] Using roomUrl:', roomUrl)
+
   return NextResponse.json({
     callId: callRecord?.id,
-    roomUrl: getRoomUrl(room.name),
+    roomUrl,
     roomName: room.name,
     token: specialistToken,
     menteeLink,

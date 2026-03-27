@@ -63,13 +63,29 @@ export default function MenteeCallPage() {
 
     console.log('[Mentee] Joining room:', roomUrl)
 
-    const call = DailyIframe.createCallObject({ audioSource: true, videoSource: false })
+    const call = DailyIframe.createCallObject({
+      audioSource: true,
+      videoSource: false,
+      subscribeToTracksAutomatically: true,
+    })
     callRef.current = call
 
-    call.on('joined-meeting', () => {
+    call.on('joined-meeting', async () => {
       console.log('[Mentee] joined-meeting')
       setStatus('active')
       startTimer()
+
+      // Force audio on
+      const local = call.participants()?.local
+      console.log('[Mentee Audio] local audio:', local?.audio)
+      if (!local?.audio) {
+        await call.setLocalAudio(true)
+        console.log('[Mentee Audio] forced audio on')
+      }
+    })
+
+    call.on('track-started', (event) => {
+      console.log('[Mentee Audio] track started:', event?.track?.kind)
     })
 
     call.on('participant-left', (event) => {
@@ -84,7 +100,7 @@ export default function MenteeCallPage() {
     })
 
     try {
-      await call.join({ url: roomUrl, token })
+      await call.join({ url: roomUrl, token, startAudioOff: false } as Parameters<typeof call.join>[0])
       console.log('[Mentee] join() resolved')
     } catch (err) {
       console.error('[Mentee] join() failed:', err)

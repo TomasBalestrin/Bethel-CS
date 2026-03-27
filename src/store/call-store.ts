@@ -29,7 +29,7 @@ interface CallState {
   setRemoteCount: (count: number) => void
 }
 
-export const useCallStore = create<CallState>((set, get) => ({
+export const useCallStore = create<CallState>((set) => ({
   isActive: false,
   roomUrl: null,
   roomName: null,

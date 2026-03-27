@@ -3,24 +3,23 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import DailyIframe from '@daily-co/daily-js'
-import { Mic, MicOff, PhoneOff, Phone, Loader2 } from 'lucide-react'
+import { Phone, Loader2, PhoneOff } from 'lucide-react'
 import Image from 'next/image'
 
 export default function MenteeCallPage() {
   const params = useParams()
   const callToken = params.callToken as string
 
-  const [status, setStatus] = useState<'loading' | 'ready' | 'connecting' | 'active' | 'ended' | 'error'>('loading')
+  const [status, setStatus] = useState<'loading' | 'ready' | 'active' | 'ended' | 'error'>('loading')
   const [specialistName, setSpecialistName] = useState('')
   const [roomUrl, setRoomUrl] = useState('')
   const [token, setToken] = useState('')
-  const [muted, setMuted] = useState(false)
-  const [seconds, setSeconds] = useState(0)
   const [error, setError] = useState('')
-  const callRef = useRef<ReturnType<typeof DailyIframe.createCallObject> | null>(null)
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Fetch token + roomUrl from API
+  const containerRef = useRef<HTMLDivElement>(null)
+  const callFrameRef = useRef<ReturnType<typeof DailyIframe.createFrame> | null>(null)
+
+  // Fetch token + roomUrl
   useEffect(() => {
     async function init() {
       try {
@@ -32,7 +31,6 @@ export default function MenteeCallPage() {
           return
         }
         const data = await res.json()
-        console.log('[Mentee] API response:', { roomName: data.roomName, roomUrl: data.roomUrl, specialistName: data.specialistName })
         setToken(data.token)
         setRoomUrl(data.roomUrl)
         setSpecialistName(data.specialistName)
@@ -45,182 +43,92 @@ export default function MenteeCallPage() {
     init()
   }, [callToken])
 
-  function startTimer() {
-    if (timerRef.current) return
-    timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000)
-  }
+  function joinCall() {
+    if (!roomUrl || !token || !containerRef.current) return
 
-  function stopTimer() {
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-      timerRef.current = null
-    }
-  }
+    setStatus('active')
 
-  async function joinCall() {
-    if (!roomUrl || !token) return
-    setStatus('connecting')
-
-    console.log('[Mentee] Joining room:', roomUrl)
-
-    const call = DailyIframe.createCallObject({
-      audioSource: true,
-      videoSource: false,
-      subscribeToTracksAutomatically: true,
+    const frame = DailyIframe.createFrame(containerRef.current, {
+      showLeaveButton: true,
+      showFullscreenButton: false,
+      iframeStyle: {
+        width: '100%',
+        height: '100%',
+        border: 'none',
+      },
     })
-    callRef.current = call
 
-    call.on('joined-meeting', async () => {
-      console.log('[Mentee] joined-meeting')
-      setStatus('active')
-      startTimer()
+    callFrameRef.current = frame
 
-      // Force audio on
-      const local = call.participants()?.local
-      console.log('[Mentee Audio] local audio:', local?.audio)
-      if (!local?.audio) {
-        await call.setLocalAudio(true)
-        console.log('[Mentee Audio] forced audio on')
+    frame.on('left-meeting', () => {
+      setStatus('ended')
+      if (callFrameRef.current) {
+        try { callFrameRef.current.destroy() } catch { /* */ }
+        callFrameRef.current = null
       }
     })
 
-    // Play remote audio tracks (headless mode)
-    call.on('track-started', (event) => {
-      const p = event?.participant
-      const track = event?.track
-      console.log('[Mentee Audio] track started:', track?.kind, 'from:', p?.local ? 'local' : 'remote')
+    frame.join({ url: roomUrl, token })
+  }
 
-      if (p?.local || track?.kind !== 'audio') return
-
-      const audioEl = document.createElement('audio')
-      audioEl.srcObject = new MediaStream([track])
-      audioEl.autoplay = true
-      audioEl.setAttribute('data-participant-id', p?.session_id || 'remote')
-      audioEl.style.display = 'none'
-      document.body.appendChild(audioEl)
-      audioEl.play().catch((e) => console.error('[Mentee Audio] play() failed:', e))
-    })
-
-    call.on('track-stopped', (event) => {
-      if (event?.participant?.local) return
-      const sid = event?.participant?.session_id
-      if (sid) {
-        const el = document.querySelector(`audio[data-participant-id="${sid}"]`)
-        if (el) { (el as HTMLAudioElement).srcObject = null; el.remove() }
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (callFrameRef.current) {
+        try { callFrameRef.current.leave() } catch { /* */ }
+        try { callFrameRef.current.destroy() } catch { /* */ }
       }
-    })
-
-    call.on('participant-left', (event) => {
-      if (event?.participant && !event.participant.local) {
-        handleEnd()
-      }
-    })
-
-    call.on('error', (e) => {
-      console.error('[Mentee] error:', e)
-      handleEnd()
-    })
-
-    try {
-      await call.join({ url: roomUrl, token, startAudioOff: false } as Parameters<typeof call.join>[0])
-      console.log('[Mentee] join() resolved')
-    } catch (err) {
-      console.error('[Mentee] join() failed:', err)
-      setError('Erro ao entrar na ligação')
-      setStatus('error')
     }
-  }
-
-  async function handleEnd() {
-    stopTimer()
-    setStatus('ended')
-    if (callRef.current) {
-      try { await callRef.current.leave() } catch { /* */ }
-      try { callRef.current.destroy() } catch { /* */ }
-      callRef.current = null
-    }
-  }
-
-  function toggleMute() {
-    if (!callRef.current) return
-    const next = !muted
-    callRef.current.setLocalAudio(!next)
-    setMuted(next)
-  }
-
-  const formatTimer = `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`
+  }, [])
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center" style={{ backgroundColor: '#060A16' }}>
-      <div className="mb-8">
-        <Image src="/logo.png" alt="Bethel CS" width={48} height={48} className="mx-auto" />
-        <p className="mt-2 text-sm text-white/60 text-center">Bethel CS</p>
-      </div>
-
-      {status === 'error' && (
-        <div className="text-center">
-          <p className="text-white/70 text-sm">{error}</p>
-        </div>
-      )}
-
-      {status === 'loading' && (
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-white/40 mx-auto" />
-          <p className="mt-3 text-sm text-white/50">Carregando...</p>
-        </div>
-      )}
-
-      {status === 'ready' && (
-        <div className="text-center">
-          <p className="text-white/60 text-sm">Ligação com</p>
-          <h1 className="text-xl font-semibold text-white mt-1">{specialistName}</h1>
-          <p className="text-white/40 text-xs mt-1">está te chamando</p>
-          <button
-            onClick={joinCall}
-            className="mt-8 flex items-center justify-center gap-2 rounded-full bg-green-600 hover:bg-green-500 transition-colors text-white font-medium px-8 py-4 text-lg mx-auto"
-          >
-            <Phone className="h-6 w-6" />
-            Entrar na ligação
-          </button>
-        </div>
-      )}
-
-      {status === 'connecting' && (
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-white/40 mx-auto" />
-          <p className="mt-3 text-sm text-white/50">Conectando...</p>
-        </div>
-      )}
-
+    <div className="flex flex-col" style={{ backgroundColor: '#060A16', height: '100dvh' }}>
+      {/* Active call — iframe fills the screen */}
       {status === 'active' && (
-        <div className="text-center">
-          <p className="text-white/60 text-sm">Em ligação com</p>
-          <h1 className="text-xl font-semibold text-white mt-1">{specialistName}</h1>
-          <p className="text-3xl font-mono text-white mt-6 tabular">{formatTimer}</p>
-          <div className="mt-10 flex items-center justify-center gap-6">
-            <button
-              onClick={toggleMute}
-              className={`rounded-full h-14 w-14 flex items-center justify-center transition-colors ${
-                muted ? 'bg-red-600 hover:bg-red-500' : 'bg-white/10 hover:bg-white/20'
-              }`}
-            >
-              {muted ? <MicOff className="h-5 w-5 text-white" /> : <Mic className="h-5 w-5 text-white" />}
-            </button>
-            <button
-              onClick={handleEnd}
-              className="rounded-full h-14 w-14 flex items-center justify-center bg-red-600 hover:bg-red-500 transition-colors"
-            >
-              <PhoneOff className="h-5 w-5 text-white" />
-            </button>
-          </div>
-        </div>
+        <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
       )}
 
-      {status === 'ended' && (
-        <div className="text-center">
-          <PhoneOff className="h-10 w-10 text-white/30 mx-auto" />
-          <p className="mt-3 text-white/70 text-sm">Ligação encerrada</p>
-          <p className="mt-1 text-white/40 text-xs">Obrigado! Até a próxima.</p>
+      {/* Non-active states — centered content */}
+      {status !== 'active' && (
+        <div className="flex flex-1 flex-col items-center justify-center">
+          <div className="mb-8">
+            <Image src="/logo.png" alt="Bethel CS" width={48} height={48} className="mx-auto" />
+            <p className="mt-2 text-sm text-white/60 text-center">Bethel CS</p>
+          </div>
+
+          {status === 'error' && (
+            <p className="text-white/70 text-sm text-center">{error}</p>
+          )}
+
+          {status === 'loading' && (
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin text-white/40 mx-auto" />
+              <p className="mt-3 text-sm text-white/50">Carregando...</p>
+            </div>
+          )}
+
+          {status === 'ready' && (
+            <div className="text-center">
+              <p className="text-white/60 text-sm">Ligação com</p>
+              <h1 className="text-xl font-semibold text-white mt-1">{specialistName}</h1>
+              <p className="text-white/40 text-xs mt-1">está te chamando</p>
+              <button
+                onClick={joinCall}
+                className="mt-8 flex items-center justify-center gap-2 rounded-full bg-green-600 hover:bg-green-500 transition-colors text-white font-medium px-8 py-4 text-lg mx-auto"
+              >
+                <Phone className="h-6 w-6" />
+                Entrar na ligação
+              </button>
+            </div>
+          )}
+
+          {status === 'ended' && (
+            <div className="text-center">
+              <PhoneOff className="h-10 w-10 text-white/30 mx-auto" />
+              <p className="mt-3 text-white/70 text-sm">Ligação encerrada</p>
+              <p className="mt-1 text-white/40 text-xs">Obrigado! Até a próxima.</p>
+            </div>
+          )}
         </div>
       )}
     </div>

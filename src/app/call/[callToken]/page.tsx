@@ -84,8 +84,30 @@ export default function MenteeCallPage() {
       }
     })
 
+    // Play remote audio tracks (headless mode)
     call.on('track-started', (event) => {
-      console.log('[Mentee Audio] track started:', event?.track?.kind)
+      const p = event?.participant
+      const track = event?.track
+      console.log('[Mentee Audio] track started:', track?.kind, 'from:', p?.local ? 'local' : 'remote')
+
+      if (p?.local || track?.kind !== 'audio') return
+
+      const audioEl = document.createElement('audio')
+      audioEl.srcObject = new MediaStream([track])
+      audioEl.autoplay = true
+      audioEl.setAttribute('data-participant-id', p?.session_id || 'remote')
+      audioEl.style.display = 'none'
+      document.body.appendChild(audioEl)
+      audioEl.play().catch((e) => console.error('[Mentee Audio] play() failed:', e))
+    })
+
+    call.on('track-stopped', (event) => {
+      if (event?.participant?.local) return
+      const sid = event?.participant?.session_id
+      if (sid) {
+        const el = document.querySelector(`audio[data-participant-id="${sid}"]`)
+        if (el) { (el as HTMLAudioElement).srcObject = null; el.remove() }
+      }
     })
 
     call.on('participant-left', (event) => {

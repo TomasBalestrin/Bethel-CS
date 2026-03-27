@@ -10,7 +10,7 @@ export default function MenteeCallPage() {
   const params = useParams()
   const callToken = params.callToken as string
 
-  const [status, setStatus] = useState<'loading' | 'ready' | 'active' | 'ended' | 'error'>('loading')
+  const [status, setStatus] = useState<'loading' | 'ready' | 'joining' | 'active' | 'ended' | 'error'>('loading')
   const [specialistName, setSpecialistName] = useState('')
   const [roomUrl, setRoomUrl] = useState('')
   const [token, setToken] = useState('')
@@ -43,39 +43,48 @@ export default function MenteeCallPage() {
     init()
   }, [callToken])
 
-  function joinCall() {
-    if (!roomUrl || !token || !containerRef.current) return
+  // When status changes to 'joining', create iframe and join
+  useEffect(() => {
+    if (status !== 'joining' || !roomUrl || !token) return
 
-    setStatus('active')
+    // Wait for next tick so containerRef is in the DOM
+    const timer = setTimeout(() => {
+      if (!containerRef.current) return
 
-    const frame = DailyIframe.createFrame(containerRef.current, {
-      showLeaveButton: true,
-      showFullscreenButton: false,
-      iframeStyle: {
-        width: '100%',
-        height: '100%',
-        border: 'none',
-      },
-    })
+      const frame = DailyIframe.createFrame(containerRef.current, {
+        showLeaveButton: true,
+        showFullscreenButton: false,
+        iframeStyle: {
+          width: '100%',
+          height: '100%',
+          border: 'none',
+        },
+      })
 
-    callFrameRef.current = frame
+      callFrameRef.current = frame
 
-    // Ensure iframe has media permissions for mobile
-    const iframe = containerRef.current.querySelector('iframe')
-    if (iframe) {
-      iframe.setAttribute('allow', 'camera; microphone; autoplay; display-capture')
-    }
-
-    frame.on('left-meeting', () => {
-      setStatus('ended')
-      if (callFrameRef.current) {
-        try { callFrameRef.current.destroy() } catch { /* */ }
-        callFrameRef.current = null
+      const iframe = containerRef.current.querySelector('iframe')
+      if (iframe) {
+        iframe.setAttribute('allow', 'camera; microphone; autoplay; display-capture')
       }
-    })
 
-    frame.join({ url: roomUrl, token, startVideoOff: true, startAudioOff: false })
-  }
+      frame.on('joined-meeting', () => {
+        setStatus('active')
+      })
+
+      frame.on('left-meeting', () => {
+        setStatus('ended')
+        if (callFrameRef.current) {
+          try { callFrameRef.current.destroy() } catch { /* */ }
+          callFrameRef.current = null
+        }
+      })
+
+      frame.join({ url: roomUrl, token, startVideoOff: true, startAudioOff: false })
+    }, 100)
+
+    return () => clearTimeout(timer)
+  }, [status, roomUrl, token])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -87,15 +96,25 @@ export default function MenteeCallPage() {
     }
   }, [])
 
+  function handleJoinClick() {
+    if (!roomUrl || !token) return
+    setStatus('joining')
+  }
+
   return (
     <div className="flex flex-col" style={{ backgroundColor: '#060A16', height: '100dvh' }}>
-      {/* Active call — iframe fills the screen */}
-      {status === 'active' && (
-        <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-      )}
+      {/* Iframe container — always in DOM, visible when joining/active */}
+      <div
+        ref={containerRef}
+        style={{
+          width: '100%',
+          height: '100%',
+          display: status === 'joining' || status === 'active' ? 'block' : 'none',
+        }}
+      />
 
       {/* Non-active states — centered content */}
-      {status !== 'active' && (
+      {status !== 'joining' && status !== 'active' && (
         <div className="flex flex-1 flex-col items-center justify-center">
           <div className="mb-8">
             <Image src="/logo.png" alt="Bethel CS" width={48} height={48} className="mx-auto" />
@@ -119,7 +138,7 @@ export default function MenteeCallPage() {
               <h1 className="text-xl font-semibold text-white mt-1">{specialistName}</h1>
               <p className="text-white/40 text-xs mt-1">está te chamando</p>
               <button
-                onClick={joinCall}
+                onClick={handleJoinClick}
                 className="mt-8 flex items-center justify-center gap-2 rounded-full bg-green-600 hover:bg-green-500 transition-colors text-white font-medium px-8 py-4 text-lg mx-auto"
               >
                 <Phone className="h-6 w-6" />

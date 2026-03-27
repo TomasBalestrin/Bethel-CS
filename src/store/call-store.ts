@@ -29,7 +29,7 @@ interface CallState {
   setRemoteCount: (count: number) => void
 }
 
-export const useCallStore = create<CallState>((set) => ({
+export const useCallStore = create<CallState>((set, get) => ({
   isActive: false,
   roomUrl: null,
   roomName: null,
@@ -41,19 +41,23 @@ export const useCallStore = create<CallState>((set) => ({
   muted: false,
   seconds: 0,
   remoteCount: 0,
-  startCall: (params) => set({
-    isActive: true,
-    status: 'connecting',
-    muted: false,
-    seconds: 0,
-    remoteCount: 0,
-    roomUrl: params.roomUrl,
-    roomName: params.roomName,
-    token: params.token,
-    callId: params.callId,
-    menteeName: params.menteeName,
-    menteeLink: params.menteeLink,
-  }),
+  startCall: (params) => {
+    const current = get()
+    if (current.isActive && current.roomUrl === params.roomUrl) return
+    set({
+      isActive: true,
+      status: 'connecting',
+      muted: false,
+      seconds: 0,
+      remoteCount: 0,
+      roomUrl: params.roomUrl,
+      roomName: params.roomName,
+      token: params.token,
+      callId: params.callId,
+      menteeName: params.menteeName,
+      menteeLink: params.menteeLink,
+    })
+  },
   endCall: () => set({
     isActive: false,
     status: 'idle',

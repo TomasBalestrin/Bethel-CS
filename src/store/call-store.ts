@@ -29,7 +29,7 @@ interface CallState {
   setRemoteCount: (count: number) => void
 }
 
-export const useCallStore = create<CallState>((set, get) => ({
+export const useCallStore = create<CallState>((set) => ({
   isActive: false,
   roomUrl: null,
   roomName: null,
@@ -42,8 +42,6 @@ export const useCallStore = create<CallState>((set, get) => ({
   seconds: 0,
   remoteCount: 0,
   startCall: (params) => {
-    const current = get()
-    if (current.isActive && current.roomUrl === params.roomUrl) return
     set({
       isActive: true,
       status: 'connecting',

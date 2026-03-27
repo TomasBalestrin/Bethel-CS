@@ -1,11 +1,10 @@
 'use client'
 
-import { useEffect, useRef, useCallback } from 'react'
+import { useEffect, useRef, useCallback, useState } from 'react'
 import DailyIframe from '@daily-co/daily-js'
-import { Mic, MicOff, PhoneOff, Loader2, Copy, Check } from 'lucide-react'
+import { Mic, MicOff, PhoneOff, Loader2, Copy, Check, MicIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useCallStore } from '@/store/call-store'
-import { useState } from 'react'
 
 type DailyCall = ReturnType<typeof DailyIframe.createCallObject>
 
@@ -17,10 +16,10 @@ export function CallPortal() {
   } = useCallStore()
 
   const [copied, setCopied] = useState(false)
+  const [audioBlocked, setAudioBlocked] = useState(false)
   const callRef = useRef<DailyCall | null>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timerStarted = useRef(false)
-  const endedRef = useRef(false)
   const joinedRoomRef = useRef<string | null>(null)
 
   const stopTimer = useCallback(() => {
@@ -41,9 +40,6 @@ export function CallPortal() {
   }, [setRemoteCount])
 
   const doEnd = useCallback(async () => {
-    if (endedRef.current) return
-    endedRef.current = true
-
     stopTimer()
     timerStarted.current = false
 
@@ -77,76 +73,77 @@ export function CallPortal() {
     }
   }, [remoteCount, status, setStatus, setSeconds])
 
-  // Main effect: join room ONCE per unique roomUrl
+  // Main effect: join room
   useEffect(() => {
     if (!isActive || !roomUrl || !token) return
 
-    // ALREADY IN THIS ROOM — do nothing
-    if (joinedRoomRef.current === roomUrl) {
-      console.log('[CallPortal] Already in room, skipping join:', roomUrl)
+    // Already in this room
+    if (joinedRoomRef.current === roomUrl && callRef.current) {
       return
     }
 
-    async function join() {
-      // If in a different room, leave first
-      if (callRef.current && joinedRoomRef.current && joinedRoomRef.current !== roomUrl) {
-        console.log('[CallPortal] Leaving old room:', joinedRoomRef.current)
-        try { await callRef.current.leave() } catch { /* */ }
-        try { callRef.current.destroy() } catch { /* */ }
-        callRef.current = null
-      }
-
-      endedRef.current = false
-      timerStarted.current = false
-      stopTimer()
-
-      // Mark as joined BEFORE calling join() to prevent re-entry
-      joinedRoomRef.current = roomUrl
-
-      console.log('[CallPortal] Joining room:', roomUrl)
-      const call = DailyIframe.createCallObject({ audioSource: true, videoSource: false })
-      callRef.current = call
-
-      call.on('joined-meeting', () => {
-        console.log('[CallPortal] joined-meeting')
-        setStatus('waiting')
-        updateRemote()
-      })
-      call.on('participant-joined', () => updateRemote())
-      call.on('participant-updated', () => updateRemote())
-      call.on('participant-left', () => {
-        updateRemote()
-        try {
-          const p = call.participants()
-          const remote = Object.values(p).filter((x) => !x.local).length
-          if (remote === 0 && timerStarted.current) doEnd()
-        } catch { /* */ }
-      })
-      call.on('left-meeting', () => doEnd())
-      call.on('error', () => doEnd())
-
-      try {
-        await call.join({ url: roomUrl!, token: token! })
-        console.log('[CallPortal] join() resolved')
-      } catch (err) {
-        console.error('[CallPortal] join() failed:', err)
-        joinedRoomRef.current = null
-        endCall()
-      }
+    // If in different room, cleanup
+    if (callRef.current) {
+      try { callRef.current.leave() } catch { /* */ }
+      try { callRef.current.destroy() } catch { /* */ }
+      callRef.current = null
     }
 
-    join()
+    timerStarted.current = false
+    stopTimer()
+    setAudioBlocked(false)
+
+    // Mark BEFORE join to prevent re-entry
+    joinedRoomRef.current = roomUrl
+
+    console.log('[CallPortal] Joining room:', roomUrl)
+    const call = DailyIframe.createCallObject({ audioSource: true, videoSource: false })
+    callRef.current = call
+
+    call.on('joined-meeting', () => {
+      console.log('[CallPortal] joined-meeting')
+      setStatus('waiting')
+      updateRemote()
+
+      // Check audio status
+      const local = call.participants()?.local
+      if (local && !local.audio) {
+        console.log('[CallPortal] Audio blocked by browser')
+        setAudioBlocked(true)
+      }
+    })
+    call.on('participant-joined', () => updateRemote())
+    call.on('participant-updated', () => updateRemote())
+    call.on('participant-left', () => {
+      updateRemote()
+      try {
+        const p = call.participants()
+        const remote = Object.values(p).filter((x) => !x.local).length
+        if (remote === 0 && timerStarted.current) doEnd()
+      } catch { /* */ }
+    })
+    call.on('left-meeting', () => doEnd())
+    call.on('error', () => doEnd())
+
+    call.join({ url: roomUrl, token }).then(() => {
+      console.log('[CallPortal] join() resolved')
+    }).catch((err) => {
+      console.error('[CallPortal] join() failed:', err)
+      joinedRoomRef.current = null
+      endCall()
+    })
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive, roomUrl, token])
 
-  // Polling fallback for remote participant detection
+  // Polling for remote participant detection
   useEffect(() => {
     if (!isActive) return
     const poll = setInterval(updateRemote, 2000)
     return () => clearInterval(poll)
   }, [isActive, updateRemote])
 
-  // Cleanup on unmount (should never happen since it's in layout)
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       stopTimer()
@@ -156,6 +153,13 @@ export function CallPortal() {
       }
     }
   }, [stopTimer])
+
+  async function activateMic() {
+    if (!callRef.current) return
+    await callRef.current.setLocalAudio(true)
+    setAudioBlocked(false)
+    setMuted(false)
+  }
 
   function toggleMute() {
     const call = callRef.current
@@ -168,7 +172,7 @@ export function CallPortal() {
   if (!isActive) return null
 
   const fmt = `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`
-  const displayStatus = status === 'ended' ? 'ended' : remoteCount > 0 ? 'active' : status
+  const displayStatus = remoteCount > 0 ? 'active' : status
 
   return (
     <div
@@ -194,11 +198,21 @@ export function CallPortal() {
           {displayStatus === 'active' && (
             <><span className="h-2 w-2 rounded-full bg-green-500" /><span className="text-[11px] text-green-400">Em ligação</span></>
           )}
-          {displayStatus === 'ended' && (
-            <span className="text-[11px] text-white/40">Encerrada</span>
-          )}
         </div>
       </div>
+
+      {/* Audio blocked warning */}
+      {audioBlocked && (
+        <div className="mx-4 mb-2">
+          <button
+            onClick={activateMic}
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-yellow-600 hover:bg-yellow-500 transition-colors px-3 py-2 text-sm text-white font-medium"
+          >
+            <MicIcon className="h-4 w-4" />
+            Ativar microfone
+          </button>
+        </div>
+      )}
 
       {/* Mentee link — while waiting */}
       {(displayStatus === 'waiting' || displayStatus === 'connecting') && menteeLink && (

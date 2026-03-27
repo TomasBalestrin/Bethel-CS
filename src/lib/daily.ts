@@ -16,6 +16,8 @@ export async function createRoom(): Promise<{ name: string; url: string }> {
       exp: Math.floor(Date.now() / 1000) + 7200,
       start_video_off: true,
       start_audio_off: false,
+      enable_recording: 'cloud',
+      start_cloud_recording: true,
     },
   }
 

@@ -97,21 +97,50 @@ export function CallPortal() {
     joinedRoomRef.current = roomUrl
 
     console.log('[CallPortal] Joining room:', roomUrl)
-    const call = DailyIframe.createCallObject({ audioSource: true, videoSource: false })
+    const call = DailyIframe.createCallObject({
+      audioSource: true,
+      videoSource: false,
+      subscribeToTracksAutomatically: true,
+    })
     callRef.current = call
 
-    call.on('joined-meeting', () => {
+    call.on('joined-meeting', async () => {
       console.log('[CallPortal] joined-meeting')
       setStatus('waiting')
       updateRemote()
 
-      // Check audio status
+      // Audio diagnostics
       const local = call.participants()?.local
-      if (local && !local.audio) {
-        console.log('[CallPortal] Audio blocked by browser')
-        setAudioBlocked(true)
+      console.log('[Audio] local audio:', local?.audio)
+      console.log('[Audio] local tracks:', JSON.stringify(local?.tracks))
+
+      try {
+        const devices = await call.enumerateDevices()
+        const mics = (devices as { devices: { kind: string; label: string }[] }).devices?.filter((d: { kind: string }) => d.kind === 'audioinput')
+        console.log('[Audio] available mics:', mics?.length, mics?.map((m: { label: string }) => m.label))
+      } catch { /* */ }
+
+      if (!local?.audio) {
+        console.log('[Audio] Audio off after join, forcing enable...')
+        try {
+          await call.setLocalAudio(true)
+          const updated = call.participants()?.local
+          console.log('[Audio] After setLocalAudio:', updated?.audio)
+          if (!updated?.audio) {
+            setAudioBlocked(true)
+          }
+        } catch (err) {
+          console.error('[Audio] setLocalAudio failed:', err)
+          setAudioBlocked(true)
+        }
       }
     })
+
+    call.on('track-started', (event) => {
+      const p = event?.participant
+      console.log('[Audio] track started:', event?.track?.kind, 'from:', p?.local ? 'local' : 'remote')
+    })
+
     call.on('participant-joined', () => updateRemote())
     call.on('participant-updated', () => updateRemote())
     call.on('participant-left', () => {
@@ -125,7 +154,7 @@ export function CallPortal() {
     call.on('left-meeting', () => doEnd())
     call.on('error', () => doEnd())
 
-    call.join({ url: roomUrl, token }).then(() => {
+    call.join({ url: roomUrl!, token: token!, startAudioOff: false } as Parameters<typeof call.join>[0]).then(() => {
       console.log('[CallPortal] join() resolved')
     }).catch((err) => {
       console.error('[CallPortal] join() failed:', err)

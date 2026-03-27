@@ -49,6 +49,22 @@ export function CallPortal() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ callId: cid }),
         }).catch(() => {})
+
+        // Poll for recording (check every 10s for 2 minutes)
+        let attempts = 0
+        const recordingPoll = setInterval(async () => {
+          attempts++
+          if (attempts > 12) { clearInterval(recordingPoll); return }
+          try {
+            const res = await fetch('/api/calls/check-recording', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ callId: cid }),
+            })
+            const data = await res.json()
+            if (data.status === 'ready') clearInterval(recordingPoll)
+          } catch { /* */ }
+        }, 10000)
       }
       joinedRef.current = null
       if (callFrameRef.current) {

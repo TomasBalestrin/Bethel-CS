@@ -75,3 +75,18 @@ export async function createMeetingToken(
 export function getRoomUrl(roomName: string): string {
   return `https://${DAILY_DOMAIN}/${roomName}`
 }
+
+export async function getRecordings(roomName: string): Promise<{ id: string; download_url: string; duration: number }[]> {
+  const res = await fetch(`https://api.daily.co/v1/recordings?room_name=${roomName}`, {
+    headers: { Authorization: `Bearer ${DAILY_API_KEY}` },
+  })
+
+  if (!res.ok) return []
+
+  const data = await res.json()
+  return (data.data || []).map((r: { id: string; download_link: string; duration: number }) => ({
+    id: r.id,
+    download_url: r.download_link,
+    duration: r.duration,
+  }))
+}

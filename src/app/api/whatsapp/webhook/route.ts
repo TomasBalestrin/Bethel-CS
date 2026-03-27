@@ -24,15 +24,14 @@ export async function POST(request: NextRequest) {
     // ─── Connection status events ───
     if (event === 'connected' || event === 'disconnected') {
       if (instanceId) {
-        // Try exact match first, then update any instance
-        const { count } = await supabase
+        const { data: updated } = await supabase
           .from('wpp_instances')
           .update({ status: event, updated_at: new Date().toISOString() })
           .eq('instance_id', instanceId)
-          .select('id', { count: 'exact' })
+          .select('id')
 
         // If no match by instance_id, update the first one
-        if (!count || count === 0) {
+        if (!updated || updated.length === 0) {
           await supabase
             .from('wpp_instances')
             .update({ status: event, updated_at: new Date().toISOString() })

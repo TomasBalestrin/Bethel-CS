@@ -41,6 +41,12 @@ export function CallPortal() {
 
     callFrameRef.current = frame
 
+    // Ensure iframe has media permissions for mobile
+    const iframe = containerRef.current.querySelector('iframe')
+    if (iframe) {
+      iframe.setAttribute('allow', 'camera; microphone; autoplay; display-capture')
+    }
+
     frame.on('left-meeting', () => {
       const cid = useCallStore.getState().callId
       if (cid) {
@@ -77,6 +83,8 @@ export function CallPortal() {
     frame.join({
       url: roomUrl,
       token,
+      startVideoOff: true,
+      startAudioOff: false,
     })
 
     // eslint-disable-next-line react-hooks/exhaustive-deps

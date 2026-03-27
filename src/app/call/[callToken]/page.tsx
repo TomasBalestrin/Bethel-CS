@@ -60,6 +60,12 @@ export default function MenteeCallPage() {
 
     callFrameRef.current = frame
 
+    // Ensure iframe has media permissions for mobile
+    const iframe = containerRef.current.querySelector('iframe')
+    if (iframe) {
+      iframe.setAttribute('allow', 'camera; microphone; autoplay; display-capture')
+    }
+
     frame.on('left-meeting', () => {
       setStatus('ended')
       if (callFrameRef.current) {
@@ -68,7 +74,7 @@ export default function MenteeCallPage() {
       }
     })
 
-    frame.join({ url: roomUrl, token })
+    frame.join({ url: roomUrl, token, startVideoOff: true, startAudioOff: false })
   }
 
   // Cleanup on unmount

@@ -17,7 +17,6 @@ export async function createRoom(): Promise<{ name: string; url: string }> {
       start_video_off: true,
       start_audio_off: false,
       enable_recording: 'cloud',
-      start_cloud_recording: true,
     },
   }
 

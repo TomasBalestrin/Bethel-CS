@@ -19,32 +19,59 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient()
 
+    console.log('[WPP Webhook] event:', event, 'instanceId:', instanceId)
+
     // ─── Connection status events ───
     if (event === 'connected' || event === 'disconnected') {
       if (instanceId) {
-        await supabase
+        const { data: updated } = await supabase
           .from('wpp_instances')
           .update({ status: event, updated_at: new Date().toISOString() })
           .eq('instance_id', instanceId)
+          .select('id')
+
+        // If no match by instance_id, update the first one
+        if (!updated || updated.length === 0) {
+          await supabase
+            .from('wpp_instances')
+            .update({ status: event, updated_at: new Date().toISOString() })
+            .limit(1)
+        }
       }
       return NextResponse.json({ ok: true })
     }
 
     // ─── Message received ───
     if (event === 'message_received') {
-      if (!instanceId || !data.phone) {
+      if (!data.phone) {
         return NextResponse.json({ ok: true })
       }
 
-      // 1. Find specialist via wpp_instances
-      const { data: instance } = await supabase
-        .from('wpp_instances')
-        .select('specialist_id')
-        .eq('instance_id', instanceId)
-        .single()
+      // 1. Find specialist — try by instance_id, fallback to first connected
+      let instance = null
+
+      if (instanceId) {
+        const { data: found } = await supabase
+          .from('wpp_instances')
+          .select('specialist_id')
+          .eq('instance_id', instanceId)
+          .single()
+        instance = found
+      }
 
       if (!instance) {
-        console.warn(`[WPP Webhook] Instance not found: ${instanceId}`)
+        // Fallback: get any connected instance
+        const { data: fallback } = await supabase
+          .from('wpp_instances')
+          .select('specialist_id')
+          .eq('status', 'connected')
+          .limit(1)
+          .single()
+        instance = fallback
+      }
+
+      if (!instance) {
+        console.warn(`[WPP Webhook] No instance found for: ${instanceId}`)
         return NextResponse.json({ ok: true })
       }
 

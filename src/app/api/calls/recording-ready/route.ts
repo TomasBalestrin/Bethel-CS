@@ -4,13 +4,15 @@ import { createAdminClient } from '@/lib/supabase/admin'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
+    console.log('[Daily Webhook] Received:', JSON.stringify(body).slice(0, 500))
 
-    if (body.action !== 'recording-ready') {
+    const action = body.action || body.type
+    if (action !== 'recording-ready' && action !== 'recording.ready-to-download') {
       return NextResponse.json({ ok: true })
     }
 
-    const roomName = body.room_name
-    const recording = body.recording
+    const roomName = body.room_name || body.payload?.room_name
+    const recording = body.recording || body.payload
 
     if (!roomName || !recording) {
       return NextResponse.json({ ok: true })

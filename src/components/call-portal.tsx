@@ -21,7 +21,7 @@ export function CallPortal() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timerStarted = useRef(false)
   const endedRef = useRef(false)
-  const currentRoomRef = useRef<string | null>(null)
+  const joinedRoomRef = useRef<string | null>(null)
 
   const stopTimer = useCallback(() => {
     if (timerRef.current) {
@@ -51,8 +51,8 @@ export function CallPortal() {
       try { await callRef.current.leave() } catch { /* */ }
       try { callRef.current.destroy() } catch { /* */ }
       callRef.current = null
-      currentRoomRef.current = null
     }
+    joinedRoomRef.current = null
 
     const cid = useCallStore.getState().callId
     if (cid) {
@@ -77,64 +77,74 @@ export function CallPortal() {
     }
   }, [remoteCount, status, setStatus, setSeconds])
 
-  // Main effect: join/leave when isActive + roomUrl changes
+  // Main effect: join room ONCE per unique roomUrl
   useEffect(() => {
     if (!isActive || !roomUrl || !token) return
 
-    // Already in this room
-    if (currentRoomRef.current === roomUrl && callRef.current) {
-      updateRemote()
+    // ALREADY IN THIS ROOM — do nothing
+    if (joinedRoomRef.current === roomUrl) {
+      console.log('[CallPortal] Already in room, skipping join:', roomUrl)
       return
     }
 
-    // Cleanup previous call if different room
-    if (callRef.current) {
-      try { callRef.current.leave() } catch { /* */ }
-      try { callRef.current.destroy() } catch { /* */ }
-      callRef.current = null
+    async function join() {
+      // If in a different room, leave first
+      if (callRef.current && joinedRoomRef.current && joinedRoomRef.current !== roomUrl) {
+        console.log('[CallPortal] Leaving old room:', joinedRoomRef.current)
+        try { await callRef.current.leave() } catch { /* */ }
+        try { callRef.current.destroy() } catch { /* */ }
+        callRef.current = null
+      }
+
+      endedRef.current = false
+      timerStarted.current = false
+      stopTimer()
+
+      // Mark as joined BEFORE calling join() to prevent re-entry
+      joinedRoomRef.current = roomUrl
+
+      console.log('[CallPortal] Joining room:', roomUrl)
+      const call = DailyIframe.createCallObject({ audioSource: true, videoSource: false })
+      callRef.current = call
+
+      call.on('joined-meeting', () => {
+        console.log('[CallPortal] joined-meeting')
+        setStatus('waiting')
+        updateRemote()
+      })
+      call.on('participant-joined', () => updateRemote())
+      call.on('participant-updated', () => updateRemote())
+      call.on('participant-left', () => {
+        updateRemote()
+        try {
+          const p = call.participants()
+          const remote = Object.values(p).filter((x) => !x.local).length
+          if (remote === 0 && timerStarted.current) doEnd()
+        } catch { /* */ }
+      })
+      call.on('left-meeting', () => doEnd())
+      call.on('error', () => doEnd())
+
+      try {
+        await call.join({ url: roomUrl!, token: token! })
+        console.log('[CallPortal] join() resolved')
+      } catch (err) {
+        console.error('[CallPortal] join() failed:', err)
+        joinedRoomRef.current = null
+        endCall()
+      }
     }
 
-    endedRef.current = false
-    timerStarted.current = false
-    stopTimer()
-    currentRoomRef.current = roomUrl
-
-    console.log('[CallPortal] Joining room:', roomUrl)
-    const call = DailyIframe.createCallObject({ audioSource: true, videoSource: false })
-    callRef.current = call
-
-    call.on('joined-meeting', () => {
-      console.log('[CallPortal] joined-meeting')
-      setStatus('waiting')
-      updateRemote()
-    })
-    call.on('participant-joined', () => updateRemote())
-    call.on('participant-updated', () => updateRemote())
-    call.on('participant-left', () => {
-      updateRemote()
-      // If all remotes left, end
-      const p = call.participants()
-      const remote = Object.values(p).filter((x) => !x.local).length
-      if (remote === 0 && timerStarted.current) doEnd()
-    })
-    call.on('left-meeting', () => doEnd())
-    call.on('error', () => doEnd())
-
-    call.join({ url: roomUrl, token }).then(() => {
-      console.log('[CallPortal] join() resolved')
-    }).catch((err) => {
-      console.error('[CallPortal] join() failed:', err)
-      endCall()
-    })
-
-    // Polling fallback
-    const poll = setInterval(updateRemote, 2000)
-
-    return () => {
-      clearInterval(poll)
-    }
+    join()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isActive, roomUrl, token])
+
+  // Polling fallback for remote participant detection
+  useEffect(() => {
+    if (!isActive) return
+    const poll = setInterval(updateRemote, 2000)
+    return () => clearInterval(poll)
+  }, [isActive, updateRemote])
 
   // Cleanup on unmount (should never happen since it's in layout)
   useEffect(() => {

@@ -167,18 +167,23 @@ export async function sendMessage(
     }
     if (imageUrl) body.imageUrl = imageUrl
 
-    const res = await authFetch(
-      `${BASE_URL}/api/chats/instances/${instanceId}/send`,
-      { method: 'POST', body: JSON.stringify(body) }
-    )
+    const url = `${BASE_URL}/api/chats/instances/${instanceId}/send`
+    console.log('[NextApps] sendMessage URL:', url)
+    console.log('[NextApps] sendMessage body:', JSON.stringify(body))
+
+    const res = await authFetch(url, { method: 'POST', body: JSON.stringify(body) })
+
+    console.log('[NextApps] sendMessage response status:', res.status)
 
     if (!res.ok) {
       const text = await res.text()
+      console.error('[NextApps] sendMessage error:', res.status, text)
       return { success: false, error: `Send failed (${res.status}): ${text}` }
     }
 
     return { success: true }
   } catch (err) {
+    console.error('[NextApps] sendMessage exception:', err)
     return { success: false, error: String(err) }
   }
 }

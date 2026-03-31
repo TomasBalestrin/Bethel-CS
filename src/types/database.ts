@@ -119,6 +119,20 @@ export interface Database {
           contract_validity: string | null
           closer_name: string | null
           transcription: string | null
+          faturamento_atual: number | null
+          faturamento_mes_anterior: number | null
+          faturamento_antes_mentoria: number | null
+          dias_acessou_sistema: number | null
+          ultimo_acesso: string | null
+          dias_preencheu: number | null
+          total_leads: number | null
+          total_vendas: number | null
+          total_receita_periodo: number | null
+          total_entrada_periodo: number | null
+          taxa_conversao: number | null
+          ticket_medio: number | null
+          funis_ativos: Json | null
+          metrics_updated_at: string | null
         }
         Insert: {
           id?: string
@@ -160,6 +174,20 @@ export interface Database {
           contract_validity?: string | null
           closer_name?: string | null
           transcription?: string | null
+          faturamento_atual?: number | null
+          faturamento_mes_anterior?: number | null
+          faturamento_antes_mentoria?: number | null
+          dias_acessou_sistema?: number | null
+          ultimo_acesso?: string | null
+          dias_preencheu?: number | null
+          total_leads?: number | null
+          total_vendas?: number | null
+          total_receita_periodo?: number | null
+          total_entrada_periodo?: number | null
+          taxa_conversao?: number | null
+          ticket_medio?: number | null
+          funis_ativos?: Json | null
+          metrics_updated_at?: string | null
         }
         Update: {
           full_name?: string
@@ -197,6 +225,20 @@ export interface Database {
           contract_validity?: string | null
           closer_name?: string | null
           transcription?: string | null
+          faturamento_atual?: number | null
+          faturamento_mes_anterior?: number | null
+          faturamento_antes_mentoria?: number | null
+          dias_acessou_sistema?: number | null
+          ultimo_acesso?: string | null
+          dias_preencheu?: number | null
+          total_leads?: number | null
+          total_vendas?: number | null
+          total_receita_periodo?: number | null
+          total_entrada_periodo?: number | null
+          taxa_conversao?: number | null
+          ticket_medio?: number | null
+          funis_ativos?: Json | null
+          metrics_updated_at?: string | null
         }
         Relationships: []
       }

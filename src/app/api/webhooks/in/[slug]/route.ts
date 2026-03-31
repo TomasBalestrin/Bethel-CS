@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { validateWebhookAuth } from '@/lib/webhook-auth'
 import { extractField } from '@/lib/webhook-fields'
 import { executeWebhookAction, type WebhookAction } from '@/lib/webhook-actions'
+import type { Json } from '@/types/database'
 
 export async function POST(
   request: NextRequest,
@@ -58,9 +59,9 @@ export async function POST(
       endpoint_id: endpoint.id,
       direction: 'inbound',
       method: request.method,
-      headers: headersObj,
-      payload: payload as Record<string, unknown>,
-      query_params: Object.fromEntries(new URL(request.url).searchParams),
+      headers: headersObj as Json,
+      payload: payload as Json,
+      query_params: Object.fromEntries(new URL(request.url).searchParams) as Json,
       source_ip: request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip') ?? null,
       status: 'received',
     })
@@ -100,7 +101,7 @@ export async function POST(
       .update({
         event_type: eventType,
         action_executed: action,
-        action_result: result as unknown as Record<string, unknown>,
+        action_result: result as unknown as Json,
         status: result.success ? 'processed' : 'failed',
         error_message: result.error ?? null,
         processing_time_ms: processingTime,

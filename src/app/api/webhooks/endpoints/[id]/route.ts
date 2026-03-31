@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import type { Database } from '@/types/database'
+
+type EndpointUpdate = Database['public']['Tables']['webhook_endpoints']['Update']
 
 async function requireAdmin(supabase: ReturnType<typeof createClient>) {
   const { data: { user } } = await supabase.auth.getUser()
@@ -48,7 +51,7 @@ export async function PUT(
 
   const { data, error } = await supabase
     .from('webhook_endpoints')
-    .update(updateData)
+    .update(updateData as EndpointUpdate)
     .eq('id', params.id)
     .select()
     .single()

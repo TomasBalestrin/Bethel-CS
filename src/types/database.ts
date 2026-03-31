@@ -608,6 +608,140 @@ export interface Database {
         }
         Relationships: []
       }
+      webhook_endpoints: {
+        Row: {
+          id: string
+          name: string
+          slug: string
+          description: string | null
+          platform: string
+          direction: string
+          secret_key: string | null
+          auth_type: string
+          auth_header: string | null
+          default_action: string
+          field_mapping: Json
+          event_field: string | null
+          event_actions: Json
+          target_url: string | null
+          target_headers: Json
+          trigger_events: string[]
+          payload_template: Json | null
+          default_kanban_stage: string | null
+          default_specialist_id: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          slug: string
+          description?: string | null
+          platform?: string
+          direction?: string
+          secret_key?: string | null
+          auth_type?: string
+          auth_header?: string | null
+          default_action?: string
+          field_mapping?: Json
+          event_field?: string | null
+          event_actions?: Json
+          target_url?: string | null
+          target_headers?: Json
+          trigger_events?: string[]
+          payload_template?: Json | null
+          default_kanban_stage?: string | null
+          default_specialist_id?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          name?: string
+          slug?: string
+          description?: string | null
+          platform?: string
+          direction?: string
+          secret_key?: string | null
+          auth_type?: string
+          auth_header?: string | null
+          default_action?: string
+          field_mapping?: Json
+          event_field?: string | null
+          event_actions?: Json
+          target_url?: string | null
+          target_headers?: Json
+          trigger_events?: string[]
+          payload_template?: Json | null
+          default_kanban_stage?: string | null
+          default_specialist_id?: string | null
+          is_active?: boolean
+          updated_at?: string
+          created_by?: string | null
+        }
+        Relationships: []
+      }
+      webhook_logs: {
+        Row: {
+          id: string
+          endpoint_id: string
+          direction: string
+          method: string | null
+          headers: Json | null
+          payload: Json
+          query_params: Json | null
+          source_ip: string | null
+          event_type: string | null
+          action_executed: string | null
+          action_result: Json | null
+          status: string
+          error_message: string | null
+          processing_time_ms: number | null
+          response_status: number | null
+          response_body: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          endpoint_id: string
+          direction?: string
+          method?: string | null
+          headers?: Json | null
+          payload: Json
+          query_params?: Json | null
+          source_ip?: string | null
+          event_type?: string | null
+          action_executed?: string | null
+          action_result?: Json | null
+          status?: string
+          error_message?: string | null
+          processing_time_ms?: number | null
+          response_status?: number | null
+          response_body?: string | null
+          created_at?: string
+        }
+        Update: {
+          endpoint_id?: string
+          direction?: string
+          method?: string | null
+          headers?: Json | null
+          payload?: Json
+          query_params?: Json | null
+          source_ip?: string | null
+          event_type?: string | null
+          action_executed?: string | null
+          action_result?: Json | null
+          status?: string
+          error_message?: string | null
+          processing_time_ms?: number | null
+          response_status?: number | null
+          response_body?: string | null
+        }
+        Relationships: []
+      }
       wpp_messages: {
         Row: {
           id: string

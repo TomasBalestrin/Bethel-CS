@@ -400,15 +400,6 @@ function InfoRow({ label, value, render }: { label: string; value?: string | nul
   )
 }
 
-// ─── Section header ───
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-      {children}
-    </h3>
-  )
-}
-
 // ─── Metric box for performance data ───
 function MetricBox({ label, value, highlight }: { label: string; value: string | number; highlight?: boolean }) {
   return (
@@ -579,169 +570,187 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
     )
   }
 
-  // ─── View mode — 3 column layout for fullscreen ───
+  // ─── View mode — redesigned fullscreen layout ───
+
+  const statusLabel = mentee.status === 'ativo' ? 'Ativo' : mentee.status === 'cancelado' ? 'Cancelado' : mentee.status === 'concluido' ? 'Concluído' : mentee.status
+  const statusColor = mentee.status === 'ativo' ? 'bg-success/10 text-success' : mentee.status === 'cancelado' ? 'bg-destructive/10 text-destructive' : 'bg-info/10 text-info'
+
+  // Collect contact items that have data
+  const contactItems: Array<{icon: React.ElementType; label: string; value: string; href?: string}> = []
+  if (mentee.phone) contactItems.push({ icon: MessageSquare, label: 'Telefone', value: mentee.phone })
+  if (mentee.email) contactItems.push({ icon: AtSign, label: 'Email', value: mentee.email })
+  if (instHandle) contactItems.push({ icon: Link2, label: 'Instagram', value: `@${instHandle}`, href: `https://instagram.com/${instHandle}` })
+  if (mentee.city || mentee.state) contactItems.push({ icon: Users, label: 'Local', value: [mentee.city, mentee.state].filter(Boolean).join(', ') })
+  if (mentee.cpf) contactItems.push({ icon: FileDown, label: 'CPF', value: mentee.cpf })
+  if (mentee.birth_date) contactItems.push({ icon: FileDown, label: 'Nascimento', value: formatDateBR(mentee.birth_date) })
+
+  const hasCloserData = mentee.niche || mentee.closer_name || mentee.main_pain || mentee.main_difficulty
+  const hasMetrics = mentee.metrics_updated_at
+
   return (
-    <div className="animate-fade-in space-y-5">
-      {/* Row 1: Dados Pessoais + Mentoria + Classificação */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-4">
-        <div>
-          <SectionTitle>Dados Pessoais</SectionTitle>
-          <div className="divide-y divide-border/50">
-            <InfoRow label="Nome" value={mentee.full_name} />
-            <InfoRow label="CPF" value={mentee.cpf} />
-            <InfoRow label="Nascimento" value={mentee.birth_date ? formatDateBR(mentee.birth_date) : null} />
-            <InfoRow label="Telefone" value={mentee.phone} />
-            <InfoRow label="Email" value={mentee.email} />
-            <InfoRow
-              label="Instagram"
-              value={mentee.instagram}
-              render={
-                instHandle ? (
-                  <a
-                    href={`https://instagram.com/${instHandle}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-accent hover:underline hover:opacity-80 transition-opacity inline-flex items-center gap-1 text-sm"
-                  >
-                    <AtSign size={14} />
-                    {instHandle}
-                  </a>
-                ) : (
-                  <span className="text-muted-foreground text-sm">—</span>
-                )
-              }
-            />
-            <InfoRow label="Cidade/Estado" value={[mentee.city, mentee.state].filter(Boolean).join(', ') || null} />
+    <div className="animate-fade-in space-y-6">
+      {/* ── Row 1: Summary cards ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
+        <div className="rounded-lg border border-border bg-card p-3 shadow-card">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Status</p>
+          <span className={`inline-block mt-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusColor}`}>{statusLabel}</span>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-3 shadow-card">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Prioridade</p>
+          <div className="mt-1">
+            <Badge variant={({ 1: 'muted', 2: 'warning', 3: 'info', 4: 'success', 5: 'accent' } as const)[mentee.priority_level] ?? 'muted'}>
+              P{mentee.priority_level}
+            </Badge>
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-3 shadow-card">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Cliente Fit</p>
+          <div className="mt-1"><ClienteFitToggle menteeId={mentee.id} initialValue={mentee.cliente_fit} /></div>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-3 shadow-card">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Produto</p>
+          <p className="mt-1 text-sm font-medium text-foreground truncate">{mentee.product_name}</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-3 shadow-card">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Início</p>
+          <p className="mt-1 text-sm font-medium text-foreground">{mentee.start_date ? formatDateBR(mentee.start_date) : '—'}</p>
+        </div>
+        {mentee.contract_validity && (
+          <div className="rounded-lg border border-border bg-card p-3 shadow-card">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Contrato</p>
+            <p className="mt-1 text-sm font-medium text-foreground">{mentee.contract_validity}</p>
+          </div>
+        )}
+      </div>
+
+      {/* ── Row 2: Contact + Mentoria details + Closer ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Contact card */}
+        <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+          <div className="px-4 py-2.5 bg-muted/50 border-b border-border">
+            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Contato</h3>
+          </div>
+          <div className="p-4 space-y-3">
+            {contactItems.map((item, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="rounded-md bg-accent/10 p-1.5">
+                  <item.icon className="h-3.5 w-3.5 text-accent" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] text-muted-foreground">{item.label}</p>
+                  {item.href ? (
+                    <a href={item.href} target="_blank" rel="noopener noreferrer" className="text-sm text-accent hover:underline truncate block">{item.value}</a>
+                  ) : (
+                    <p className="text-sm text-foreground truncate">{item.value}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+            {contactItems.length === 0 && <p className="text-xs text-muted-foreground">Nenhum contato cadastrado</p>}
           </div>
         </div>
 
-        <div>
-          <SectionTitle>Dados da Mentoria</SectionTitle>
-          <div className="divide-y divide-border/50">
-            <InfoRow label="Produto" value={mentee.product_name} />
-            <InfoRow label="Início" value={mentee.start_date ? formatDateBR(mentee.start_date) : null} />
-            <InfoRow label="Término" value={mentee.end_date ? formatDateBR(mentee.end_date) : null} />
-            <InfoRow label="Vendedor" value={mentee.seller_name} />
-            <InfoRow label="Funil" value={mentee.funnel_origin} />
-            <InfoRow label="Contrato" value={mentee.contract_validity} />
-            <InfoRow label="Origem" value={mentee.source} />
-            <InfoRow label="Status" value={
-              mentee.status === 'ativo' ? 'Ativo' :
-              mentee.status === 'cancelado' ? 'Cancelado' :
-              mentee.status === 'concluido' ? 'Concluído' : mentee.status
-            } />
+        {/* Mentorship details card */}
+        <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+          <div className="px-4 py-2.5 bg-muted/50 border-b border-border">
+            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Mentoria</h3>
+          </div>
+          <div className="p-4 space-y-2">
+            {mentee.end_date && <InfoRow label="Término" value={formatDateBR(mentee.end_date)} />}
+            {mentee.seller_name && <InfoRow label="Vendedor" value={mentee.seller_name} />}
+            {mentee.funnel_origin && <InfoRow label="Funil" value={mentee.funnel_origin} />}
+            {mentee.source && <InfoRow label="Origem" value={mentee.source} />}
+            {mentee.has_partner && (
+              <>
+                <InfoRow label="Sócio" value="Sim" />
+                {mentee.partner_name && <InfoRow label="Nome do sócio" value={mentee.partner_name} />}
+              </>
+            )}
+            {mentee.chat_token && (
+              <div className="pt-2 border-t border-border/50">
+                <p className="text-[10px] text-muted-foreground mb-1">Link do chat</p>
+                <ChatLinkCopy chatToken={mentee.chat_token} />
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <SectionTitle>Classificação</SectionTitle>
-            <div className="divide-y divide-border/50">
-              <div className="flex items-center justify-between py-2 text-sm">
-                <span className="text-xs text-muted-foreground">Prioridade</span>
-                <Badge variant={({ 1: 'muted', 2: 'warning', 3: 'info', 4: 'success', 5: 'accent' } as const)[mentee.priority_level] ?? 'muted'}>
-                  P{mentee.priority_level}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between py-2 text-sm">
-                <span className="text-xs text-muted-foreground">Cliente Fit</span>
-                <ClienteFitToggle menteeId={mentee.id} initialValue={mentee.cliente_fit} />
-              </div>
-              {mentee.has_partner && (
-                <>
-                  <InfoRow label="Sócio" value="Sim" />
-                  <InfoRow label="Nome do sócio" value={mentee.partner_name} />
-                </>
+        {/* Closer card — only if data exists */}
+        {hasCloserData && (
+          <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+            <div className="px-4 py-2.5 bg-warning/5 border-b border-border">
+              <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Closer / Venda</h3>
+            </div>
+            <div className="p-4 space-y-2">
+              {mentee.closer_name && <InfoRow label="Closer" value={mentee.closer_name} />}
+              {mentee.niche && <InfoRow label="Nicho" value={mentee.niche} />}
+              {mentee.main_pain && <InfoRow label="Dor principal" value={mentee.main_pain} />}
+              {mentee.main_difficulty && <InfoRow label="Dificuldade" value={mentee.main_difficulty} />}
+              {mentee.transcription && (
+                <div className="pt-2 border-t border-border/50">
+                  <p className="text-[10px] text-muted-foreground mb-1">Transcrição</p>
+                  <div className="rounded bg-muted/50 p-2 text-xs text-foreground max-h-24 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                    {mentee.transcription}
+                  </div>
+                </div>
               )}
             </div>
           </div>
-
-          {/* Closer data */}
-          {(mentee.niche || mentee.closer_name || mentee.main_pain) && (
-            <div>
-              <SectionTitle>Closer / Venda</SectionTitle>
-              <div className="divide-y divide-border/50">
-                <InfoRow label="Closer" value={mentee.closer_name} />
-                <InfoRow label="Nicho" value={mentee.niche} />
-                <InfoRow label="Dor principal" value={mentee.main_pain} />
-                <InfoRow label="Dificuldade" value={mentee.main_difficulty} />
-              </div>
-            </div>
-          )}
-
-          {/* Chat link */}
-          {mentee.chat_token && (
-            <div>
-              <SectionTitle>Link do Chat</SectionTitle>
-              <ChatLinkCopy chatToken={mentee.chat_token} />
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
-      {/* Transcription — full width */}
-      {mentee.transcription && (
-        <div className="border-t border-border/50 pt-4">
-          <SectionTitle>Transcrição da call</SectionTitle>
-          <div className="rounded-md bg-muted/50 p-3 text-xs text-foreground max-h-28 overflow-y-auto whitespace-pre-wrap">
-            {mentee.transcription}
-          </div>
-        </div>
-      )}
-
-      {/* Performance — Bethel Metrics */}
-      {mentee.metrics_updated_at && (
-        <div className="border-t border-border/50 pt-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <SectionTitle>Performance (Bethel Metrics)</SectionTitle>
+      {/* ── Row 3: Performance (Bethel Metrics) ── */}
+      {hasMetrics && (
+        <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+          <div className="px-4 py-2.5 bg-accent/5 border-b border-border flex items-center justify-between">
+            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Performance</h3>
             <span className="text-[10px] text-muted-foreground">
-              Atualizado {new Date(mentee.metrics_updated_at).toLocaleDateString('pt-BR')}
+              Atualizado {new Date(mentee.metrics_updated_at!).toLocaleDateString('pt-BR')}
             </span>
           </div>
-
-          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-            <MetricBox label="Fat. atual" value={mentee.faturamento_atual != null ? formatBRL(mentee.faturamento_atual) : '—'} highlight />
-            <MetricBox label="Mês anterior" value={mentee.faturamento_mes_anterior != null ? formatBRL(mentee.faturamento_mes_anterior) : '—'} />
-            <MetricBox label="Antes mentoria" value={mentee.faturamento_antes_mentoria != null ? formatBRL(mentee.faturamento_antes_mentoria) : '—'} />
-            <MetricBox label="Leads" value={mentee.total_leads ?? '—'} />
-            <MetricBox label="Vendas" value={mentee.total_vendas ?? '—'} />
-            <MetricBox label="Conversão" value={mentee.taxa_conversao != null ? `${mentee.taxa_conversao}%` : '—'} />
-            <MetricBox label="Ticket médio" value={mentee.ticket_medio != null ? formatBRL(mentee.ticket_medio) : '—'} />
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            <MetricBox label="Receita período" value={mentee.total_receita_periodo != null ? formatBRL(mentee.total_receita_periodo) : '—'} />
-            <MetricBox label="Entrada período" value={mentee.total_entrada_periodo != null ? formatBRL(mentee.total_entrada_periodo) : '—'} />
-            <MetricBox label="Dias acessou" value={mentee.dias_acessou_sistema ?? '—'} />
-            <MetricBox label="Dias preencheu" value={mentee.dias_preencheu ?? '—'} />
-            <MetricBox label="Último acesso" value={mentee.ultimo_acesso ? new Date(mentee.ultimo_acesso).toLocaleDateString('pt-BR') : '—'} />
-          </div>
-
-          {mentee.funis_ativos && Array.isArray(mentee.funis_ativos) && (mentee.funis_ativos as Array<{nome: string}>).length > 0 && (
-            <div>
-              <p className="text-[10px] text-muted-foreground mb-1.5">Funis ativos</p>
-              <div className="flex flex-wrap gap-1.5">
-                {(mentee.funis_ativos as Array<{id?: string; nome: string; slug?: string}>).map((f, i) => (
-                  <Badge key={f.id ?? i} variant="muted" className="text-[10px]">{f.nome}</Badge>
-                ))}
-              </div>
+          <div className="p-4 space-y-3">
+            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+              <MetricBox label="Fat. atual" value={mentee.faturamento_atual != null ? formatBRL(mentee.faturamento_atual) : '—'} highlight />
+              <MetricBox label="Mês anterior" value={mentee.faturamento_mes_anterior != null ? formatBRL(mentee.faturamento_mes_anterior) : '—'} />
+              <MetricBox label="Antes mentoria" value={mentee.faturamento_antes_mentoria != null ? formatBRL(mentee.faturamento_antes_mentoria) : '—'} />
+              <MetricBox label="Leads" value={mentee.total_leads ?? '—'} />
+              <MetricBox label="Vendas" value={mentee.total_vendas ?? '—'} />
+              <MetricBox label="Conversão" value={mentee.taxa_conversao != null ? `${mentee.taxa_conversao}%` : '—'} />
+              <MetricBox label="Ticket médio" value={mentee.ticket_medio != null ? formatBRL(mentee.ticket_medio) : '—'} />
             </div>
-          )}
+
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              <MetricBox label="Receita período" value={mentee.total_receita_periodo != null ? formatBRL(mentee.total_receita_periodo) : '—'} />
+              <MetricBox label="Entrada período" value={mentee.total_entrada_periodo != null ? formatBRL(mentee.total_entrada_periodo) : '—'} />
+              <MetricBox label="Dias acessou" value={mentee.dias_acessou_sistema ?? '—'} />
+              <MetricBox label="Dias preencheu" value={mentee.dias_preencheu ?? '—'} />
+              <MetricBox label="Último acesso" value={mentee.ultimo_acesso ? new Date(mentee.ultimo_acesso).toLocaleDateString('pt-BR') : '—'} />
+            </div>
+
+            {mentee.funis_ativos && Array.isArray(mentee.funis_ativos) && (mentee.funis_ativos as Array<{nome: string}>).length > 0 && (
+              <div>
+                <p className="text-[10px] text-muted-foreground mb-1.5">Funis ativos</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {(mentee.funis_ativos as Array<{id?: string; nome: string; slug?: string}>).map((f, i) => (
+                    <Badge key={f.id ?? i} variant="muted" className="text-[10px]">{f.nome}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {/* Transition to Mentorship button */}
       {isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship && (
-        <div className="border-t border-border/50 pt-4">
-          <Button
-            variant="outline"
-            onClick={() => onTransitionToMentorship(mentee)}
-            className="w-full text-sm"
-          >
-            Enviar para Etapas Mentoria
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          onClick={() => onTransitionToMentorship(mentee)}
+          className="w-full text-sm border-accent/30 text-accent hover:bg-accent/5"
+        >
+          Enviar para Etapas Mentoria
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
       )}
     </div>
   )

@@ -138,6 +138,22 @@ const PLATFORM_TEMPLATES: Record<string, PlatformTemplate> = {
     auth_header: 'x-webhook-secret',
     example_payload: JSON.stringify({"event":"sale_closed","timestamp":"2026-03-31T12:00:00.000Z","client":{"id":"uuid","name":"Nome do Cliente","email":"email@exemplo.com","phone":"(11) 99999-9999","company":"Empresa","niche":"Nicho","instagram":"@instagram","source":"manual","sdr_name":"Nome do SDR","funnel_source":"Fonte do funil","has_partner":false,"main_pain":"Dor principal","main_difficulty":"Dificuldade principal","product_offered":"Elite"},"sale":{"sold_at":"2026-03-31","contract_validity":"12 meses","sale_notes":"Observações da venda"},"closer_name":"Nome do Closer","transcription":"Transcrição completa da última call"}, null, 2),
   },
+  metrics: {
+    event_field: '',
+    field_mapping: {
+      name: 'mentorado.nome', email: 'mentorado.email', phone: 'mentorado.telefone',
+      faturamento_atual: 'faturamento_atual', faturamento_mes_anterior: 'faturamento_mes_anterior',
+      faturamento_antes_mentoria: 'faturamento_anterior.valor',
+      dias_acessou_sistema: 'dias_acessou_sistema', ultimo_acesso: 'ultimo_acesso',
+      dias_preencheu: 'dias_preencheu', total_leads: 'resumo_periodo.total_leads',
+      total_vendas: 'resumo_periodo.total_vendas', total_receita_periodo: 'resumo_periodo.total_receita',
+      total_entrada_periodo: 'resumo_periodo.total_entrada', taxa_conversao: 'resumo_periodo.conversao',
+      ticket_medio: 'resumo_periodo.ticket_medio', funis_ativos: 'funis_ativos',
+    },
+    event_actions: {},
+    auth_header: 'x-webhook-secret',
+    example_payload: JSON.stringify({"mentorado":{"id":"uuid-do-mentorado","nome":"João Silva","email":"joao@email.com","telefone":"(11) 99999-9999","cpf":"12345678900","criado_em":"2026-01-15T10:00:00Z"},"faturamento_atual":25000.00,"faturamento_mes_anterior":18000.00,"faturamento_anterior":{"valor":5000.00,"fonte":"avg_revenue_before_mentoring"},"dias_acessou_sistema":22,"ultimo_acesso":"2026-03-31T14:30:00Z","dias_preencheu":18,"funis_ativos":[{"id":"uuid-funil-1","nome":"Funil Levantada de Mão","slug":"traffic"},{"id":"uuid-funil-2","nome":"Funil de Indicação","slug":"referral"}],"resumo_periodo":{"total_leads":200,"total_vendas":15,"total_receita":25000.00,"total_entrada":5000.00,"conversao":7.5,"ticket_medio":1666.67}}, null, 2),
+  },
   custom: {
     event_field: '',
     field_mapping: {},
@@ -166,6 +182,19 @@ const GUIDED_FIELDS: Array<{ key: string; label: string; icon: string; recommend
   { key: 'closer_name', label: 'Nome do Closer', icon: '🤝' },
   { key: 'transcription', label: 'Transcrição da call', icon: '🎙️' },
   { key: 'has_partner', label: 'Tem sócio', icon: '👥' },
+  { key: 'faturamento_atual', label: 'Faturamento atual', icon: '💵' },
+  { key: 'faturamento_mes_anterior', label: 'Faturamento mês anterior', icon: '💵' },
+  { key: 'faturamento_antes_mentoria', label: 'Faturamento antes mentoria', icon: '💵' },
+  { key: 'dias_acessou_sistema', label: 'Dias acessou sistema', icon: '📊' },
+  { key: 'ultimo_acesso', label: 'Último acesso', icon: '🕐' },
+  { key: 'dias_preencheu', label: 'Dias preencheu dados', icon: '📊' },
+  { key: 'total_leads', label: 'Total leads', icon: '👥' },
+  { key: 'total_vendas', label: 'Total vendas', icon: '🛒' },
+  { key: 'total_receita_periodo', label: 'Receita do período', icon: '💰' },
+  { key: 'total_entrada_periodo', label: 'Entrada do período', icon: '💰' },
+  { key: 'taxa_conversao', label: 'Taxa de conversão', icon: '📈' },
+  { key: 'ticket_medio', label: 'Ticket médio', icon: '🎫' },
+  { key: 'funis_ativos', label: 'Funis ativos', icon: '🔄' },
 ]
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -174,6 +203,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   mentorfy: 'Mentorfy',
   activecampaign: 'ActiveCampaign',
   closer: 'Bethel Closer',
+  metrics: 'Bethel Metrics',
   custom: 'Custom',
 }
 

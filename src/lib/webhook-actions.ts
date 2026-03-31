@@ -23,7 +23,7 @@ interface EndpointConfig {
   slug?: string
 }
 
-const MENTEE_FIND_FIELDS = 'id, full_name, email, phone, product_name, status, transaction_id, amount, source, webhook_notes, instagram, funnel_origin, start_date, has_partner, niche, main_pain, main_difficulty, contract_validity, closer_name, transcription'
+const MENTEE_FIND_FIELDS = '*'
 
 /**
  * Busca mentorado por email → phone → transaction_id (deduplicação).
@@ -205,8 +205,26 @@ async function executeCreateMentee(
   }
 }
 
+// Campos que o Metrics controla — sempre sobrescreve
+const METRICS_OWNED_FIELDS = [
+  'faturamento_atual', 'faturamento_mes_anterior', 'faturamento_antes_mentoria',
+  'dias_acessou_sistema', 'ultimo_acesso', 'dias_preencheu',
+  'total_leads', 'total_vendas', 'total_receita_periodo', 'total_entrada_periodo',
+  'taxa_conversao', 'ticket_medio', 'funis_ativos', 'metrics_updated_at',
+]
+
+// Campos compartilhados — só preenche se vazio
+const SHARED_UPDATE_FIELDS = [
+  'full_name', 'email', 'phone', 'cpf', 'birth_date', 'instagram',
+  'city', 'state', 'product_name', 'seller_name', 'funnel_origin',
+  'has_partner', 'partner_name', 'amount', 'transaction_id', 'webhook_notes',
+  'niche', 'main_pain', 'main_difficulty', 'contract_validity', 'closer_name', 'transcription',
+]
+
 /**
- * update_mentee: busca por email/phone e atualiza campos mapeados.
+ * update_mentee: busca por email/phone e atualiza campos.
+ * - Campos do Metrics (faturamento, leads, etc.): sempre sobrescreve
+ * - Campos compartilhados (nome, email, etc.): só preenche se vazio
  */
 async function executeUpdateMentee(
   payload: unknown,
@@ -228,18 +246,28 @@ async function executeUpdateMentee(
     }
   }
 
-  // Mapear apenas campos válidos da tabela mentees
-  const allowedFields = [
-    'full_name', 'email', 'phone', 'cpf', 'birth_date', 'instagram',
-    'city', 'state', 'product_name', 'seller_name', 'funnel_origin',
-    'has_partner', 'partner_name', 'amount', 'transaction_id', 'webhook_notes',
-    'niche', 'main_pain', 'main_difficulty', 'contract_validity', 'closer_name', 'transcription',
-  ]
   const updateData: Record<string, unknown> = {}
+  const menteeRecord = mentee as Record<string, unknown>
+
   for (const [key, value] of Object.entries(fields)) {
-    if (allowedFields.includes(key) && value !== undefined) {
+    if (value === undefined || value === null) continue
+
+    if (METRICS_OWNED_FIELDS.includes(key)) {
+      // Metrics fields: always overwrite
       updateData[key] = value
+    } else if (SHARED_UPDATE_FIELDS.includes(key)) {
+      // Shared fields: only fill if currently empty
+      const current = menteeRecord[key]
+      if (current === null || current === undefined || current === '') {
+        updateData[key] = value
+      }
     }
+  }
+
+  // Always stamp metrics_updated_at when Metrics fields are present
+  const hasMetricsFields = Object.keys(updateData).some((k) => METRICS_OWNED_FIELDS.includes(k))
+  if (hasMetricsFields) {
+    updateData.metrics_updated_at = new Date().toISOString()
   }
 
   if (Object.keys(updateData).length === 0) {

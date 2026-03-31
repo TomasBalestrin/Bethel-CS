@@ -36,14 +36,17 @@ async function loadToken(key: string): Promise<{ value: string; expires_at: stri
 }
 
 async function doLogin(): Promise<string> {
+  console.log('[NextApps] doLogin → URL:', `${BASE_URL}/api/auth/login`, '| email:', EMAIL, '| pass:', PASSWORD.slice(0, 4) + '****')
   const res = await fetch(`${BASE_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
   })
 
+  console.log('[NextApps] doLogin response status:', res.status)
   if (!res.ok) {
     const text = await res.text()
+    console.error('[NextApps] doLogin FAILED:', res.status, text)
     throw new Error(`Next Apps login failed (${res.status}): ${text}`)
   }
 
@@ -103,12 +106,14 @@ async function doRefresh(refreshTokenValue: string): Promise<string> {
 async function getToken(): Promise<string> {
   // 1. Check in-memory cache (same lambda invocation)
   if (cachedAccessToken && Date.now() < cachedExpiresAt - 60000) {
+    console.log('[NextApps] getToken → using in-memory cache')
     return cachedAccessToken
   }
 
   // 2. Check database for valid access token
   const accessRow = await loadToken('nextapps_access')
   if (accessRow && accessRow.expires_at && new Date(accessRow.expires_at).getTime() > Date.now() + 60000) {
+    console.log('[NextApps] getToken → using DB access token (expires:', accessRow.expires_at, ')')
     cachedAccessToken = accessRow.value
     cachedExpiresAt = new Date(accessRow.expires_at).getTime()
     return accessRow.value
@@ -117,10 +122,12 @@ async function getToken(): Promise<string> {
   // 3. Try refresh token from database
   const refreshRow = await loadToken('nextapps_refresh')
   if (refreshRow && refreshRow.expires_at && new Date(refreshRow.expires_at).getTime() > Date.now()) {
+    console.log('[NextApps] getToken → refreshing token')
     return await doRefresh(refreshRow.value)
   }
 
   // 4. No valid tokens — full login
+  console.log('[NextApps] getToken → no valid tokens, doing full login')
   return await doLogin()
 }
 
@@ -133,9 +140,11 @@ async function authFetch(url: string, options: RequestInit = {}): Promise<Respon
   }
 
   let res = await fetch(url, { ...options, headers })
+  console.log('[NextApps] authFetch →', url, '| status:', res.status)
 
   // Retry once on 401 (token expired between check and use)
   if (res.status === 401) {
+    console.log('[NextApps] authFetch → 401 received, retrying with fresh token')
     cachedAccessToken = ''
     cachedExpiresAt = 0
     // Clear stale access token from DB

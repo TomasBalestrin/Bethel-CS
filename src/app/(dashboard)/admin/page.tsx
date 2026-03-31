@@ -23,10 +23,11 @@ export default async function AdminPage() {
     redirect('/')
   }
 
-  const [{ data: users }, { data: products }, { data: wppInstances }] = await Promise.all([
+  const [{ data: users }, { data: products }, { data: wppInstances }, { data: kanbanStages }] = await Promise.all([
     supabase.from('profiles').select('*').order('full_name'),
     supabase.from('products').select('*').order('name'),
     supabase.from('wpp_instances').select('*'),
+    supabase.from('kanban_stages').select('id, name, type').order('position'),
   ])
 
   return (
@@ -34,6 +35,7 @@ export default async function AdminPage() {
       users={users ?? []}
       products={products ?? []}
       wppInstances={wppInstances ?? []}
+      kanbanStages={kanbanStages ?? []}
       currentUserId={user.id}
     />
   )

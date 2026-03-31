@@ -1,13 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-} from '@/components/ui/sheet'
+// Sheet no longer used — panel is fullscreen overlay
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -144,6 +138,16 @@ export function MenteePanel({ mentee, open, onOpenChange, onMenteeDeleted, onMen
     if (!open) setEditing(false)
   }, [open])
 
+  // Close on Escape key
+  useEffect(() => {
+    if (!open) return
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !deleteOpen) onOpenChange(false)
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [open, deleteOpen, onOpenChange])
+
   async function handleDelete() {
     if (!mentee) return
     setDeleting(true)
@@ -164,67 +168,78 @@ export function MenteePanel({ mentee, open, onOpenChange, onMenteeDeleted, onMen
   const isAdmin = userRole === 'admin'
   const priorityLabel = `P${mentee.priority_level}`
 
+  if (!open) return null
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full max-w-full p-0 sm:min-w-[580px] sm:max-w-[680px] h-[100dvh] sm:h-full rounded-none">
-        <SheetHeader className="px-4 pt-3 pb-3 sm:px-6 sm:pt-6 sm:pb-4">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <SheetTitle className="font-heading font-semibold text-xl leading-tight truncate">
-                {mentee.full_name}
-              </SheetTitle>
-              <Badge
-                variant={
-                  ({ 1: 'muted', 2: 'warning', 3: 'info', 4: 'success', 5: 'accent' } as const)[
-                    mentee.priority_level
-                  ] ?? 'muted'
-                }
-              >
-                {priorityLabel}
-              </Badge>
-            </div>
-            {isAdmin && (
-              <div className="flex items-center gap-1.5 shrink-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setEditing((e) => !e)}
-                  className="text-xs h-7 px-2"
-                >
-                  <Pencil className="h-3 w-3 mr-1" />
-                  {editing ? 'Cancelar' : 'Editar'}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setDeleteOpen(true)}
-                  className="text-xs h-7 px-2 text-destructive border-destructive/30 hover:bg-destructive/5"
-                >
-                  <Trash2 className="h-3 w-3 mr-1" />
-                  Excluir
-                </Button>
-              </div>
-            )}
+    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-6 bg-card shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0 min-h-[44px]"
+          >
+            <ChevronRight className="h-4 w-4 rotate-180" />
+            <span className="hidden sm:inline">Voltar</span>
+          </button>
+          <Separator orientation="vertical" className="h-6" />
+          <div className="flex items-center gap-2.5 min-w-0">
+            <h1 className="font-heading font-semibold text-lg sm:text-xl leading-tight truncate">
+              {mentee.full_name}
+            </h1>
+            <Badge
+              variant={
+                ({ 1: 'muted', 2: 'warning', 3: 'info', 4: 'success', 5: 'accent' } as const)[
+                  mentee.priority_level
+                ] ?? 'muted'
+              }
+            >
+              {priorityLabel}
+            </Badge>
           </div>
-          <SheetDescription className="text-sm text-muted-foreground">
-            {mentee.product_name}
-          </SheetDescription>
-          <div className="flex items-center gap-3 pt-1 text-xs text-muted-foreground">
+          <span className="text-sm text-muted-foreground hidden md:inline">{mentee.product_name}</span>
+          <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground ml-2">
             <span className="inline-flex items-center gap-1">
               <Headphones size={12} />
-              {mentee.attendance_count} atendimentos
+              {mentee.attendance_count} atend.
             </span>
             <span className="inline-flex items-center gap-1">
               <Users size={12} />
-              {mentee.indication_count} indicações
+              {mentee.indication_count} indic.
             </span>
             <span className="inline-flex items-center gap-1">
               <DollarSign size={12} />
-              R$ {(mentee.revenue_total / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })} receita nova
+              R$ {(mentee.revenue_total / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </span>
           </div>
-        </SheetHeader>
-        <Separator />
+        </div>
+        {isAdmin && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setEditing((e) => !e)}
+              className="text-xs h-8 px-2.5"
+            >
+              <Pencil className="h-3 w-3 mr-1" />
+              {editing ? 'Cancelar' : 'Editar'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteOpen(true)}
+              className="text-xs h-8 px-2.5 text-destructive border-destructive/30 hover:bg-destructive/5"
+            >
+              <Trash2 className="h-3 w-3 mr-1" />
+              <span className="hidden sm:inline">Excluir</span>
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-hidden">
         <PanelTabs
           mentee={mentee}
           editing={editing}
@@ -233,9 +248,10 @@ export function MenteePanel({ mentee, open, onOpenChange, onMenteeDeleted, onMen
           isAdmin={isAdmin}
           onTransitionToMentorship={onTransitionToMentorship}
         />
+      </div>
 
-        {/* Delete confirmation dialog */}
-        <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Excluir mentorado</DialogTitle>
@@ -258,8 +274,7 @@ export function MenteePanel({ mentee, open, onOpenChange, onMenteeDeleted, onMen
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </SheetContent>
-    </Sheet>
+    </div>
   )
 }
 
@@ -288,7 +303,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
   }, [])
 
   return (
-    <Tabs defaultValue="info" className="flex flex-col h-[calc(100vh-180px)]">
+    <Tabs defaultValue="info" className="flex flex-col h-full">
       <div className="relative mx-4 mt-3 sm:mx-6">
         <div
           ref={tabsRef}
@@ -345,7 +360,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
           </button>
         )}
       </div>
-      <ScrollArea className="flex-1 px-4 py-4 sm:px-6">
+      <ScrollArea className="flex-1 px-4 py-4 sm:px-6 lg:px-8">
         <TabsContent value="info">
           <TabInfo
             mentee={mentee}
@@ -392,6 +407,23 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
       {children}
     </h3>
   )
+}
+
+// ─── Metric box for performance data ───
+function MetricBox({ label, value, highlight }: { label: string; value: string | number; highlight?: boolean }) {
+  return (
+    <div className={`rounded-md border border-border p-2 text-center ${highlight ? 'bg-accent/5 border-accent/20' : 'bg-card'}`}>
+      <p className="text-[10px] text-muted-foreground leading-tight">{label}</p>
+      <p className={`font-heading text-sm font-bold tabular leading-tight mt-0.5 ${highlight ? 'text-accent' : 'text-foreground'}`}>
+        {value}
+      </p>
+    </div>
+  )
+}
+
+// ─── Format BRL currency ───
+function formatBRL(v: number) {
+  return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
 }
 
 // ─── Tab 1: Info Geral ───
@@ -547,11 +579,11 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
     )
   }
 
-  // ─── View mode — 2 column grouped layout ───
+  // ─── View mode — 3 column layout for fullscreen ───
   return (
     <div className="animate-fade-in space-y-5">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
-        {/* Dados Pessoais */}
+      {/* Row 1: Dados Pessoais + Mentoria + Classificação */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-4">
         <div>
           <SectionTitle>Dados Pessoais</SectionTitle>
           <div className="divide-y divide-border/50">
@@ -583,7 +615,6 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
           </div>
         </div>
 
-        {/* Dados da Mentoria */}
         <div>
           <SectionTitle>Dados da Mentoria</SectionTitle>
           <div className="divide-y divide-border/50">
@@ -592,6 +623,8 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
             <InfoRow label="Término" value={mentee.end_date ? formatDateBR(mentee.end_date) : null} />
             <InfoRow label="Vendedor" value={mentee.seller_name} />
             <InfoRow label="Funil" value={mentee.funnel_origin} />
+            <InfoRow label="Contrato" value={mentee.contract_validity} />
+            <InfoRow label="Origem" value={mentee.source} />
             <InfoRow label="Status" value={
               mentee.status === 'ativo' ? 'Ativo' :
               mentee.status === 'cancelado' ? 'Cancelado' :
@@ -599,83 +632,105 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
             } />
           </div>
         </div>
-      </div>
 
-      {/* Closer / Venda — only if source starts with webhook or has closer fields */}
-      {(mentee.niche || mentee.main_pain || mentee.main_difficulty || mentee.contract_validity || mentee.closer_name || mentee.transcription) && (
-        <div className="border-t border-border/50 pt-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+        <div className="space-y-4">
+          <div>
+            <SectionTitle>Classificação</SectionTitle>
+            <div className="divide-y divide-border/50">
+              <div className="flex items-center justify-between py-2 text-sm">
+                <span className="text-xs text-muted-foreground">Prioridade</span>
+                <Badge variant={({ 1: 'muted', 2: 'warning', 3: 'info', 4: 'success', 5: 'accent' } as const)[mentee.priority_level] ?? 'muted'}>
+                  P{mentee.priority_level}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between py-2 text-sm">
+                <span className="text-xs text-muted-foreground">Cliente Fit</span>
+                <ClienteFitToggle menteeId={mentee.id} initialValue={mentee.cliente_fit} />
+              </div>
+              {mentee.has_partner && (
+                <>
+                  <InfoRow label="Sócio" value="Sim" />
+                  <InfoRow label="Nome do sócio" value={mentee.partner_name} />
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Closer data */}
+          {(mentee.niche || mentee.closer_name || mentee.main_pain) && (
             <div>
               <SectionTitle>Closer / Venda</SectionTitle>
               <div className="divide-y divide-border/50">
+                <InfoRow label="Closer" value={mentee.closer_name} />
                 <InfoRow label="Nicho" value={mentee.niche} />
                 <InfoRow label="Dor principal" value={mentee.main_pain} />
-                <InfoRow label="Dificuldade principal" value={mentee.main_difficulty} />
-                <InfoRow label="Closer" value={mentee.closer_name} />
+                <InfoRow label="Dificuldade" value={mentee.main_difficulty} />
               </div>
             </div>
+          )}
+
+          {/* Chat link */}
+          {mentee.chat_token && (
             <div>
-              <SectionTitle>Contrato</SectionTitle>
-              <div className="divide-y divide-border/50">
-                <InfoRow label="Validade" value={mentee.contract_validity} />
-                <InfoRow label="Origem" value={mentee.source} />
-              </div>
+              <SectionTitle>Link do Chat</SectionTitle>
+              <ChatLinkCopy chatToken={mentee.chat_token} />
             </div>
+          )}
+        </div>
+      </div>
+
+      {/* Transcription — full width */}
+      {mentee.transcription && (
+        <div className="border-t border-border/50 pt-4">
+          <SectionTitle>Transcrição da call</SectionTitle>
+          <div className="rounded-md bg-muted/50 p-3 text-xs text-foreground max-h-28 overflow-y-auto whitespace-pre-wrap">
+            {mentee.transcription}
           </div>
-          {mentee.transcription && (
-            <div className="mt-3">
-              <p className="text-xs text-muted-foreground mb-1">Transcrição da call</p>
-              <div className="rounded-md bg-muted/50 p-3 text-xs text-foreground max-h-32 overflow-y-auto whitespace-pre-wrap">
-                {mentee.transcription}
+        </div>
+      )}
+
+      {/* Performance — Bethel Metrics */}
+      {mentee.metrics_updated_at && (
+        <div className="border-t border-border/50 pt-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <SectionTitle>Performance (Bethel Metrics)</SectionTitle>
+            <span className="text-[10px] text-muted-foreground">
+              Atualizado {new Date(mentee.metrics_updated_at).toLocaleDateString('pt-BR')}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+            <MetricBox label="Fat. atual" value={mentee.faturamento_atual != null ? formatBRL(mentee.faturamento_atual) : '—'} highlight />
+            <MetricBox label="Mês anterior" value={mentee.faturamento_mes_anterior != null ? formatBRL(mentee.faturamento_mes_anterior) : '—'} />
+            <MetricBox label="Antes mentoria" value={mentee.faturamento_antes_mentoria != null ? formatBRL(mentee.faturamento_antes_mentoria) : '—'} />
+            <MetricBox label="Leads" value={mentee.total_leads ?? '—'} />
+            <MetricBox label="Vendas" value={mentee.total_vendas ?? '—'} />
+            <MetricBox label="Conversão" value={mentee.taxa_conversao != null ? `${mentee.taxa_conversao}%` : '—'} />
+            <MetricBox label="Ticket médio" value={mentee.ticket_medio != null ? formatBRL(mentee.ticket_medio) : '—'} />
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <MetricBox label="Receita período" value={mentee.total_receita_periodo != null ? formatBRL(mentee.total_receita_periodo) : '—'} />
+            <MetricBox label="Entrada período" value={mentee.total_entrada_periodo != null ? formatBRL(mentee.total_entrada_periodo) : '—'} />
+            <MetricBox label="Dias acessou" value={mentee.dias_acessou_sistema ?? '—'} />
+            <MetricBox label="Dias preencheu" value={mentee.dias_preencheu ?? '—'} />
+            <MetricBox label="Último acesso" value={mentee.ultimo_acesso ? new Date(mentee.ultimo_acesso).toLocaleDateString('pt-BR') : '—'} />
+          </div>
+
+          {mentee.funis_ativos && Array.isArray(mentee.funis_ativos) && (mentee.funis_ativos as Array<{nome: string}>).length > 0 && (
+            <div>
+              <p className="text-[10px] text-muted-foreground mb-1.5">Funis ativos</p>
+              <div className="flex flex-wrap gap-1.5">
+                {(mentee.funis_ativos as Array<{id?: string; nome: string; slug?: string}>).map((f, i) => (
+                  <Badge key={f.id ?? i} variant="muted" className="text-[10px]">{f.nome}</Badge>
+                ))}
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Sociedade — only if has_partner */}
-      {mentee.has_partner && (
-        <div className="border-t border-border/50 pt-4">
-          <SectionTitle>Sociedade</SectionTitle>
-          <div className="divide-y divide-border/50">
-            <InfoRow label="Entrou com sócio" value="Sim" />
-            <InfoRow label="Nome do sócio" value={mentee.partner_name} />
-          </div>
-        </div>
-      )}
-
-      {/* Classificação */}
-      <div className="border-t border-border/50 pt-4">
-        <SectionTitle>Classificação</SectionTitle>
-        <div className="divide-y divide-border/50">
-          <div className="flex items-center justify-between py-2 text-sm">
-            <span className="text-xs text-muted-foreground">Nível de prioridade</span>
-            <Badge
-              variant={
-                ({ 1: 'muted', 2: 'warning', 3: 'info', 4: 'success', 5: 'accent' } as const)[
-                  mentee.priority_level
-                ] ?? 'muted'
-              }
-            >
-              P{mentee.priority_level}
-            </Badge>
-          </div>
-          <div className="flex items-center justify-between py-2 text-sm">
-            <span className="text-xs text-muted-foreground">Cliente Fit</span>
-            <ClienteFitToggle menteeId={mentee.id} initialValue={mentee.cliente_fit} />
-          </div>
-        </div>
-      </div>
-
-      {/* Link do Chat */}
-      {mentee.chat_token && (
-        <div className="border-t border-border/50 pt-4">
-          <SectionTitle>Link do Chat</SectionTitle>
-          <ChatLinkCopy chatToken={mentee.chat_token} />
-        </div>
-      )}
-
-      {/* Transition to Mentorship button — admin only, initial kanban only */}
+      {/* Transition to Mentorship button */}
       {isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship && (
         <div className="border-t border-border/50 pt-4">
           <Button

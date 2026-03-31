@@ -21,7 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Shield, User, Plus, Pencil, Trash2, Package, MessageSquare, Wifi, WifiOff, Webhook } from 'lucide-react'
 import { WebhooksSection } from '@/components/admin-webhooks'

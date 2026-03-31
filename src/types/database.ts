@@ -113,6 +113,12 @@ export interface Database {
           amount: number | null
           source: string | null
           webhook_notes: string | null
+          niche: string | null
+          main_pain: string | null
+          main_difficulty: string | null
+          contract_validity: string | null
+          closer_name: string | null
+          transcription: string | null
         }
         Insert: {
           id?: string
@@ -148,6 +154,12 @@ export interface Database {
           amount?: number | null
           source?: string | null
           webhook_notes?: string | null
+          niche?: string | null
+          main_pain?: string | null
+          main_difficulty?: string | null
+          contract_validity?: string | null
+          closer_name?: string | null
+          transcription?: string | null
         }
         Update: {
           full_name?: string
@@ -179,6 +191,12 @@ export interface Database {
           amount?: number | null
           source?: string | null
           webhook_notes?: string | null
+          niche?: string | null
+          main_pain?: string | null
+          main_difficulty?: string | null
+          contract_validity?: string | null
+          closer_name?: string | null
+          transcription?: string | null
         }
         Relationships: []
       }

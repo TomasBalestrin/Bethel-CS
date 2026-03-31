@@ -23,7 +23,7 @@ interface EndpointConfig {
   slug?: string
 }
 
-const MENTEE_FIND_FIELDS = 'id, full_name, email, phone, product_name, status, transaction_id, amount, source, webhook_notes'
+const MENTEE_FIND_FIELDS = 'id, full_name, email, phone, product_name, status, transaction_id, amount, source, webhook_notes, instagram, funnel_origin, start_date, has_partner, niche, main_pain, main_difficulty, contract_validity, closer_name, transcription'
 
 /**
  * Busca mentorado por email → phone → transaction_id (deduplicação).
@@ -90,6 +90,16 @@ async function executeCreateMentee(
   const amount = fields.amount !== undefined ? Number(fields.amount) : undefined
   const transactionId = fields.transaction_id as string | undefined
   const notes = fields.notes as string | undefined
+  const instagram = fields.instagram as string | undefined
+  const funnelOrigin = fields.funnel_origin as string | undefined
+  const startDate = fields.start_date as string | undefined
+  const hasPartner = fields.has_partner as boolean | undefined
+  const niche = fields.niche as string | undefined
+  const mainPain = fields.main_pain as string | undefined
+  const mainDifficulty = fields.main_difficulty as string | undefined
+  const contractValidity = fields.contract_validity as string | undefined
+  const closerName = fields.closer_name as string | undefined
+  const transcription = fields.transcription as string | undefined
 
   // Criar com o que tiver — nome não é obrigatório, usa fallback
   const fullName = name || 'Sem nome (webhook)'
@@ -97,14 +107,23 @@ async function executeCreateMentee(
   // Deduplicação: email → phone → transaction_id
   const existing = await findMentee(supabase, email, phone, transactionId)
   if (existing) {
+    // Regra: só preenche campos vazios, nunca sobrescreve
     const updateData: Record<string, unknown> = {}
+    if (name && existing.full_name === 'Sem nome (webhook)') updateData.full_name = name
     if (email && !existing.email) updateData.email = email
     if (phone && !existing.phone) updateData.phone = phone
     if (product && !existing.product_name) updateData.product_name = product
     if (amount !== undefined && !existing.amount) updateData.amount = amount
     if (transactionId && !existing.transaction_id) updateData.transaction_id = transactionId
     if (notes && !existing.webhook_notes) updateData.webhook_notes = notes
-    if (name && existing.full_name === 'Sem nome (webhook)') updateData.full_name = name
+    if (instagram && !existing.instagram) updateData.instagram = instagram
+    if (funnelOrigin && !existing.funnel_origin) updateData.funnel_origin = funnelOrigin
+    if (niche && !existing.niche) updateData.niche = niche
+    if (mainPain && !existing.main_pain) updateData.main_pain = mainPain
+    if (mainDifficulty && !existing.main_difficulty) updateData.main_difficulty = mainDifficulty
+    if (contractValidity && !existing.contract_validity) updateData.contract_validity = contractValidity
+    if (closerName && !existing.closer_name) updateData.closer_name = closerName
+    if (transcription && !existing.transcription) updateData.transcription = transcription
 
     if (Object.keys(updateData).length > 0) {
       await supabase.from('mentees').update(updateData).eq('id', existing.id)
@@ -147,7 +166,7 @@ async function executeCreateMentee(
       email: email ?? null,
       phone: phone ?? '',
       product_name: product ?? 'Mentoria Elite Premium',
-      start_date: new Date().toISOString().split('T')[0],
+      start_date: startDate ?? new Date().toISOString().split('T')[0],
       current_stage_id: currentStageId,
       kanban_type: kanbanType,
       created_by: config.default_specialist_id ?? null,
@@ -156,6 +175,15 @@ async function executeCreateMentee(
       transaction_id: transactionId ?? null,
       webhook_notes: notes ?? null,
       source: config.slug ? `webhook:${config.slug}` : 'webhook',
+      instagram: instagram ?? null,
+      funnel_origin: funnelOrigin ?? null,
+      has_partner: hasPartner ?? false,
+      niche: niche ?? null,
+      main_pain: mainPain ?? null,
+      main_difficulty: mainDifficulty ?? null,
+      contract_validity: contractValidity ?? null,
+      closer_name: closerName ?? null,
+      transcription: transcription ?? null,
     })
     .select('id')
     .single()
@@ -205,6 +233,7 @@ async function executeUpdateMentee(
     'full_name', 'email', 'phone', 'cpf', 'birth_date', 'instagram',
     'city', 'state', 'product_name', 'seller_name', 'funnel_origin',
     'has_partner', 'partner_name', 'amount', 'transaction_id', 'webhook_notes',
+    'niche', 'main_pain', 'main_difficulty', 'contract_validity', 'closer_name', 'transcription',
   ]
   const updateData: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(fields)) {

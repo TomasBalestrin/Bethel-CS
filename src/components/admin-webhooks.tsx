@@ -133,7 +133,7 @@ const PLATFORM_TEMPLATES: Record<string, PlatformTemplate> = {
   },
   closer: {
     event_field: 'event',
-    field_mapping: { name: 'client.name', email: 'client.email', phone: 'client.phone', product_name: 'client.product_offered', notes: 'sale.sale_notes' },
+    field_mapping: { name: 'client.name', email: 'client.email', phone: 'client.phone', product_name: 'client.product_offered', notes: 'sale.sale_notes', instagram: 'client.instagram', funnel_origin: 'client.funnel_source', niche: 'client.niche', main_pain: 'client.main_pain', main_difficulty: 'client.main_difficulty', start_date: 'sale.sold_at', contract_validity: 'sale.contract_validity', closer_name: 'closer_name', transcription: 'transcription', has_partner: 'client.has_partner' },
     event_actions: { 'sale_closed': 'create_mentee' },
     auth_header: 'x-webhook-secret',
     example_payload: JSON.stringify({"event":"sale_closed","timestamp":"2026-03-31T12:00:00.000Z","client":{"id":"uuid","name":"Nome do Cliente","email":"email@exemplo.com","phone":"(11) 99999-9999","company":"Empresa","niche":"Nicho","instagram":"@instagram","source":"manual","sdr_name":"Nome do SDR","funnel_source":"Fonte do funil","has_partner":false,"main_pain":"Dor principal","main_difficulty":"Dificuldade principal","product_offered":"Elite"},"sale":{"sold_at":"2026-03-31","contract_validity":"12 meses","sale_notes":"Observações da venda"},"closer_name":"Nome do Closer","transcription":"Transcrição completa da última call"}, null, 2),
@@ -155,7 +155,17 @@ const GUIDED_FIELDS: Array<{ key: string; label: string; icon: string; recommend
   { key: 'product_name', label: 'Produto', icon: '📦' },
   { key: 'amount', label: 'Valor pago', icon: '💰' },
   { key: 'transaction_id', label: 'ID da transação', icon: '🔑' },
-  { key: 'notes', label: 'Notas', icon: '📝' },
+  { key: 'notes', label: 'Notas da venda', icon: '📝' },
+  { key: 'instagram', label: 'Instagram', icon: '📸' },
+  { key: 'funnel_origin', label: 'Funil de origem', icon: '🔄' },
+  { key: 'niche', label: 'Nicho', icon: '🏷️' },
+  { key: 'main_pain', label: 'Dor principal', icon: '🎯' },
+  { key: 'main_difficulty', label: 'Dificuldade principal', icon: '⚠️' },
+  { key: 'start_date', label: 'Data da venda', icon: '📅' },
+  { key: 'contract_validity', label: 'Validade do contrato', icon: '📄' },
+  { key: 'closer_name', label: 'Nome do Closer', icon: '🤝' },
+  { key: 'transcription', label: 'Transcrição da call', icon: '🎙️' },
+  { key: 'has_partner', label: 'Tem sócio', icon: '👥' },
 ]
 
 const PLATFORM_LABELS: Record<string, string> = {

@@ -132,11 +132,11 @@ const PLATFORM_TEMPLATES: Record<string, PlatformTemplate> = {
     example_payload: JSON.stringify({"type":"contact_tag_added","contact":{"id":123,"first_name":"Pedro","last_name":"Lima","email":"pedro@example.com","phone":"5541966666666"},"tag":"elite-premium"}, null, 2),
   },
   closer: {
-    event_field: 'action',
-    field_mapping: { name: 'lead.name', email: 'lead.email', phone: 'lead.phone', notes: 'lead.qualification_notes' },
-    event_actions: { 'lead.qualified': 'create_mentee', 'lead.updated': 'update_mentee' },
+    event_field: 'event',
+    field_mapping: { name: 'client.name', email: 'client.email', phone: 'client.phone', product_name: 'client.product_offered', notes: 'sale.sale_notes' },
+    event_actions: { 'sale_closed': 'create_mentee' },
     auth_header: 'x-webhook-secret',
-    example_payload: JSON.stringify({"action":"lead.qualified","lead":{"name":"Fernanda Oliveira","email":"fernanda@example.com","phone":"5511955555555","qualification_notes":"Alta intenção de compra, faturamento 50k/mês"},"closer":{"name":"Tomás Balestrin"}}, null, 2),
+    example_payload: JSON.stringify({"event":"sale_closed","timestamp":"2026-03-31T12:00:00.000Z","client":{"id":"uuid","name":"Nome do Cliente","email":"email@exemplo.com","phone":"(11) 99999-9999","company":"Empresa","niche":"Nicho","instagram":"@instagram","source":"manual","sdr_name":"Nome do SDR","funnel_source":"Fonte do funil","has_partner":false,"main_pain":"Dor principal","main_difficulty":"Dificuldade principal","product_offered":"Elite"},"sale":{"sold_at":"2026-03-31","contract_validity":"12 meses","sale_notes":"Observações da venda"},"closer_name":"Nome do Closer","transcription":"Transcrição completa da última call"}, null, 2),
   },
   custom: {
     event_field: '',

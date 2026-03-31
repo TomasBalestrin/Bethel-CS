@@ -573,7 +573,7 @@ function EndpointFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[100dvh] sm:max-h-[85vh] overflow-y-auto w-full h-full sm:h-auto sm:w-auto rounded-none sm:rounded-lg">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Editar Endpoint' : 'Novo Endpoint'}</DialogTitle>
           <DialogDescription>
@@ -585,7 +585,7 @@ function EndpointFormDialog({
           {/* Section 1: Identification */}
           <fieldset className="space-y-3">
             <legend className="text-sm font-semibold text-foreground">Identificação</legend>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label htmlFor="ep-name">Nome *</Label>
                 <Input id="ep-name" value={name} onChange={(e) => handleNameChange(e.target.value)} required />
@@ -595,7 +595,7 @@ function EndpointFormDialog({
                 <Input id="ep-slug" value={slug} onChange={(e) => setSlug(e.target.value)} required pattern="[a-z0-9\-]+" title="Apenas letras minúsculas, números e hífens" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Plataforma</Label>
                 <Select value={platform} onValueChange={handlePlatformChange}>
@@ -628,7 +628,7 @@ function EndpointFormDialog({
           {/* Section 2: Security */}
           <fieldset className="space-y-3">
             <legend className="text-sm font-semibold text-foreground">Segurança</legend>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Autenticação</Label>
                 <Select value={authType} onValueChange={setAuthType}>
@@ -674,21 +674,21 @@ function EndpointFormDialog({
             <legend className="text-sm font-semibold text-foreground">Mapeamento de Campos</legend>
             <div className="space-y-2">
               {fieldMapping.map((fm, i) => (
-                <div key={i} className="flex items-center gap-2">
+                <div key={i} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2 p-2 sm:p-0 rounded-md sm:rounded-none border sm:border-0 border-border">
                   <Input
                     value={fm.key}
                     onChange={(e) => updateFieldMapping(i, 'key', e.target.value)}
                     placeholder="Campo CS (ex: name)"
                     className="text-xs"
                   />
-                  <span className="text-muted-foreground text-xs shrink-0">&larr;</span>
+                  <span className="text-muted-foreground text-xs shrink-0 hidden sm:block">&larr;</span>
                   <Input
                     value={fm.value}
                     onChange={(e) => updateFieldMapping(i, 'value', e.target.value)}
                     placeholder="Campo payload (ex: data.buyer.name)"
                     className="text-xs"
                   />
-                  <button type="button" onClick={() => removeFieldMapping(i)} className="text-muted-foreground hover:text-destructive shrink-0">
+                  <button type="button" onClick={() => removeFieldMapping(i)} className="text-muted-foreground hover:text-destructive shrink-0 self-end sm:self-auto">
                     <X className="h-4 w-4" />
                   </button>
                 </div>
@@ -712,14 +712,14 @@ function EndpointFormDialog({
             <div className="space-y-2 pt-2">
               <Label>Mapeamento de eventos</Label>
               {eventActions.map((ea, i) => (
-                <div key={i} className="flex items-center gap-2">
+                <div key={i} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2 p-2 sm:p-0 rounded-md sm:rounded-none border sm:border-0 border-border">
                   <Input
                     value={ea.event}
                     onChange={(e) => updateEventAction(i, 'event', e.target.value)}
                     placeholder="Evento (ex: PURCHASE_APPROVED)"
                     className="text-xs"
                   />
-                  <span className="text-muted-foreground text-xs shrink-0">&rarr;</span>
+                  <span className="text-muted-foreground text-xs shrink-0 hidden sm:block">&rarr;</span>
                   <Select value={ea.action} onValueChange={(v) => updateEventAction(i, 'action', v)}>
                     <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -728,7 +728,7 @@ function EndpointFormDialog({
                       ))}
                     </SelectContent>
                   </Select>
-                  <button type="button" onClick={() => removeEventAction(i)} className="text-muted-foreground hover:text-destructive shrink-0">
+                  <button type="button" onClick={() => removeEventAction(i)} className="text-muted-foreground hover:text-destructive shrink-0 self-end sm:self-auto">
                     <X className="h-4 w-4" />
                   </button>
                 </div>
@@ -742,7 +742,7 @@ function EndpointFormDialog({
           {/* Section 4: Action Config */}
           <fieldset className="space-y-3">
             <legend className="text-sm font-semibold text-foreground">Configurações de Ação</legend>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label>Etapa padrão do kanban</Label>
                 <Select value={kanbanStage || '_none'} onValueChange={(v) => setKanbanStage(v === '_none' ? '' : v)}>
@@ -905,7 +905,7 @@ function LogsDialog({
 
   return (
     <Dialog open={!!endpoint} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[100dvh] sm:max-h-[85vh] overflow-y-auto w-full h-full sm:h-auto sm:w-auto rounded-none sm:rounded-lg">
         <DialogHeader>
           <DialogTitle>Logs — {endpoint?.name}</DialogTitle>
           <DialogDescription>{total} registros</DialogDescription>

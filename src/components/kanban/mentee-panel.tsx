@@ -400,15 +400,6 @@ function InfoRow({ label, value, render }: { label: string; value?: string | nul
   )
 }
 
-// ─── Section header ───
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h3 className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-      {children}
-    </h3>
-  )
-}
-
 // ─── Metric box for performance data ───
 function MetricBox({ label, value, highlight }: { label: string; value: string | number; highlight?: boolean }) {
   return (

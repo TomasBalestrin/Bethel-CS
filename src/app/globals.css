@@ -48,6 +48,14 @@
   :focus-visible {
     @apply outline-none ring-2 ring-accent ring-offset-2;
   }
+
+  /* Safe area padding for iPhones with home bar */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
 }
 
 @layer components {

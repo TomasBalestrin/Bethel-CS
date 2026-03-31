@@ -61,12 +61,14 @@ export function AdminUserList({ users, products, wppInstances, kanbanStages, cur
       </p>
 
       <Tabs defaultValue="users" className="mt-6">
-        <TabsList>
-          <TabsTrigger value="users"><User className="h-4 w-4 mr-1.5" />Usuários</TabsTrigger>
-          <TabsTrigger value="products"><Package className="h-4 w-4 mr-1.5" />Produtos</TabsTrigger>
-          <TabsTrigger value="whatsapp"><MessageSquare className="h-4 w-4 mr-1.5" />WhatsApp</TabsTrigger>
-          <TabsTrigger value="webhooks"><Webhook className="h-4 w-4 mr-1.5" />Webhooks</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto scrollbar-none">
+          <TabsList className="min-w-max">
+            <TabsTrigger value="users"><User className="h-4 w-4 mr-1.5" />Usuários</TabsTrigger>
+            <TabsTrigger value="products"><Package className="h-4 w-4 mr-1.5" />Produtos</TabsTrigger>
+            <TabsTrigger value="whatsapp"><MessageSquare className="h-4 w-4 mr-1.5" />WhatsApp</TabsTrigger>
+            <TabsTrigger value="webhooks"><Webhook className="h-4 w-4 mr-1.5" />Webhooks</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="users">
           <UsersSection users={users} currentUserId={currentUserId} />

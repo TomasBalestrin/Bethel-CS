@@ -98,7 +98,7 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
     <div className="space-y-8">
       {/* Header */}
       <div>
-        <h1 className="font-heading text-2xl font-bold text-foreground">
+        <h1 className="font-heading text-xl sm:text-2xl font-bold text-foreground">
           Bem-vindo, {props.userName}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">Painel do Customer Success</p>
@@ -240,14 +240,14 @@ function MetricCard({
   note?: string
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-4 shadow-card animate-slide-up">
-      <div className="flex items-center gap-3">
-        <div className={`rounded-md p-2 ${bg}`}>
-          <Icon className={`h-5 w-5 ${color}`} />
+    <div className="rounded-lg border border-border bg-card p-3 sm:p-4 shadow-card animate-slide-up">
+      <div className="flex items-center gap-2 sm:gap-3">
+        <div className={`rounded-md p-1.5 sm:p-2 ${bg}`}>
+          <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${color}`} />
         </div>
         <div className="min-w-0">
-          <p className="label-xs">{label}</p>
-          <p className="font-heading text-lg font-bold text-foreground tabular leading-tight">{value}</p>
+          <p className="label-xs text-[10px] sm:text-xs">{label}</p>
+          <p className="font-heading text-base sm:text-lg font-bold text-foreground tabular leading-tight">{value}</p>
           {note && <p className="mt-0.5 text-[10px] text-muted-foreground">{note}</p>}
         </div>
       </div>

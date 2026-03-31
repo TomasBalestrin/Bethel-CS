@@ -394,6 +394,23 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   )
 }
 
+// ─── Metric box for performance data ───
+function MetricBox({ label, value, highlight }: { label: string; value: string | number; highlight?: boolean }) {
+  return (
+    <div className={`rounded-md border border-border p-2 text-center ${highlight ? 'bg-accent/5 border-accent/20' : 'bg-card'}`}>
+      <p className="text-[10px] text-muted-foreground leading-tight">{label}</p>
+      <p className={`font-heading text-sm font-bold tabular leading-tight mt-0.5 ${highlight ? 'text-accent' : 'text-foreground'}`}>
+        {value}
+      </p>
+    </div>
+  )
+}
+
+// ─── Format BRL currency ───
+function formatBRL(v: number) {
+  return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+}
+
 // ─── Tab 1: Info Geral ───
 function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTransitionToMentorship }: {
   mentee: MenteeWithStats
@@ -672,6 +689,71 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
         <div className="border-t border-border/50 pt-4">
           <SectionTitle>Link do Chat</SectionTitle>
           <ChatLinkCopy chatToken={mentee.chat_token} />
+        </div>
+      )}
+
+      {/* Performance — Bethel Metrics */}
+      {mentee.metrics_updated_at && (
+        <div className="border-t border-border/50 pt-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <SectionTitle>Performance (Bethel Metrics)</SectionTitle>
+            <span className="text-[10px] text-muted-foreground">
+              Atualizado {new Date(mentee.metrics_updated_at).toLocaleDateString('pt-BR')}
+            </span>
+          </div>
+
+          {/* Faturamento cards */}
+          <div className="grid grid-cols-3 gap-2">
+            <MetricBox
+              label="Faturamento atual"
+              value={mentee.faturamento_atual != null ? formatBRL(mentee.faturamento_atual) : '—'}
+              highlight
+            />
+            <MetricBox
+              label="Mês anterior"
+              value={mentee.faturamento_mes_anterior != null ? formatBRL(mentee.faturamento_mes_anterior) : '—'}
+            />
+            <MetricBox
+              label="Antes da mentoria"
+              value={mentee.faturamento_antes_mentoria != null ? formatBRL(mentee.faturamento_antes_mentoria) : '—'}
+            />
+          </div>
+
+          {/* Vendas e conversão */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <MetricBox label="Leads" value={mentee.total_leads ?? '—'} />
+            <MetricBox label="Vendas" value={mentee.total_vendas ?? '—'} />
+            <MetricBox label="Conversão" value={mentee.taxa_conversao != null ? `${mentee.taxa_conversao}%` : '—'} />
+            <MetricBox label="Ticket médio" value={mentee.ticket_medio != null ? formatBRL(mentee.ticket_medio) : '—'} />
+          </div>
+
+          {/* Receita e entrada do período */}
+          <div className="grid grid-cols-2 gap-2">
+            <MetricBox label="Receita do período" value={mentee.total_receita_periodo != null ? formatBRL(mentee.total_receita_periodo) : '—'} />
+            <MetricBox label="Entrada do período" value={mentee.total_entrada_periodo != null ? formatBRL(mentee.total_entrada_periodo) : '—'} />
+          </div>
+
+          {/* Engajamento no sistema */}
+          <div className="grid grid-cols-3 gap-2">
+            <MetricBox label="Dias acessou" value={mentee.dias_acessou_sistema ?? '—'} />
+            <MetricBox label="Dias preencheu" value={mentee.dias_preencheu ?? '—'} />
+            <MetricBox
+              label="Último acesso"
+              value={mentee.ultimo_acesso ? new Date(mentee.ultimo_acesso).toLocaleDateString('pt-BR') : '—'}
+            />
+          </div>
+
+          {/* Funis ativos */}
+          {mentee.funis_ativos && Array.isArray(mentee.funis_ativos) && (mentee.funis_ativos as Array<{nome: string}>).length > 0 && (
+            <div>
+              <p className="text-[10px] text-muted-foreground mb-1.5">Funis ativos</p>
+              <div className="flex flex-wrap gap-1.5">
+                {(mentee.funis_ativos as Array<{id?: string; nome: string; slug?: string}>).map((f, i) => (
+                  <Badge key={f.id ?? i} variant="muted" className="text-[10px]">{f.nome}</Badge>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

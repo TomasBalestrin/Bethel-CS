@@ -23,7 +23,6 @@ import {
   AtSign,
   Pencil,
   Trash2,
-  FileDown,
   Headphones,
   Users,
   DollarSign,
@@ -32,6 +31,17 @@ import {
   MessageSquare,
   Copy,
   Check,
+  Phone,
+  Mail,
+  MapPin,
+  Calendar,
+  Shield,
+  Package,
+  Clock,
+  TrendingUp,
+  Target,
+  Briefcase,
+  Mic,
 } from 'lucide-react'
 import { formatDateBR } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
@@ -390,12 +400,34 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
   )
 }
 
-// ─── Info field row ───
-function InfoRow({ label, value, render }: { label: string; value?: string | null; render?: React.ReactNode }) {
+// ─── Contact row with colored icon ───
+function ContactRow({ icon: Icon, label, value, href, color, bg }: {
+  icon: React.ElementType; label: string; value: string; href?: string; color: string; bg: string
+}) {
   return (
-    <div className="flex items-center justify-between py-2 text-sm">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      {render ?? <span className={value ? 'text-foreground' : 'text-muted-foreground'}>{value || '—'}</span>}
+    <div className="flex items-center gap-3 py-1.5">
+      <div className={`rounded-md p-1.5 ${bg}`}>
+        <Icon className={`h-3.5 w-3.5 ${color}`} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] text-muted-foreground leading-none">{label}</p>
+        {href ? (
+          <a href={href} target="_blank" rel="noopener noreferrer" className="text-sm text-accent hover:underline truncate block">{value}</a>
+        ) : (
+          <p className="text-sm text-foreground truncate">{value}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Mini row with icon for mentoria/closer sections ───
+function MiniRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-2 py-1">
+      <Icon className="h-3 w-3 text-muted-foreground shrink-0" />
+      <span className="text-xs text-muted-foreground shrink-0">{label}</span>
+      <span className="text-xs text-foreground ml-auto text-right truncate">{value}</span>
     </div>
   )
 }
@@ -570,126 +602,122 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
     )
   }
 
-  // ─── View mode — redesigned fullscreen layout ───
+  // ─── View mode — premium fullscreen layout v2 ───
 
   const statusLabel = mentee.status === 'ativo' ? 'Ativo' : mentee.status === 'cancelado' ? 'Cancelado' : mentee.status === 'concluido' ? 'Concluído' : mentee.status
-  const statusColor = mentee.status === 'ativo' ? 'bg-success/10 text-success' : mentee.status === 'cancelado' ? 'bg-destructive/10 text-destructive' : 'bg-info/10 text-info'
-
-  // Collect contact items that have data
-  const contactItems: Array<{icon: React.ElementType; label: string; value: string; href?: string}> = []
-  if (mentee.phone) contactItems.push({ icon: MessageSquare, label: 'Telefone', value: mentee.phone })
-  if (mentee.email) contactItems.push({ icon: AtSign, label: 'Email', value: mentee.email })
-  if (instHandle) contactItems.push({ icon: Link2, label: 'Instagram', value: `@${instHandle}`, href: `https://instagram.com/${instHandle}` })
-  if (mentee.city || mentee.state) contactItems.push({ icon: Users, label: 'Local', value: [mentee.city, mentee.state].filter(Boolean).join(', ') })
-  if (mentee.cpf) contactItems.push({ icon: FileDown, label: 'CPF', value: mentee.cpf })
-  if (mentee.birth_date) contactItems.push({ icon: FileDown, label: 'Nascimento', value: formatDateBR(mentee.birth_date) })
+  const statusColor = mentee.status === 'ativo' ? 'bg-success/10 text-success border-success/20' : mentee.status === 'cancelado' ? 'bg-destructive/10 text-destructive border-destructive/20' : 'bg-info/10 text-info border-info/20'
 
   const hasCloserData = mentee.niche || mentee.closer_name || mentee.main_pain || mentee.main_difficulty
   const hasMetrics = mentee.metrics_updated_at
+  const hasMentoriaDetails = mentee.end_date || mentee.seller_name || mentee.funnel_origin || mentee.source || mentee.has_partner
 
   return (
-    <div className="animate-fade-in space-y-6">
-      {/* ── Row 1: Summary cards ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3">
-        <div className="rounded-lg border border-border bg-card p-3 shadow-card">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Status</p>
-          <span className={`inline-block mt-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusColor}`}>{statusLabel}</span>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-3 shadow-card">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Prioridade</p>
-          <div className="mt-1">
-            <Badge variant={({ 1: 'muted', 2: 'warning', 3: 'info', 4: 'success', 5: 'accent' } as const)[mentee.priority_level] ?? 'muted'}>
-              P{mentee.priority_level}
-            </Badge>
-          </div>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-3 shadow-card">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Cliente Fit</p>
-          <div className="mt-1"><ClienteFitToggle menteeId={mentee.id} initialValue={mentee.cliente_fit} /></div>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-3 shadow-card">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Produto</p>
-          <p className="mt-1 text-sm font-medium text-foreground truncate">{mentee.product_name}</p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-3 shadow-card">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Início</p>
-          <p className="mt-1 text-sm font-medium text-foreground">{mentee.start_date ? formatDateBR(mentee.start_date) : '—'}</p>
-        </div>
+    <div className="animate-fade-in space-y-5">
+      {/* ── Summary strip — compact badges ── */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${statusColor}`}>
+          <span className={`h-1.5 w-1.5 rounded-full ${mentee.status === 'ativo' ? 'bg-success' : mentee.status === 'cancelado' ? 'bg-destructive' : 'bg-info'}`} />
+          {statusLabel}
+        </span>
+        <Badge variant={({ 1: 'muted', 2: 'warning', 3: 'info', 4: 'success', 5: 'accent' } as const)[mentee.priority_level] ?? 'muted'}>
+          P{mentee.priority_level}
+        </Badge>
+        <div className="flex items-center"><ClienteFitToggle menteeId={mentee.id} initialValue={mentee.cliente_fit} /></div>
+        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground">
+          <Package className="h-3 w-3" /> {mentee.product_name}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground">
+          <Calendar className="h-3 w-3" /> {mentee.start_date ? formatDateBR(mentee.start_date) : '—'}
+        </span>
         {mentee.contract_validity && (
-          <div className="rounded-lg border border-border bg-card p-3 shadow-card">
-            <p className="text-[10px] text-muted-foreground uppercase tracking-wide">Contrato</p>
-            <p className="mt-1 text-sm font-medium text-foreground">{mentee.contract_validity}</p>
-          </div>
+          <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground">
+            <Clock className="h-3 w-3" /> {mentee.contract_validity}
+          </span>
+        )}
+        {mentee.source && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground">
+            <Target className="h-3 w-3" /> {mentee.source}
+          </span>
         )}
       </div>
 
-      {/* ── Row 2: Contact + Mentoria details + Closer ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* ── Main grid — adapts to available data ── */}
+      <div className={`grid gap-4 ${hasCloserData ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 md:grid-cols-2'}`}>
+
         {/* Contact card */}
         <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-          <div className="px-4 py-2.5 bg-muted/50 border-b border-border">
-            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Contato</h3>
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
+            <Phone className="h-3.5 w-3.5 text-accent" />
+            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Contato & Dados</h3>
           </div>
-          <div className="p-4 space-y-3">
-            {contactItems.map((item, i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className="rounded-md bg-accent/10 p-1.5">
-                  <item.icon className="h-3.5 w-3.5 text-accent" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[10px] text-muted-foreground">{item.label}</p>
-                  {item.href ? (
-                    <a href={item.href} target="_blank" rel="noopener noreferrer" className="text-sm text-accent hover:underline truncate block">{item.value}</a>
-                  ) : (
-                    <p className="text-sm text-foreground truncate">{item.value}</p>
-                  )}
-                </div>
-              </div>
-            ))}
-            {contactItems.length === 0 && <p className="text-xs text-muted-foreground">Nenhum contato cadastrado</p>}
+          <div className="p-4 space-y-0.5">
+            {mentee.phone && <ContactRow icon={Phone} label="Telefone" value={mentee.phone} color="text-accent" bg="bg-accent/10" />}
+            {mentee.email && <ContactRow icon={Mail} label="Email" value={mentee.email} color="text-info" bg="bg-info/10" />}
+            {instHandle && <ContactRow icon={AtSign} label="Instagram" value={`@${instHandle}`} href={`https://instagram.com/${instHandle}`} color="text-pink-500" bg="bg-pink-500/10" />}
+            {(mentee.city || mentee.state) && <ContactRow icon={MapPin} label="Local" value={[mentee.city, mentee.state].filter(Boolean).join(', ')} color="text-warning" bg="bg-warning/10" />}
+            {mentee.cpf && <ContactRow icon={Shield} label="CPF" value={mentee.cpf} color="text-muted-foreground" bg="bg-muted" />}
+            {mentee.birth_date && <ContactRow icon={Calendar} label="Nascimento" value={formatDateBR(mentee.birth_date)} color="text-muted-foreground" bg="bg-muted" />}
           </div>
         </div>
 
-        {/* Mentorship details card */}
+        {/* Mentoria + actions card */}
         <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-          <div className="px-4 py-2.5 bg-muted/50 border-b border-border">
-            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Mentoria</h3>
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-gradient-to-r from-success/5 to-transparent">
+            <Briefcase className="h-3.5 w-3.5 text-success" />
+            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Mentoria & Ações</h3>
           </div>
-          <div className="p-4 space-y-2">
-            {mentee.end_date && <InfoRow label="Término" value={formatDateBR(mentee.end_date)} />}
-            {mentee.seller_name && <InfoRow label="Vendedor" value={mentee.seller_name} />}
-            {mentee.funnel_origin && <InfoRow label="Funil" value={mentee.funnel_origin} />}
-            {mentee.source && <InfoRow label="Origem" value={mentee.source} />}
-            {mentee.has_partner && (
-              <>
-                <InfoRow label="Sócio" value="Sim" />
-                {mentee.partner_name && <InfoRow label="Nome do sócio" value={mentee.partner_name} />}
-              </>
+          <div className="p-4 space-y-3">
+            {hasMentoriaDetails && (
+              <div className="space-y-1">
+                {mentee.end_date && <MiniRow icon={Calendar} label="Término" value={formatDateBR(mentee.end_date)} />}
+                {mentee.seller_name && <MiniRow icon={Users} label="Vendedor" value={mentee.seller_name} />}
+                {mentee.funnel_origin && <MiniRow icon={Target} label="Funil" value={mentee.funnel_origin} />}
+                {mentee.has_partner && <MiniRow icon={Users} label="Sócio" value={mentee.partner_name || 'Sim'} />}
+              </div>
             )}
             {mentee.chat_token && (
-              <div className="pt-2 border-t border-border/50">
-                <p className="text-[10px] text-muted-foreground mb-1">Link do chat</p>
+              <div className={hasMentoriaDetails ? 'pt-2 border-t border-border/50' : ''}>
+                <p className="text-[10px] text-muted-foreground mb-1.5">Link do chat para o mentorado</p>
                 <ChatLinkCopy chatToken={mentee.chat_token} />
               </div>
             )}
+            {!hasMentoriaDetails && !mentee.chat_token && (
+              <div className="py-3 text-center">
+                <Briefcase className="h-8 w-8 text-muted-foreground/20 mx-auto mb-2" />
+                <p className="text-xs text-muted-foreground">Dados adicionais aparecerão aqui</p>
+              </div>
+            )}
+            {isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship && (
+              <div className="pt-2 border-t border-border/50">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onTransitionToMentorship(mentee)}
+                  className="w-full text-xs border-accent/30 text-accent hover:bg-accent/5"
+                >
+                  Enviar para Etapas Mentoria <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Closer card — only if data exists */}
+        {/* Closer card */}
         {hasCloserData && (
           <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-            <div className="px-4 py-2.5 bg-warning/5 border-b border-border">
+            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-gradient-to-r from-warning/5 to-transparent">
+              <Mic className="h-3.5 w-3.5 text-warning" />
               <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Closer / Venda</h3>
             </div>
-            <div className="p-4 space-y-2">
-              {mentee.closer_name && <InfoRow label="Closer" value={mentee.closer_name} />}
-              {mentee.niche && <InfoRow label="Nicho" value={mentee.niche} />}
-              {mentee.main_pain && <InfoRow label="Dor principal" value={mentee.main_pain} />}
-              {mentee.main_difficulty && <InfoRow label="Dificuldade" value={mentee.main_difficulty} />}
+            <div className="p-4 space-y-1">
+              {mentee.closer_name && <MiniRow icon={Users} label="Closer" value={mentee.closer_name} />}
+              {mentee.niche && <MiniRow icon={Target} label="Nicho" value={mentee.niche} />}
+              {mentee.main_pain && <MiniRow icon={TrendingUp} label="Dor principal" value={mentee.main_pain} />}
+              {mentee.main_difficulty && <MiniRow icon={Shield} label="Dificuldade" value={mentee.main_difficulty} />}
               {mentee.transcription && (
-                <div className="pt-2 border-t border-border/50">
-                  <p className="text-[10px] text-muted-foreground mb-1">Transcrição</p>
-                  <div className="rounded bg-muted/50 p-2 text-xs text-foreground max-h-24 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                <div className="pt-2 mt-1 border-t border-border/50">
+                  <p className="text-[10px] text-muted-foreground mb-1">Transcrição da call</p>
+                  <div className="rounded bg-muted/50 p-2.5 text-xs text-foreground max-h-24 overflow-y-auto whitespace-pre-wrap leading-relaxed">
                     {mentee.transcription}
                   </div>
                 </div>
@@ -699,11 +727,14 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
         )}
       </div>
 
-      {/* ── Row 3: Performance (Bethel Metrics) ── */}
+      {/* ── Performance (Bethel Metrics) ── */}
       {hasMetrics && (
         <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-          <div className="px-4 py-2.5 bg-accent/5 border-b border-border flex items-center justify-between">
-            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Performance</h3>
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-3.5 w-3.5 text-accent" />
+              <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Performance</h3>
+            </div>
             <span className="text-[10px] text-muted-foreground">
               Atualizado {new Date(mentee.metrics_updated_at!).toLocaleDateString('pt-BR')}
             </span>
@@ -718,7 +749,6 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
               <MetricBox label="Conversão" value={mentee.taxa_conversao != null ? `${mentee.taxa_conversao}%` : '—'} />
               <MetricBox label="Ticket médio" value={mentee.ticket_medio != null ? formatBRL(mentee.ticket_medio) : '—'} />
             </div>
-
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
               <MetricBox label="Receita período" value={mentee.total_receita_periodo != null ? formatBRL(mentee.total_receita_periodo) : '—'} />
               <MetricBox label="Entrada período" value={mentee.total_entrada_periodo != null ? formatBRL(mentee.total_entrada_periodo) : '—'} />
@@ -726,7 +756,6 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
               <MetricBox label="Dias preencheu" value={mentee.dias_preencheu ?? '—'} />
               <MetricBox label="Último acesso" value={mentee.ultimo_acesso ? new Date(mentee.ultimo_acesso).toLocaleDateString('pt-BR') : '—'} />
             </div>
-
             {mentee.funis_ativos && Array.isArray(mentee.funis_ativos) && (mentee.funis_ativos as Array<{nome: string}>).length > 0 && (
               <div>
                 <p className="text-[10px] text-muted-foreground mb-1.5">Funis ativos</p>
@@ -741,16 +770,15 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
         </div>
       )}
 
-      {/* Transition to Mentorship button */}
-      {isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship && (
-        <Button
-          variant="outline"
-          onClick={() => onTransitionToMentorship(mentee)}
-          className="w-full text-sm border-accent/30 text-accent hover:bg-accent/5"
-        >
-          Enviar para Etapas Mentoria
-          <ArrowRight className="ml-2 h-4 w-4" />
-        </Button>
+      {/* Empty state when very few data */}
+      {!hasCloserData && !hasMetrics && !hasMentoriaDetails && (
+        <div className="rounded-lg border border-dashed border-border bg-muted/20 p-6 text-center">
+          <TrendingUp className="h-10 w-10 text-muted-foreground/20 mx-auto mb-3" />
+          <p className="text-sm font-medium text-muted-foreground">Dados complementares</p>
+          <p className="text-xs text-muted-foreground/70 mt-1 max-w-md mx-auto">
+            Informações do Closer e métricas de performance serão preenchidas automaticamente via webhooks.
+          </p>
+        </div>
       )}
     </div>
   )

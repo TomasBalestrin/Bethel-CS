@@ -601,6 +601,38 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
         </div>
       </div>
 
+      {/* Closer / Venda — only if source starts with webhook or has closer fields */}
+      {(mentee.niche || mentee.main_pain || mentee.main_difficulty || mentee.contract_validity || mentee.closer_name || mentee.transcription) && (
+        <div className="border-t border-border/50 pt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
+            <div>
+              <SectionTitle>Closer / Venda</SectionTitle>
+              <div className="divide-y divide-border/50">
+                <InfoRow label="Nicho" value={mentee.niche} />
+                <InfoRow label="Dor principal" value={mentee.main_pain} />
+                <InfoRow label="Dificuldade principal" value={mentee.main_difficulty} />
+                <InfoRow label="Closer" value={mentee.closer_name} />
+              </div>
+            </div>
+            <div>
+              <SectionTitle>Contrato</SectionTitle>
+              <div className="divide-y divide-border/50">
+                <InfoRow label="Validade" value={mentee.contract_validity} />
+                <InfoRow label="Origem" value={mentee.source} />
+              </div>
+            </div>
+          </div>
+          {mentee.transcription && (
+            <div className="mt-3">
+              <p className="text-xs text-muted-foreground mb-1">Transcrição da call</p>
+              <div className="rounded-md bg-muted/50 p-3 text-xs text-foreground max-h-32 overflow-y-auto whitespace-pre-wrap">
+                {mentee.transcription}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Sociedade — only if has_partner */}
       {mentee.has_partner && (
         <div className="border-t border-border/50 pt-4">

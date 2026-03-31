@@ -41,9 +41,13 @@ export async function POST(request: NextRequest) {
 
     if (instanceError || !instance) {
       console.error('[WPP Send] No connected instance found:', instanceError)
+      // Log all instances for debugging
+      const { data: allInstances } = await supabase.from('wpp_instances').select('instance_id, status, specialist_id')
+      console.error('[WPP Send] All instances in DB:', JSON.stringify(allInstances))
       return NextResponse.json({ error: 'Instância WhatsApp não configurada' }, { status: 404 })
     }
 
+    console.log('[WPP Send] Using instance:', instance.instance_id, '| status:', instance.status, '| specialist:', instance.specialist_id)
     const specialistId = instance.specialist_id || user.id
 
     // 4. Normalize phone

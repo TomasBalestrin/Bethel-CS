@@ -109,6 +109,10 @@ export interface Database {
           created_by: string | null
           created_at: string
           updated_at: string
+          transaction_id: string | null
+          amount: number | null
+          source: string | null
+          webhook_notes: string | null
         }
         Insert: {
           id?: string
@@ -140,6 +144,10 @@ export interface Database {
           created_by?: string | null
           created_at?: string
           updated_at?: string
+          transaction_id?: string | null
+          amount?: number | null
+          source?: string | null
+          webhook_notes?: string | null
         }
         Update: {
           full_name?: string
@@ -167,6 +175,10 @@ export interface Database {
           status?: MenteeStatus
           created_by?: string | null
           updated_at?: string
+          transaction_id?: string | null
+          amount?: number | null
+          source?: string | null
+          webhook_notes?: string | null
         }
         Relationships: []
       }

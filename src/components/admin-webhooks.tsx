@@ -33,6 +33,7 @@ import {
   Send,
   Webhook,
 } from 'lucide-react'
+import { extractField } from '@/lib/webhook-fields'
 
 // ═══════════════════════════════════════
 // Types
@@ -93,49 +94,69 @@ interface KanbanStage {
 // Platform templates
 // ═══════════════════════════════════════
 
-const PLATFORM_TEMPLATES: Record<string, {
+interface PlatformTemplate {
   event_field: string
   field_mapping: Record<string, string>
   event_actions: Record<string, string>
   auth_header: string
-}> = {
+  example_payload: string
+}
+
+const PLATFORM_TEMPLATES: Record<string, PlatformTemplate> = {
   hotmart: {
     event_field: 'event',
-    field_mapping: { name: 'data.buyer.name', email: 'data.buyer.email', phone: 'data.buyer.phone', product_name: 'data.product.name' },
+    field_mapping: { name: 'data.buyer.name', email: 'data.buyer.email', phone: 'data.buyer.phone', product_name: 'data.product.name', amount: 'data.purchase.price.value', transaction_id: 'data.purchase.transaction' },
     event_actions: { PURCHASE_APPROVED: 'create_mentee', PURCHASE_REFUNDED: 'deactivate_mentee', PURCHASE_CANCELED: 'deactivate_mentee' },
     auth_header: 'x-hotmart-hottok',
+    example_payload: JSON.stringify({"event":"PURCHASE_APPROVED","data":{"buyer":{"name":"Maria Silva","email":"maria@example.com","phone":"5511999999999"},"product":{"name":"Mentoria Elite Premium","id":12345},"purchase":{"transaction":"HP1234567890","price":{"value":4997.00,"currency_code":"BRL"},"status":"APPROVED"}}}, null, 2),
   },
   kiwify: {
     event_field: 'order_status',
-    field_mapping: { name: 'Customer.full_name', email: 'Customer.email', phone: 'Customer.mobile' },
+    field_mapping: { name: 'Customer.full_name', email: 'Customer.email', phone: 'Customer.mobile', product_name: 'Product.product_name', amount: 'Commissions.charge_amount' },
     event_actions: { paid: 'create_mentee', refunded: 'deactivate_mentee' },
     auth_header: 'x-webhook-secret',
+    example_payload: JSON.stringify({"order_id":"KW-ABC123","order_status":"paid","Customer":{"full_name":"João Santos","email":"joao@example.com","mobile":"5521988888888"},"Product":{"product_name":"Mentoria Elite Premium"},"Commissions":{"charge_amount":"497.00","currency":"BRL"}}, null, 2),
   },
   mentorfy: {
     event_field: 'event',
-    field_mapping: { name: 'student.name', email: 'student.email' },
+    field_mapping: { name: 'student.name', email: 'student.email', phone: 'student.phone' },
     event_actions: {},
     auth_header: 'x-webhook-secret',
+    example_payload: JSON.stringify({"event":"student.enrolled","student":{"name":"Ana Costa","email":"ana@example.com","phone":"5531977777777"},"course":{"name":"Mentoria Elite Premium","progress":0}}, null, 2),
   },
   activecampaign: {
     event_field: 'type',
     field_mapping: { name: 'contact.first_name', email: 'contact.email', phone: 'contact.phone' },
     event_actions: {},
     auth_header: 'x-webhook-secret',
+    example_payload: JSON.stringify({"type":"contact_tag_added","contact":{"id":123,"first_name":"Pedro","last_name":"Lima","email":"pedro@example.com","phone":"5541966666666"},"tag":"elite-premium"}, null, 2),
   },
   closer: {
     event_field: 'action',
-    field_mapping: { name: 'lead.name', email: 'lead.email', phone: 'lead.phone' },
+    field_mapping: { name: 'lead.name', email: 'lead.email', phone: 'lead.phone', notes: 'lead.qualification_notes' },
     event_actions: { 'lead.qualified': 'create_mentee', 'lead.updated': 'update_mentee' },
     auth_header: 'x-webhook-secret',
+    example_payload: JSON.stringify({"action":"lead.qualified","lead":{"name":"Fernanda Oliveira","email":"fernanda@example.com","phone":"5511955555555","qualification_notes":"Alta intenção de compra, faturamento 50k/mês"},"closer":{"name":"Tomás Balestrin"}}, null, 2),
   },
   custom: {
     event_field: '',
     field_mapping: {},
     event_actions: {},
     auth_header: 'x-webhook-secret',
+    example_payload: '{\n  \n}',
   },
 }
+
+// Guided mapping fields with icons and labels
+const GUIDED_FIELDS: Array<{ key: string; label: string; icon: string; recommended?: boolean }> = [
+  { key: 'email', label: 'Email', icon: '📧', recommended: true },
+  { key: 'name', label: 'Nome completo', icon: '👤' },
+  { key: 'phone', label: 'Telefone', icon: '📱' },
+  { key: 'product_name', label: 'Produto', icon: '📦' },
+  { key: 'amount', label: 'Valor pago', icon: '💰' },
+  { key: 'transaction_id', label: 'ID da transação', icon: '🔑' },
+  { key: 'notes', label: 'Notas', icon: '📝' },
+]
 
 const PLATFORM_LABELS: Record<string, string> = {
   hotmart: 'Hotmart',
@@ -386,7 +407,6 @@ function EndpointFormDialog({
   const [showSecret, setShowSecret] = useState(false)
 
   // Test state
-  const [testOpen, setTestOpen] = useState(false)
   const [testPayload, setTestPayload] = useState('')
   const [testResult, setTestResult] = useState<string | null>(null)
   const [testLoading, setTestLoading] = useState(false)
@@ -412,11 +432,14 @@ function EndpointFormDialog({
 
         const ea = endpoint.event_actions ?? {}
         setEventActions(Object.entries(ea).map(([event, action]) => ({ event, action })))
+
+        // Load example payload for the platform
+        const tmpl = PLATFORM_TEMPLATES[endpoint.platform]
+        setTestPayload(tmpl?.example_payload ?? '')
       } else {
         resetForm()
       }
       setError(null)
-      setTestOpen(false)
       setTestResult(null)
     }
   }, [open, endpoint])
@@ -448,14 +471,15 @@ function EndpointFormDialog({
 
   function handlePlatformChange(value: string) {
     setPlatform(value)
-    if (!isEdit) {
-      const template = PLATFORM_TEMPLATES[value]
-      if (template) {
+    const template = PLATFORM_TEMPLATES[value]
+    if (template) {
+      if (!isEdit) {
         setEventField(template.event_field)
         setAuthHeader(template.auth_header)
         setFieldMapping(Object.entries(template.field_mapping).map(([key, v]) => ({ key, value: v })))
         setEventActions(Object.entries(template.event_actions).map(([event, action]) => ({ event, action })))
       }
+      setTestPayload(template.example_payload)
     }
   }
 
@@ -463,19 +487,6 @@ function EndpointFormDialog({
     const array = new Uint8Array(32)
     crypto.getRandomValues(array)
     setSecretKey(Array.from(array, (b) => b.toString(16).padStart(2, '0')).join(''))
-  }
-
-  // Field mapping CRUD
-  function addFieldMapping() {
-    setFieldMapping([...fieldMapping, { key: '', value: '' }])
-  }
-  function updateFieldMapping(index: number, field: 'key' | 'value', val: string) {
-    const updated = [...fieldMapping]
-    updated[index][field] = val
-    setFieldMapping(updated)
-  }
-  function removeFieldMapping(index: number) {
-    setFieldMapping(fieldMapping.filter((_, i) => i !== index))
   }
 
   // Event actions CRUD
@@ -669,62 +680,69 @@ function EndpointFormDialog({
             )}
           </fieldset>
 
-          {/* Section 3: Field Mapping */}
+          {/* Section 3: Guided Field Mapping */}
           <fieldset className="space-y-3">
             <legend className="text-sm font-semibold text-foreground">Mapeamento de Campos</legend>
+            <p className="text-xs text-muted-foreground">Informe o caminho de cada campo no JSON da plataforma. Campos vazios são ignorados.</p>
             <div className="space-y-2">
-              {fieldMapping.map((fm, i) => (
-                <div key={i} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2 p-2 sm:p-0 rounded-md sm:rounded-none border sm:border-0 border-border">
-                  <Input
-                    value={fm.key}
-                    onChange={(e) => updateFieldMapping(i, 'key', e.target.value)}
-                    placeholder="Campo CS (ex: name)"
-                    className="text-xs"
-                  />
-                  <span className="text-muted-foreground text-xs shrink-0 hidden sm:block">&larr;</span>
-                  <Input
-                    value={fm.value}
-                    onChange={(e) => updateFieldMapping(i, 'value', e.target.value)}
-                    placeholder="Campo payload (ex: data.buyer.name)"
-                    className="text-xs"
-                  />
-                  <button type="button" onClick={() => removeFieldMapping(i)} className="text-muted-foreground hover:text-destructive shrink-0 self-end sm:self-auto">
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-              <Button type="button" variant="outline" size="sm" onClick={addFieldMapping}>
-                <Plus className="mr-1 h-3 w-3" /> Adicionar campo
-              </Button>
+              {GUIDED_FIELDS.map((gf) => {
+                const fm = fieldMapping.find((f) => f.key === gf.key)
+                const value = fm?.value ?? ''
+                return (
+                  <div key={gf.key} className="flex items-center gap-2">
+                    <span className="text-sm shrink-0 w-36 flex items-center gap-1.5">
+                      <span>{gf.icon}</span>
+                      <span className="text-xs text-foreground">{gf.label}</span>
+                      {gf.recommended && <span className="text-[9px] text-accent">*</span>}
+                    </span>
+                    <span className="text-muted-foreground text-xs shrink-0">&rarr;</span>
+                    <Input
+                      value={value}
+                      onChange={(e) => {
+                        const updated = fieldMapping.filter((f) => f.key !== gf.key)
+                        if (e.target.value) updated.push({ key: gf.key, value: e.target.value })
+                        setFieldMapping(updated)
+                      }}
+                      placeholder={`ex: data.buyer.${gf.key}`}
+                      className="text-xs font-mono"
+                    />
+                  </div>
+                )
+              })}
             </div>
+            <p className="text-[10px] text-muted-foreground">* Recomendado (usado para deduplicação)</p>
+          </fieldset>
 
-            <div className="space-y-1 pt-2">
-              <Label htmlFor="ep-event-field">Campo de evento</Label>
+          {/* Section 3b: Event Mapping */}
+          <fieldset className="space-y-3">
+            <legend className="text-sm font-semibold text-foreground">Mapeamento de Eventos</legend>
+            <div className="space-y-1">
+              <Label htmlFor="ep-event-field">Campo que identifica o evento</Label>
               <Input
                 id="ep-event-field"
                 value={eventField}
                 onChange={(e) => setEventField(e.target.value)}
                 placeholder="ex: event, order_status, action"
-                className="text-xs"
+                className="text-xs font-mono"
               />
             </div>
 
             <div className="space-y-2 pt-2">
-              <Label>Mapeamento de eventos</Label>
+              <Label>Quando o valor for... executar ação:</Label>
               {eventActions.map((ea, i) => (
-                <div key={i} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2 p-2 sm:p-0 rounded-md sm:rounded-none border sm:border-0 border-border">
+                <div key={i} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2">
                   <Input
                     value={ea.event}
                     onChange={(e) => updateEventAction(i, 'event', e.target.value)}
-                    placeholder="Evento (ex: PURCHASE_APPROVED)"
-                    className="text-xs"
+                    placeholder="Valor do evento"
+                    className="text-xs font-mono"
                   />
                   <span className="text-muted-foreground text-xs shrink-0 hidden sm:block">&rarr;</span>
                   <Select value={ea.action} onValueChange={(v) => updateEventAction(i, 'action', v)}>
                     <SelectTrigger className="text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {Object.entries(ACTION_LABELS).map(([value, label]) => (
-                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                      {Object.entries(ACTION_LABELS).map(([val, lab]) => (
+                        <SelectItem key={val} value={val}>{lab}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -737,6 +755,26 @@ function EndpointFormDialog({
                 <Plus className="mr-1 h-3 w-3" /> Adicionar evento
               </Button>
             </div>
+          </fieldset>
+
+          {/* Section 3c: Live Preview */}
+          <fieldset className="space-y-3">
+            <legend className="text-sm font-semibold text-foreground">Testar Mapeamento</legend>
+            <p className="text-xs text-muted-foreground">Cole um payload de exemplo para verificar a extração dos campos.</p>
+            <Textarea
+              value={testPayload}
+              onChange={(e) => setTestPayload(e.target.value)}
+              placeholder="Cole aqui o JSON de exemplo..."
+              rows={6}
+              className="font-mono text-xs"
+            />
+            <MappingPreview
+              payload={testPayload}
+              fieldMapping={fieldMapping}
+              eventField={eventField}
+              eventActions={eventActions}
+              defaultAction={defaultAction}
+            />
           </fieldset>
 
           {/* Section 4: Action Config */}
@@ -776,9 +814,9 @@ function EndpointFormDialog({
           {/* Actions */}
           <div className="flex items-center justify-between pt-2">
             <div className="flex gap-2">
-              {isEdit && (
-                <Button type="button" variant="outline" size="sm" onClick={() => setTestOpen(!testOpen)}>
-                  <Send className="mr-1 h-3 w-3" /> Testar
+              {isEdit && testPayload.trim() && (
+                <Button type="button" variant="outline" size="sm" onClick={handleTest} disabled={testLoading}>
+                  <Send className="mr-1 h-3 w-3" /> {testLoading ? 'Enviando...' : 'Enviar teste real'}
                 </Button>
               )}
             </div>
@@ -790,32 +828,109 @@ function EndpointFormDialog({
             </div>
           </div>
 
-          {/* Test Section */}
-          {testOpen && isEdit && (
-            <fieldset className="space-y-3 border border-border rounded-lg p-4">
-              <legend className="text-sm font-semibold text-foreground px-1">Testar Webhook</legend>
-              <Textarea
-                value={testPayload}
-                onChange={(e) => setTestPayload(e.target.value)}
-                placeholder='{"event": "PURCHASE_APPROVED", "data": {"buyer": {"name": "Teste", "email": "teste@email.com"}}}'
-                rows={5}
-                className="font-mono text-xs"
-              />
-              <div className="flex gap-2">
-                <Button type="button" size="sm" onClick={handleTest} disabled={testLoading || !testPayload.trim()}>
-                  {testLoading ? 'Enviando...' : 'Enviar teste'}
-                </Button>
-              </div>
-              {testResult && (
-                <pre className="bg-muted rounded-md p-3 text-xs font-mono overflow-auto max-h-32">
-                  {testResult}
-                </pre>
-              )}
-            </fieldset>
+          {testResult && (
+            <pre className="bg-muted rounded-md p-3 text-xs font-mono overflow-auto max-h-32">
+              {testResult}
+            </pre>
           )}
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+// ═══════════════════════════════════════
+// Mapping Preview (live extraction result)
+// ═══════════════════════════════════════
+
+function MappingPreview({
+  payload,
+  fieldMapping,
+  eventField,
+  eventActions,
+  defaultAction,
+}: {
+  payload: string
+  fieldMapping: Array<{ key: string; value: string }>
+  eventField: string
+  eventActions: Array<{ event: string; action: string }>
+  defaultAction: string
+}) {
+  if (!payload.trim()) return null
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(payload)
+  } catch {
+    return (
+      <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+        <p className="text-xs text-destructive">JSON inválido. Verifique a sintaxe.</p>
+      </div>
+    )
+  }
+
+  // Extract fields
+  const results: Array<{ key: string; label: string; icon: string; value: unknown; found: boolean }> = []
+  for (const gf of GUIDED_FIELDS) {
+    const fm = fieldMapping.find((f) => f.key === gf.key)
+    if (fm?.value) {
+      const extracted = extractField(parsed, fm.value)
+      results.push({ key: gf.key, label: gf.label, icon: gf.icon, value: extracted, found: extracted !== undefined && extracted !== null })
+    } else {
+      results.push({ key: gf.key, label: gf.label, icon: gf.icon, value: undefined, found: false })
+    }
+  }
+
+  // Detect event
+  let detectedEvent: string | null = null
+  let detectedAction = defaultAction
+  if (eventField) {
+    const ev = extractField(parsed, eventField)
+    if (typeof ev === 'string') {
+      detectedEvent = ev
+      const match = eventActions.find((ea) => ea.event === ev)
+      if (match) detectedAction = match.action
+    }
+  }
+
+  // Format value for display
+  function formatValue(key: string, val: unknown): string {
+    if (val === undefined || val === null) return '(não mapeado)'
+    if (key === 'amount' && typeof val === 'number') {
+      return `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+    }
+    return String(val)
+  }
+
+  return (
+    <div className="rounded-md border border-border bg-muted/30 p-3 space-y-2">
+      <p className="text-[10px] font-semibold text-muted-foreground uppercase">Resultado da extração</p>
+      <div className="space-y-1">
+        {results.map((r) => (
+          <div key={r.key} className="flex items-center gap-2 text-xs">
+            <span className={r.found ? 'text-green-600' : 'text-muted-foreground/50'}>
+              {r.found ? '✅' : '⬜'}
+            </span>
+            <span className="w-28 shrink-0 text-muted-foreground">{r.icon} {r.label}:</span>
+            <span className={`font-mono ${r.found ? 'text-foreground' : 'text-muted-foreground/50 italic'}`}>
+              {formatValue(r.key, r.value)}
+            </span>
+          </div>
+        ))}
+      </div>
+      {eventField && (
+        <div className="border-t border-border pt-2 mt-2 space-y-1">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Evento detectado:</span>
+            <span className="font-mono font-medium text-foreground">{detectedEvent ?? '(não encontrado)'}</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Ação:</span>
+            <Badge variant="muted" className="text-[10px]">{ACTION_LABELS[detectedAction] ?? detectedAction}</Badge>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 

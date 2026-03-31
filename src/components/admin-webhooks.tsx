@@ -407,7 +407,6 @@ function EndpointFormDialog({
   const [showSecret, setShowSecret] = useState(false)
 
   // Test state
-  const [testOpen, setTestOpen] = useState(false)
   const [testPayload, setTestPayload] = useState('')
   const [testResult, setTestResult] = useState<string | null>(null)
   const [testLoading, setTestLoading] = useState(false)
@@ -441,7 +440,6 @@ function EndpointFormDialog({
         resetForm()
       }
       setError(null)
-      setTestOpen(false)
       setTestResult(null)
     }
   }, [open, endpoint])

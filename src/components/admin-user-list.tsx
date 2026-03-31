@@ -22,7 +22,9 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { Shield, User, Plus, Pencil, Trash2, Package, MessageSquare, Wifi, WifiOff } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Shield, User, Plus, Pencil, Trash2, Package, MessageSquare, Wifi, WifiOff, Webhook } from 'lucide-react'
+import { WebhooksSection } from '@/components/admin-webhooks'
 import {
   createUser,
   updateUser,
@@ -37,33 +39,58 @@ type Profile = Database['public']['Tables']['profiles']['Row']
 type Product = Database['public']['Tables']['products']['Row']
 type WppInstance = Database['public']['Tables']['wpp_instances']['Row']
 
+interface KanbanStage {
+  id: string
+  name: string
+  type: string
+}
+
 interface AdminUserListProps {
   users: Profile[]
   products: Product[]
   wppInstances: WppInstance[]
+  kanbanStages: KanbanStage[]
   currentUserId: string
 }
 
-export function AdminUserList({ users, products, wppInstances, currentUserId }: AdminUserListProps) {
+export function AdminUserList({ users, products, wppInstances, kanbanStages, currentUserId }: AdminUserListProps) {
   return (
     <div>
       <h1 className="font-heading text-2xl font-bold text-foreground">Admin</h1>
       <p className="mt-1 text-sm text-muted-foreground">
-        Gestão de usuários, produtos e WhatsApp do sistema
+        Gestão de usuários, produtos, WhatsApp e webhooks do sistema
       </p>
 
-      <UsersSection users={users} currentUserId={currentUserId} />
+      <Tabs defaultValue="users" className="mt-6">
+        <TabsList>
+          <TabsTrigger value="users"><User className="h-4 w-4 mr-1.5" />Usuários</TabsTrigger>
+          <TabsTrigger value="products"><Package className="h-4 w-4 mr-1.5" />Produtos</TabsTrigger>
+          <TabsTrigger value="whatsapp"><MessageSquare className="h-4 w-4 mr-1.5" />WhatsApp</TabsTrigger>
+          <TabsTrigger value="webhooks"><Webhook className="h-4 w-4 mr-1.5" />Webhooks</TabsTrigger>
+        </TabsList>
 
-      <Separator className="my-8" />
+        <TabsContent value="users">
+          <UsersSection users={users} currentUserId={currentUserId} />
+        </TabsContent>
 
-      <ProductsSection products={products} />
+        <TabsContent value="products">
+          <ProductsSection products={products} />
+        </TabsContent>
 
-      <Separator className="my-8" />
+        <TabsContent value="whatsapp">
+          <WhatsAppSection
+            specialists={users.filter((u) => u.role === 'especialista')}
+            instances={wppInstances}
+          />
+        </TabsContent>
 
-      <WhatsAppSection
-        specialists={users.filter((u) => u.role === 'especialista')}
-        instances={wppInstances}
-      />
+        <TabsContent value="webhooks">
+          <WebhooksSection
+            specialists={users.filter((u) => u.role === 'especialista').map((u) => ({ id: u.id, full_name: u.full_name, role: u.role }))}
+            kanbanStages={kanbanStages}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

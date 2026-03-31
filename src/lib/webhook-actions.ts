@@ -20,16 +20,19 @@ interface EndpointConfig {
   field_mapping: Record<string, string>
   default_kanban_stage?: string | null
   default_specialist_id?: string | null
+  slug?: string
 }
 
+const MENTEE_FIND_FIELDS = 'id, full_name, email, phone, product_name, status, transaction_id, amount, source, webhook_notes'
+
 /**
- * Busca mentorado por email OU phone.
+ * Busca mentorado por email → phone → transaction_id (deduplicação).
  */
-async function findMentee(supabase: ReturnType<typeof createAdminClient>, email?: string, phone?: string) {
+async function findMentee(supabase: ReturnType<typeof createAdminClient>, email?: string, phone?: string, transactionId?: string) {
   if (email) {
     const { data } = await supabase
       .from('mentees')
-      .select('id, full_name, email, phone, status')
+      .select(MENTEE_FIND_FIELDS)
       .eq('email', email)
       .limit(1)
       .single()
@@ -38,8 +41,17 @@ async function findMentee(supabase: ReturnType<typeof createAdminClient>, email?
   if (phone) {
     const { data } = await supabase
       .from('mentees')
-      .select('id, full_name, email, phone, status')
+      .select(MENTEE_FIND_FIELDS)
       .eq('phone', phone)
+      .limit(1)
+      .single()
+    if (data) return data
+  }
+  if (transactionId) {
+    const { data } = await supabase
+      .from('mentees')
+      .select(MENTEE_FIND_FIELDS)
+      .eq('transaction_id', transactionId)
       .limit(1)
       .single()
     if (data) return data
@@ -61,7 +73,8 @@ async function findKanbanStageByName(supabase: ReturnType<typeof createAdminClie
 }
 
 /**
- * create_mentee: cria mentorado, verifica duplicata, move para kanban.
+ * create_mentee: cria mentorado com deduplicação (email → phone → transaction_id).
+ * Se já existe, atualiza campos vazios e retorna como "deduplicated".
  */
 async function executeCreateMentee(
   payload: unknown,
@@ -73,23 +86,26 @@ async function executeCreateMentee(
   const name = fields.name as string | undefined
   const email = fields.email as string | undefined
   const phone = fields.phone as string | undefined
+  const product = fields.product_name as string | undefined
+  const amount = fields.amount !== undefined ? Number(fields.amount) : undefined
+  const transactionId = fields.transaction_id as string | undefined
+  const notes = fields.notes as string | undefined
 
-  if (!name || (!email && !phone)) {
-    return {
-      success: false,
-      action: 'create_mentee',
-      error: 'Campos obrigatórios ausentes: name e (email ou phone)',
-      details: { extracted: fields },
-    }
-  }
+  // Criar com o que tiver — nome não é obrigatório, usa fallback
+  const fullName = name || 'Sem nome (webhook)'
 
-  // Verificar duplicata
-  const existing = await findMentee(supabase, email, phone)
+  // Deduplicação: email → phone → transaction_id
+  const existing = await findMentee(supabase, email, phone, transactionId)
   if (existing) {
-    // Atualizar dados do existente
     const updateData: Record<string, unknown> = {}
     if (email && !existing.email) updateData.email = email
     if (phone && !existing.phone) updateData.phone = phone
+    if (product && !existing.product_name) updateData.product_name = product
+    if (amount !== undefined && !existing.amount) updateData.amount = amount
+    if (transactionId && !existing.transaction_id) updateData.transaction_id = transactionId
+    if (notes && !existing.webhook_notes) updateData.webhook_notes = notes
+    if (name && existing.full_name === 'Sem nome (webhook)') updateData.full_name = name
+
     if (Object.keys(updateData).length > 0) {
       await supabase.from('mentees').update(updateData).eq('id', existing.id)
     }
@@ -97,7 +113,7 @@ async function executeCreateMentee(
       success: true,
       action: 'create_mentee',
       mentee_id: existing.id,
-      details: { already_exists: true, updated_fields: Object.keys(updateData) },
+      details: { deduplicated: true, updated_fields: Object.keys(updateData) },
     }
   }
 
@@ -113,7 +129,6 @@ async function executeCreateMentee(
     }
   }
 
-  // Fallback: primeira etapa do kanban initial
   if (!currentStageId) {
     const { data: firstStage } = await supabase
       .from('kanban_stages')
@@ -128,20 +143,19 @@ async function executeCreateMentee(
   const { data: newMentee, error } = await supabase
     .from('mentees')
     .insert({
-      full_name: name,
+      full_name: fullName,
       email: email ?? null,
       phone: phone ?? '',
-      product_name: (fields.product_name as string) ?? 'Mentoria Elite Premium',
+      product_name: product ?? 'Mentoria Elite Premium',
       start_date: new Date().toISOString().split('T')[0],
       current_stage_id: currentStageId,
       kanban_type: kanbanType,
       created_by: config.default_specialist_id ?? null,
       priority_level: 1,
-      seller_name: (fields.seller_name as string) ?? null,
-      cpf: (fields.cpf as string) ?? null,
-      city: (fields.city as string) ?? null,
-      state: (fields.state as string) ?? null,
-      instagram: (fields.instagram as string) ?? null,
+      amount: amount ?? null,
+      transaction_id: transactionId ?? null,
+      webhook_notes: notes ?? null,
+      source: config.slug ? `webhook:${config.slug}` : 'webhook',
     })
     .select('id')
     .single()
@@ -190,7 +204,7 @@ async function executeUpdateMentee(
   const allowedFields = [
     'full_name', 'email', 'phone', 'cpf', 'birth_date', 'instagram',
     'city', 'state', 'product_name', 'seller_name', 'funnel_origin',
-    'has_partner', 'partner_name',
+    'has_partner', 'partner_name', 'amount', 'transaction_id', 'webhook_notes',
   ]
   const updateData: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(fields)) {

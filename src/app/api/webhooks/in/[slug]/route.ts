@@ -90,6 +90,7 @@ export async function POST(
     field_mapping: (endpoint.field_mapping as Record<string, string>) ?? {},
     default_kanban_stage: endpoint.default_kanban_stage,
     default_specialist_id: endpoint.default_specialist_id,
+    slug: endpoint.slug,
   })
 
   const processingTime = Date.now() - startTime

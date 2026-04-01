@@ -422,17 +422,6 @@ function ContactRow({ icon: Icon, label, value, href, color, bg }: {
   )
 }
 
-// ─── Mini row with icon for mentoria/closer sections ───
-function MiniRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
-  return (
-    <div className="flex items-center gap-2 py-1">
-      <Icon className="h-3 w-3 text-muted-foreground shrink-0" />
-      <span className="text-xs text-muted-foreground shrink-0">{label}</span>
-      <span className="text-xs text-foreground ml-auto text-right truncate">{value}</span>
-    </div>
-  )
-}
-
 // ─── Metric box for performance data ───
 function MetricBox({ label, value, highlight }: { label: string; value: string | number; highlight?: boolean }) {
   return (
@@ -642,14 +631,14 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
         )}
       </div>
 
-      {/* ── Main grid — adapts to available data ── */}
-      <div className={`grid gap-4 ${hasCloserData ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 md:grid-cols-2'}`}>
+      {/* ── Main grid — always 3 cols on desktop ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 
         {/* Contact card */}
         <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
             <Phone className="h-3.5 w-3.5 text-accent" />
-            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Contato & Dados</h3>
+            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Contato</h3>
           </div>
           <div className="p-4 space-y-0.5">
             {mentee.phone && <ContactRow icon={Phone} label="Telefone" value={mentee.phone} color="text-accent" bg="bg-accent/10" />}
@@ -661,71 +650,89 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
           </div>
         </div>
 
-        {/* Mentoria + actions card */}
+        {/* Mentoria data card — only data, no actions */}
         <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-gradient-to-r from-success/5 to-transparent">
             <Briefcase className="h-3.5 w-3.5 text-success" />
-            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Mentoria & Ações</h3>
+            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Mentoria</h3>
           </div>
-          <div className="p-4 space-y-3">
-            {hasMentoriaDetails && (
-              <div className="space-y-1">
-                {mentee.end_date && <MiniRow icon={Calendar} label="Término" value={formatDateBR(mentee.end_date)} />}
-                {mentee.seller_name && <MiniRow icon={Users} label="Vendedor" value={mentee.seller_name} />}
-                {mentee.funnel_origin && <MiniRow icon={Target} label="Funil" value={mentee.funnel_origin} />}
-                {mentee.has_partner && <MiniRow icon={Users} label="Sócio" value={mentee.partner_name || 'Sim'} />}
-              </div>
-            )}
-            {mentee.chat_token && (
-              <div className={hasMentoriaDetails ? 'pt-2 border-t border-border/50' : ''}>
-                <p className="text-[10px] text-muted-foreground mb-1.5">Link do chat para o mentorado</p>
-                <ChatLinkCopy chatToken={mentee.chat_token} />
-              </div>
-            )}
-            {!hasMentoriaDetails && !mentee.chat_token && (
-              <div className="py-3 text-center">
-                <Briefcase className="h-8 w-8 text-muted-foreground/20 mx-auto mb-2" />
-                <p className="text-xs text-muted-foreground">Dados adicionais aparecerão aqui</p>
-              </div>
-            )}
-            {isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship && (
-              <div className="pt-2 border-t border-border/50">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onTransitionToMentorship(mentee)}
-                  className="w-full text-xs border-accent/30 text-accent hover:bg-accent/5"
-                >
-                  Enviar para Etapas Mentoria <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                </Button>
+          <div className="p-4 space-y-0.5">
+            {mentee.end_date && <ContactRow icon={Calendar} label="Término" value={formatDateBR(mentee.end_date)} color="text-info" bg="bg-info/10" />}
+            {mentee.seller_name && <ContactRow icon={Users} label="Vendedor" value={mentee.seller_name} color="text-success" bg="bg-success/10" />}
+            {mentee.funnel_origin && <ContactRow icon={Target} label="Funil" value={mentee.funnel_origin} color="text-warning" bg="bg-warning/10" />}
+            {mentee.has_partner && <ContactRow icon={Users} label="Sócio" value={mentee.partner_name || 'Sim'} color="text-accent" bg="bg-accent/10" />}
+            {mentee.source && <ContactRow icon={Target} label="Origem" value={mentee.source} color="text-muted-foreground" bg="bg-muted" />}
+            {!hasMentoriaDetails && (
+              <div className="py-4 text-center">
+                <Briefcase className="h-7 w-7 text-muted-foreground/15 mx-auto mb-1.5" />
+                <p className="text-[11px] text-muted-foreground/60">Sem dados adicionais</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Closer card */}
-        {hasCloserData && (
-          <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-gradient-to-r from-warning/5 to-transparent">
-              <Mic className="h-3.5 w-3.5 text-warning" />
-              <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Closer / Venda</h3>
-            </div>
-            <div className="p-4 space-y-1">
-              {mentee.closer_name && <MiniRow icon={Users} label="Closer" value={mentee.closer_name} />}
-              {mentee.niche && <MiniRow icon={Target} label="Nicho" value={mentee.niche} />}
-              {mentee.main_pain && <MiniRow icon={TrendingUp} label="Dor principal" value={mentee.main_pain} />}
-              {mentee.main_difficulty && <MiniRow icon={Shield} label="Dificuldade" value={mentee.main_difficulty} />}
-              {mentee.transcription && (
-                <div className="pt-2 mt-1 border-t border-border/50">
-                  <p className="text-[10px] text-muted-foreground mb-1">Transcrição da call</p>
-                  <div className="rounded bg-muted/50 p-2.5 text-xs text-foreground max-h-24 overflow-y-auto whitespace-pre-wrap leading-relaxed">
-                    {mentee.transcription}
+        {/* Right column: Actions + Closer (or empty state) */}
+        <div className="space-y-4">
+          {/* Actions card — chat link + transition */}
+          {(mentee.chat_token || (isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship)) && (
+            <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
+                <MessageSquare className="h-3.5 w-3.5 text-accent" />
+                <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Ações</h3>
+              </div>
+              <div className="p-4 space-y-3">
+                {mentee.chat_token && (
+                  <div>
+                    <p className="text-[10px] text-muted-foreground mb-1.5">Link do chat para o mentorado</p>
+                    <ChatLinkCopy chatToken={mentee.chat_token} />
                   </div>
-                </div>
-              )}
+                )}
+                {isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onTransitionToMentorship(mentee)}
+                    className="w-full text-xs border-accent/30 text-accent hover:bg-accent/5"
+                  >
+                    Enviar para Etapas Mentoria <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+
+          {/* Closer card */}
+          {hasCloserData && (
+            <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-gradient-to-r from-warning/5 to-transparent">
+                <Mic className="h-3.5 w-3.5 text-warning" />
+                <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Closer / Venda</h3>
+              </div>
+              <div className="p-4 space-y-0.5">
+                {mentee.closer_name && <ContactRow icon={Users} label="Closer" value={mentee.closer_name} color="text-warning" bg="bg-warning/10" />}
+                {mentee.niche && <ContactRow icon={Target} label="Nicho" value={mentee.niche} color="text-accent" bg="bg-accent/10" />}
+                {mentee.main_pain && <ContactRow icon={TrendingUp} label="Dor principal" value={mentee.main_pain} color="text-destructive" bg="bg-destructive/10" />}
+                {mentee.main_difficulty && <ContactRow icon={Shield} label="Dificuldade" value={mentee.main_difficulty} color="text-info" bg="bg-info/10" />}
+                {mentee.transcription && (
+                  <div className="pt-2 mt-1 border-t border-border/50">
+                    <p className="text-[10px] text-muted-foreground mb-1">Transcrição</p>
+                    <div className="rounded bg-muted/50 p-2.5 text-xs text-foreground max-h-24 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                      {mentee.transcription}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Empty state for right column when no closer and no actions */}
+          {!hasCloserData && !mentee.chat_token && !(isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship) && (
+            <div className="rounded-lg border border-dashed border-border bg-muted/10 p-5 text-center">
+              <Mic className="h-7 w-7 text-muted-foreground/15 mx-auto mb-1.5" />
+              <p className="text-[11px] text-muted-foreground/60">Dados do Closer aparecerão aqui via webhook</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Performance (Bethel Metrics) ── */}
@@ -771,13 +778,13 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
         </div>
       )}
 
-      {/* Empty state when very few data */}
-      {!hasCloserData && !hasMetrics && !hasMentoriaDetails && (
-        <div className="rounded-lg border border-dashed border-border bg-muted/20 p-6 text-center">
-          <TrendingUp className="h-10 w-10 text-muted-foreground/20 mx-auto mb-3" />
-          <p className="text-sm font-medium text-muted-foreground">Dados complementares</p>
-          <p className="text-xs text-muted-foreground/70 mt-1 max-w-md mx-auto">
-            Informações do Closer e métricas de performance serão preenchidas automaticamente via webhooks.
+      {/* Empty state for metrics */}
+      {!hasMetrics && (
+        <div className="rounded-lg border border-dashed border-border bg-muted/10 p-5 text-center">
+          <TrendingUp className="h-8 w-8 text-muted-foreground/15 mx-auto mb-2" />
+          <p className="text-xs font-medium text-muted-foreground/60">Métricas de performance</p>
+          <p className="text-[11px] text-muted-foreground/40 mt-0.5">
+            Serão preenchidas automaticamente pelo Bethel Metrics via webhook semanal.
           </p>
         </div>
       )}

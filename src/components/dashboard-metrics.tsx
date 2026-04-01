@@ -11,7 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Separator } from '@/components/ui/separator'
 import {
   Users,
   UserPlus,
@@ -26,11 +25,9 @@ import {
   Video,
   CalendarCheck,
   Headphones,
+  Database,
+  FileText,
 } from 'lucide-react'
-
-const PRIORITY_VARIANT: Record<number, 'muted' | 'warning' | 'info' | 'success' | 'accent'> = {
-  1: 'muted', 2: 'warning', 3: 'info', 4: 'success', 5: 'accent',
-}
 
 interface DashboardMetricsProps {
   userName: string
@@ -46,7 +43,6 @@ interface DashboardMetricsProps {
     fitMentees: number
     totalIndications: number
     cancelados: number
-    priorityDistribution: Record<number, number>
   }
   section3: {
     totalRevenue: number
@@ -95,7 +91,7 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="font-heading text-xl sm:text-2xl font-bold text-foreground">
@@ -104,9 +100,12 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
         <p className="mt-1 text-sm text-muted-foreground">Painel do Customer Success</p>
       </div>
 
-      {/* ═══ SEÇÃO 1: FILTROS GLOBAIS ═══ */}
+      {/* ═══ FILTROS ═══ */}
       <section className="rounded-lg border border-border bg-card p-4 shadow-card">
-        <p className="label-xs mb-3">Filtros</p>
+        <div className="flex items-center gap-2 mb-3">
+          <Database className="h-3.5 w-3.5 text-muted-foreground" />
+          <p className="label-xs">Filtros</p>
+        </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
           <div className="space-y-1">
             <Label className="text-xs">Especialista</Label>
@@ -142,85 +141,76 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
         </div>
       </section>
 
-      {/* ═══ SEÇÃO 2: VISÃO GERAL DOS MENTORADOS ═══ */}
-      <section>
-        <SectionTitle>Visão geral dos mentorados</SectionTitle>
-        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <MetricCard icon={Users} label="Mentorados ativos" value={props.section2.totalMentees} color="text-accent" bg="bg-accent/10" />
-          <MetricCard icon={Star} label="Clientes Fit" value={props.section2.fitMentees} color="text-warning" bg="bg-warning/10" />
-          <MetricCard icon={UserPlus} label="Indicações geradas" value={props.section2.totalIndications} color="text-success" bg="bg-success/10" />
-          <MetricCard icon={XCircle} label="Cancelamentos" value={props.section2.cancelados} color="text-destructive" bg="bg-destructive/10" />
+      {/* ═══ VISÃO GERAL DOS MENTORADOS ═══ */}
+      <section className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
+          <Users className="h-4 w-4 text-accent" />
+          <h2 className="text-sm font-semibold text-foreground">Visão geral dos mentorados</h2>
         </div>
-        <div className="mt-4 flex gap-3 overflow-x-auto pb-2 scrollbar-none sm:grid sm:grid-cols-5 sm:overflow-visible sm:pb-0">
-          {[1, 2, 3, 4, 5].map((level) => (
-            <div key={level} className="min-w-[120px] shrink-0 rounded-lg border border-border bg-card p-3 shadow-card text-center sm:min-w-0 sm:shrink">
-              <Badge variant={PRIORITY_VARIANT[level]}>Nível {level}</Badge>
-              <p className="mt-1 font-heading text-xl font-bold text-foreground tabular">{props.section2.priorityDistribution[level] ?? 0}</p>
-              <p className="text-[10px] text-muted-foreground">mentorados</p>
-            </div>
-          ))}
+        <div className="p-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <MetricCard icon={Users} label="Mentorados ativos" value={props.section2.totalMentees} color="text-accent" bg="bg-accent/10" source="mentees (status=ativo)" />
+            <MetricCard icon={Star} label="Clientes Fit" value={props.section2.fitMentees} color="text-warning" bg="bg-warning/10" source="mentees (cliente_fit)" />
+            <MetricCard icon={UserPlus} label="Indicações geradas" value={props.section2.totalIndications} color="text-success" bg="bg-success/10" source="indications" />
+            <MetricCard icon={XCircle} label="Cancelamentos" value={props.section2.cancelados} color="text-destructive" bg="bg-destructive/10" source="mentees (status=cancelado)" />
+          </div>
         </div>
       </section>
 
-      <Separator />
-
-      {/* ═══ SEÇÃO 3: INDICADORES DE SUCESSO DO CLIENTE ═══ */}
-      <section>
-        <SectionTitle>Sucesso do cliente</SectionTitle>
-        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {/* Card 1 */}
-          <MetricCard icon={DollarSign} label="Receita nova gerada" value={formatBRL(props.section3.totalRevenue)} color="text-success" bg="bg-success/10" />
-          {/* Card 2 */}
-          <MetricCard icon={TrendingUp} label="Avanço nas etapas" value="—" color="text-info" bg="bg-info/10" note="Log de stage changes pendente" />
-          {/* Card 3 */}
-          <MetricCard icon={BookOpen} label="Área de membros (Mentorfy)" value={`${props.section3.engByType.aula ?? 0} acessos registrados`} color="text-accent" bg="bg-accent/10" note="Registro manual — integração Mentorfy pendente" />
-          {/* Card 4 */}
-          <MetricCard icon={Video} label="Mentorias ao vivo" value={`${props.section3.engByType.live ?? 0} presenças registradas`} color="text-info" bg="bg-info/10" />
-          {/* Card 5 */}
-          <MetricCard icon={CalendarCheck} label="Eventos" value={`${props.section3.engByType.evento ?? 0} participações registradas`} color="text-warning" bg="bg-warning/10" />
-          {/* Card 6 */}
-          <MetricCard icon={Headphones} label="Canal do especialista" value={`${props.section3.engByType.whatsapp_contato ?? 0} contatos recebidos`} color="text-success" bg="bg-success/10" note="Será substituído por Stream Chat — Fase 9" />
-          {/* Card 7 */}
-          <MetricCard icon={MessageSquareQuote} label="Depoimentos gerados" value={props.section3.totalTestimonials} color="text-warning" bg="bg-warning/10" />
-          {/* Card 8 */}
-          <MetricCard icon={XCircle} label="Cancelamentos" value={props.section3.cancelados} color="text-destructive" bg="bg-destructive/10" />
+      {/* ═══ SUCESSO DO CLIENTE ═══ */}
+      <section className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-gradient-to-r from-success/5 to-transparent">
+          <TrendingUp className="h-4 w-4 text-success" />
+          <h2 className="text-sm font-semibold text-foreground">Sucesso do cliente</h2>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <MetricCard icon={DollarSign} label="Receita nova gerada" value={formatBRL(props.section3.totalRevenue)} color="text-success" bg="bg-success/10" source="revenue_records" />
+            <MetricCard icon={TrendingUp} label="Avanço nas etapas" value="—" color="text-info" bg="bg-info/10" source="Pendente" note="Log de stage changes pendente" />
+            <MetricCard icon={BookOpen} label="Área de membros" value={`${props.section3.engByType.aula ?? 0} acessos`} color="text-accent" bg="bg-accent/10" source="engagement_records (aula)" />
+            <MetricCard icon={Video} label="Mentorias ao vivo" value={`${props.section3.engByType.live ?? 0} presenças`} color="text-info" bg="bg-info/10" source="engagement_records (live)" />
+            <MetricCard icon={CalendarCheck} label="Eventos" value={`${props.section3.engByType.evento ?? 0} participações`} color="text-warning" bg="bg-warning/10" source="engagement_records (evento)" />
+            <MetricCard icon={Headphones} label="Canal do especialista" value={`${props.section3.engByType.whatsapp_contato ?? 0} contatos`} color="text-success" bg="bg-success/10" source="engagement_records (whatsapp)" />
+            <MetricCard icon={MessageSquareQuote} label="Depoimentos" value={props.section3.totalTestimonials} color="text-warning" bg="bg-warning/10" source="testimonials" />
+            <MetricCard icon={XCircle} label="Cancelamentos" value={props.section3.cancelados} color="text-destructive" bg="bg-destructive/10" source="mentees (status=cancelado)" />
+          </div>
         </div>
       </section>
 
-      <Separator />
-
-      {/* ═══ SEÇÃO 4: TRABALHO DO CS ═══ */}
-      <section>
-        <SectionTitle>Trabalho do CS</SectionTitle>
-        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <MetricCard icon={Phone} label="Ligações realizadas" value={props.section4.totalLigacoes} color="text-warning" bg="bg-warning/10" />
-          <MetricCard icon={Phone} label="Tempo total de ligações" value={formatMinutes(props.section4.totalLigacaoDuration)} color="text-warning" bg="bg-warning/10" />
-          <MetricCard icon={MessageCircle} label="Atendimentos WhatsApp" value={props.section4.totalWhatsapp} color="text-success" bg="bg-success/10" />
-          <MetricCard icon={MessageCircle} label="Tempo médio WhatsApp" value={props.section4.avgWhatsappDuration > 0 ? `${props.section4.avgWhatsappDuration} min` : '—'} color="text-success" bg="bg-success/10" />
+      {/* ═══ TRABALHO DO CS ═══ */}
+      <section className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-gradient-to-r from-warning/5 to-transparent">
+          <Phone className="h-4 w-4 text-warning" />
+          <h2 className="text-sm font-semibold text-foreground">Trabalho do CS</h2>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <MetricCard icon={Phone} label="Ligações realizadas" value={props.section4.totalLigacoes} color="text-warning" bg="bg-warning/10" source="cs_activities (ligacao)" />
+            <MetricCard icon={Phone} label="Tempo de ligações" value={formatMinutes(props.section4.totalLigacaoDuration)} color="text-warning" bg="bg-warning/10" source="cs_activities (duration)" />
+            <MetricCard icon={MessageCircle} label="Atendimentos WhatsApp" value={props.section4.totalWhatsapp} color="text-success" bg="bg-success/10" source="cs_activities (whatsapp)" />
+            <MetricCard icon={MessageCircle} label="Tempo médio WhatsApp" value={props.section4.avgWhatsappDuration > 0 ? `${props.section4.avgWhatsappDuration} min` : '—'} color="text-success" bg="bg-success/10" source="cs_activities (avg duration)" />
+          </div>
         </div>
       </section>
 
-      <Separator />
-
-      {/* ═══ SEÇÃO 5: INDICADORES DE RECEITA NOVA ═══ */}
-      <section>
-        <SectionTitle>Receita nova</SectionTitle>
-        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-3">
-          <MetricCard icon={DollarSign} label="Crossell" value={formatBRL(props.section5.crossell)} color="text-success" bg="bg-success/10" />
-          <MetricCard icon={TrendingUp} label="Ascensão (Upsell)" value={formatBRL(props.section5.upsell)} color="text-accent" bg="bg-accent/10" />
-          <MetricCard icon={UserPlus} label="Indicação Perpétuo" value={formatBRL(props.section5.indicacao_perpetuo)} color="text-info" bg="bg-info/10" />
-          <MetricCard icon={UserPlus} label="Indicação Intensivo" value={formatBRL(props.section5.indicacao_intensivo)} color="text-warning" bg="bg-warning/10" />
-          <MetricCard icon={UserPlus} label="Indicação Encontro Elite" value={formatBRL(props.section5.indicacao_encontro)} color="text-accent" bg="bg-accent/10" />
-          <MetricCard icon={DollarSign} label="Total geral receita nova" value={formatBRL(props.section5.total)} color="text-foreground" bg="bg-muted" />
+      {/* ═══ RECEITA NOVA ═══ */}
+      <section className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
+          <DollarSign className="h-4 w-4 text-accent" />
+          <h2 className="text-sm font-semibold text-foreground">Receita nova</h2>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            <MetricCard icon={DollarSign} label="Crossell" value={formatBRL(props.section5.crossell)} color="text-success" bg="bg-success/10" source="revenue_records (crossell)" />
+            <MetricCard icon={TrendingUp} label="Ascensão (Upsell)" value={formatBRL(props.section5.upsell)} color="text-accent" bg="bg-accent/10" source="revenue_records (upsell)" />
+            <MetricCard icon={UserPlus} label="Indicação Perpétuo" value={formatBRL(props.section5.indicacao_perpetuo)} color="text-info" bg="bg-info/10" source="revenue_records (indic_perpetuo)" />
+            <MetricCard icon={UserPlus} label="Indicação Intensivo" value={formatBRL(props.section5.indicacao_intensivo)} color="text-warning" bg="bg-warning/10" source="revenue_records (indic_intensivo)" />
+            <MetricCard icon={UserPlus} label="Indicação Encontro" value={formatBRL(props.section5.indicacao_encontro)} color="text-accent" bg="bg-accent/10" source="revenue_records (indic_encontro)" />
+            <MetricCard icon={DollarSign} label="Total geral" value={formatBRL(props.section5.total)} color="text-foreground" bg="bg-muted" source="revenue_records (soma)" highlight />
+          </div>
         </div>
       </section>
     </div>
-  )
-}
-
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="font-heading text-xl font-semibold text-foreground">{children}</h2>
   )
 }
 
@@ -230,25 +220,32 @@ function MetricCard({
   value,
   color,
   bg,
+  source,
   note,
+  highlight,
 }: {
   icon: React.ElementType
   label: string
   value: string | number
   color: string
   bg: string
+  source: string
   note?: string
+  highlight?: boolean
 }) {
   return (
-    <div className="rounded-lg border border-border bg-card p-3 sm:p-4 shadow-card animate-slide-up">
-      <div className="flex items-center gap-2 sm:gap-3">
-        <div className={`rounded-md p-1.5 sm:p-2 ${bg}`}>
+    <div className={`rounded-lg border p-3 sm:p-4 animate-slide-up ${highlight ? 'border-accent/20 bg-accent/5' : 'border-border bg-background'}`}>
+      <div className="flex items-start gap-2 sm:gap-3">
+        <div className={`rounded-md p-1.5 sm:p-2 ${bg} shrink-0`}>
           <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${color}`} />
         </div>
-        <div className="min-w-0">
-          <p className="label-xs text-[10px] sm:text-xs">{label}</p>
-          <p className="font-heading text-base sm:text-lg font-bold text-foreground tabular leading-tight">{value}</p>
-          {note && <p className="mt-0.5 text-[10px] text-muted-foreground">{note}</p>}
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wide leading-tight">{label}</p>
+          <p className={`font-heading text-base sm:text-lg font-bold tabular leading-tight mt-0.5 ${highlight ? 'text-accent' : 'text-foreground'}`}>{value}</p>
+          {note && <p className="mt-0.5 text-[9px] text-muted-foreground/70 italic">{note}</p>}
+          <p className="mt-1 text-[8px] text-muted-foreground/40 flex items-center gap-0.5">
+            <FileText className="h-2 w-2" /> {source}
+          </p>
         </div>
       </div>
     </div>

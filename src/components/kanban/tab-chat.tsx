@@ -659,17 +659,26 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
 // ─── Message Content Renderer ───
 
+const S3_BASE = 'https://whatsapp-avatar.s3.sa-east-1.amazonaws.com'
+
+/** Ensure media URL is a full URL (handles legacy relative paths) */
+function resolveMediaUrl(url: string | null): string | null {
+  if (!url) return null
+  if (url.startsWith('http://') || url.startsWith('https://')) return url
+  return `${S3_BASE}/${url}`
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function MessageContent({ msg, menteeName }: { msg: WppMessage; menteeName: string }) {
   const content = msg.content || ''
-  const mediaUrl = msg.media_url
+  const mediaUrl = resolveMediaUrl(msg.media_url)
 
   // Image from media_url
   if (msg.message_type === 'image' && mediaUrl) {
     return (
       <>
         <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="block relative min-h-[100px]">
-          <Image src={mediaUrl} alt="Imagem" width={300} height={200} className="rounded-lg mb-1 w-full h-auto" unoptimized={!mediaUrl.includes('supabase')} />
+          <Image src={mediaUrl} alt="Imagem" width={300} height={200} className="rounded-lg mb-1 w-full h-auto" unoptimized={!mediaUrl.includes('supabase') && !mediaUrl.includes('amazonaws.com')} />
         </a>
         {content && <p className="whitespace-pre-wrap break-words">{content}</p>}
       </>

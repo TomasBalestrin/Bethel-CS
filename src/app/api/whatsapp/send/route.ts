@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { sendMessage } from '@/lib/nextapps'
+import { sendTextMessage, sendMediaMessage } from '@/lib/nextapps'
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,10 +13,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { menteeId, message, type, imageUrl } = body
+    const { menteeId, message, type, imageUrl, fileName, mimeType } = body
 
-    if (!menteeId || !message) {
-      return NextResponse.json({ error: 'menteeId e message são obrigatórios' }, { status: 400 })
+    if (!menteeId || (!message && !imageUrl)) {
+      return NextResponse.json({ error: 'menteeId e message/imageUrl são obrigatórios' }, { status: 400 })
     }
 
     // 2. Find mentee
@@ -27,68 +27,66 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (menteeError || !mentee) {
-      console.error('[WPP Send] Mentee not found:', menteeId, menteeError)
       return NextResponse.json({ error: 'Mentorado não encontrado' }, { status: 404 })
     }
 
-    // 3. Find any connected WPP instance
-    const { data: instance, error: instanceError } = await supabase
+    // 3. Find connected WPP instance (for specialist_id and instance_id)
+    const { data: instance } = await supabase
       .from('wpp_instances')
-      .select('instance_id, status, specialist_id')
+      .select('instance_id, specialist_id')
       .eq('status', 'connected')
       .limit(1)
       .single()
 
-    if (instanceError || !instance) {
-      console.error('[WPP Send] No connected instance found:', instanceError)
-      // Log all instances for debugging
-      const { data: allInstances } = await supabase.from('wpp_instances').select('instance_id, status, specialist_id')
-      console.error('[WPP Send] All instances in DB:', JSON.stringify(allInstances))
-      return NextResponse.json({ error: 'Instância WhatsApp não configurada' }, { status: 404 })
+    if (!instance) {
+      return NextResponse.json({ error: 'Instância WhatsApp não conectada' }, { status: 404 })
     }
 
-    console.log('[WPP Send] Using instance:', instance.instance_id, '| status:', instance.status, '| specialist:', instance.specialist_id)
     const specialistId = instance.specialist_id || user.id
 
-    // 4. Normalize phone
+    // 4. Format phone: ensure 55{DDD}{NUMERO} without special chars
     let phone = mentee.phone.replace(/\D/g, '')
     if (!phone.startsWith('55')) {
       phone = '55' + phone
     }
 
-    console.log('[WPP Send] Sending to:', phone, 'via instance:', instance.instance_id, 'message length:', message.length)
+    // 5. Send via NextTrack API
+    let result: { success: boolean; error?: string }
 
-    // 5. Send via Next Apps
-    const result = await sendMessage(instance.instance_id, phone, message, type, imageUrl)
+    if (!type || type === 'text') {
+      result = await sendTextMessage(phone, message)
+    } else {
+      result = await sendMediaMessage(
+        phone,
+        type as 'image' | 'audio' | 'video' | 'document',
+        imageUrl || '',
+        message || undefined,
+        fileName || undefined,
+        mimeType || undefined
+      )
+    }
 
     if (!result.success) {
-      console.error('[WPP Send] sendMessage failed:', result.error)
       return NextResponse.json({ error: result.error }, { status: 500 })
     }
 
-    console.log('[WPP Send] Message sent successfully')
-
-    // 6. Save to wpp_messages
-    const { error: insertError } = await supabase.from('wpp_messages').insert({
+    // 6. Save to wpp_messages (the webhook will also fire for fromApi,
+    //    but we filter fromApi=true in the webhook handler to avoid duplicates)
+    await supabase.from('wpp_messages').insert({
       mentee_id: menteeId,
       specialist_id: specialistId,
       instance_id: instance.instance_id,
       direction: 'outgoing',
       message_type: type || 'text',
-      content: message,
+      content: message || null,
       media_url: imageUrl || null,
       is_read: true,
       sent_at: new Date().toISOString(),
     })
 
-    if (insertError) {
-      console.error('[WPP Send] Insert wpp_messages failed:', insertError)
-      // Still return success — message was sent, just not saved
-    }
-
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('[WPP Send] Unhandled error:', err)
+    console.error('[WPP Send] Error:', err)
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
 }

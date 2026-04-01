@@ -30,8 +30,6 @@ import {
   ChevronRight,
   ArrowRight,
   MessageSquare,
-  Copy,
-  Check,
   Phone,
   Mail,
   MapPin,
@@ -673,30 +671,22 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
 
         {/* Right column: Actions + Closer (or empty state) */}
         <div className="space-y-4">
-          {/* Actions card — chat link + transition */}
-          {(mentee.chat_token || (isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship)) && (
+          {/* Actions card — transition only */}
+          {isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship && (
             <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
               <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
-                <MessageSquare className="h-3.5 w-3.5 text-accent" />
+                <ArrowRight className="h-3.5 w-3.5 text-accent" />
                 <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Ações</h3>
               </div>
-              <div className="p-4 space-y-3">
-                {mentee.chat_token && (
-                  <div>
-                    <p className="text-[10px] text-muted-foreground mb-1.5">Link do chat para o mentorado</p>
-                    <ChatLinkCopy chatToken={mentee.chat_token} />
-                  </div>
-                )}
-                {isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onTransitionToMentorship(mentee)}
-                    className="w-full text-xs border-accent/30 text-accent hover:bg-accent/5"
-                  >
-                    Enviar para Etapas Mentoria <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                  </Button>
-                )}
+              <div className="p-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onTransitionToMentorship(mentee)}
+                  className="w-full text-xs border-accent/30 text-accent hover:bg-accent/5"
+                >
+                  Enviar para Etapas Mentoria <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                </Button>
               </div>
             </div>
           )}
@@ -726,7 +716,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
           )}
 
           {/* Empty state for right column when no closer and no actions */}
-          {!hasCloserData && !mentee.chat_token && !(isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship) && (
+          {!hasCloserData && !(isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship) && (
             <div className="rounded-lg border border-dashed border-border bg-muted/10 p-5 text-center">
               <Mic className="h-7 w-7 text-muted-foreground/15 mx-auto mb-1.5" />
               <p className="text-[11px] text-muted-foreground/60">Dados do Closer aparecerão aqui via webhook</p>
@@ -830,31 +820,6 @@ function ClienteFitToggle({ menteeId, initialValue }: { menteeId: string; initia
   )
 }
 
-function ChatLinkCopy({ chatToken }: { chatToken: string }) {
-  const [copied, setCopied] = useState(false)
-  const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/chat/${chatToken}`
-
-  async function handleCopy() {
-    await navigator.clipboard.writeText(url)
-    setCopied(true)
-    toast.success('Link copiado!')
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  return (
-    <div className="flex items-center gap-2 py-2">
-      <Input
-        readOnly
-        value={url}
-        className="text-xs h-8 bg-muted/50 flex-1"
-        onFocus={(e) => e.target.select()}
-      />
-      <Button variant="outline" size="sm" className="h-8 px-2 shrink-0" onClick={handleCopy}>
-        {copied ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
-      </Button>
-    </div>
-  )
-}
 
 // ─── Tab 2: Plano de Ação ───
 

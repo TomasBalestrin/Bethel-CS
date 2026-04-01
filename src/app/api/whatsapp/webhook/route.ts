@@ -13,7 +13,9 @@ import { getMediaUrl } from '@/lib/nextapps'
 
 function normalizePhone(phone: string): string {
   const digits = phone.replace(/\D/g, '')
-  return digits.slice(-9)
+  // Use last 8 digits for matching — avoids issues with
+  // inconsistent 9th digit between WhatsApp and stored phone
+  return digits.slice(-8)
 }
 
 function timestampToISO(momment: unknown): string {
@@ -160,7 +162,7 @@ export async function POST(request: NextRequest) {
 
       // 2. Find mentee by phone (last 9 digits match)
       const phoneDigits = normalizePhone(phone)
-      console.log('[WPP Webhook] Phone:', phone, '→ normalized:', phoneDigits, '→ LIKE %' + phoneDigits)
+      console.log('[WPP Webhook] Phone:', phone, '→ last 8 digits:', phoneDigits, '→ LIKE %' + phoneDigits)
 
       const { data: mentees, error: menteeErr } = await supabase
         .from('mentees')

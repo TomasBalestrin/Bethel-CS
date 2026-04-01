@@ -609,7 +609,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
           {statusLabel}
         </span>
         <Badge variant={({ 1: 'muted', 2: 'warning', 3: 'info', 4: 'success', 5: 'accent' } as const)[mentee.priority_level] ?? 'muted'}>
-          Prioridade {priorityLabel}
+          Prioridade P{mentee.priority_level}
         </Badge>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground">
           <Star className="h-3 w-3" /> Fit <ClienteFitToggle menteeId={mentee.id} initialValue={mentee.cliente_fit} />

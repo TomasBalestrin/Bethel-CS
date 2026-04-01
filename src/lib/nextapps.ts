@@ -1,18 +1,27 @@
 /**
- * Next Apps (WhatsApp) server-side authentication and API client.
- * Tokens persisted in system_tokens table for serverless compatibility.
+ * NextTrack WhatsApp API client.
+ * Handles JWT auth, token persistence, and message sending.
+ * Base URL: https://service.nextrack.com.br
  * NEVER import in client components.
  */
 
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const BASE_URL = process.env.NEXTAPPS_BASE_URL || 'https://service.nexttrack.com.br'
+const BASE_URL = process.env.NEXTAPPS_BASE_URL || 'https://service.nextrack.com.br'
 const EMAIL = process.env.NEXTAPPS_EMAIL || ''
 const PASSWORD = process.env.NEXTAPPS_PASSWORD || ''
+
+// NextTrack UUID for the instance (used in API endpoints)
+const NEXTRACK_INSTANCE_UUID = process.env.NEXTRACK_INSTANCE_UUID || ''
+
+// S3 base for constructing full media URLs
+const S3_BASE = 'https://whatsapp-avatar.s3.sa-east-1.amazonaws.com'
 
 // In-memory cache (survives within a single request/warm lambda)
 let cachedAccessToken = ''
 let cachedExpiresAt = 0
+
+// ─── Token Persistence ───
 
 async function saveToken(key: string, value: string, expiresAt: Date) {
   const supabase = createAdminClient()
@@ -35,26 +44,26 @@ async function loadToken(key: string): Promise<{ value: string; expires_at: stri
   return data as { value: string; expires_at: string } | null
 }
 
+// ─── Auth ───
+
 async function doLogin(): Promise<string> {
-  console.log('[NextApps] doLogin → URL:', `${BASE_URL}/api/auth/login`, '| email:', EMAIL, '| pass:', PASSWORD.slice(0, 4) + '****')
+  console.log('[NextTrack] doLogin → email:', EMAIL)
   const res = await fetch(`${BASE_URL}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
   })
 
-  console.log('[NextApps] doLogin response status:', res.status)
   if (!res.ok) {
     const text = await res.text()
-    console.error('[NextApps] doLogin FAILED:', res.status, text)
-    throw new Error(`Next Apps login failed (${res.status}): ${text}`)
+    console.error('[NextTrack] doLogin FAILED:', res.status, text)
+    throw new Error(`NextTrack login failed (${res.status}): ${text}`)
   }
 
   const data = await res.json()
   const access = data.accessToken || data.token || ''
   const refresh = data.refreshToken || ''
 
-  // Persist tokens
   const accessExpiry = new Date(Date.now() + 23 * 60 * 60 * 1000) // 23h
   const refreshExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7d
 
@@ -63,7 +72,6 @@ async function doLogin(): Promise<string> {
     refresh ? saveToken('nextapps_refresh', refresh, refreshExpiry) : Promise.resolve(),
   ])
 
-  // Update in-memory cache
   cachedAccessToken = access
   cachedExpiresAt = accessExpiry.getTime()
 
@@ -72,7 +80,7 @@ async function doLogin(): Promise<string> {
 
 async function doRefresh(refreshTokenValue: string): Promise<string> {
   try {
-    const res = await fetch(`${BASE_URL}/api/auth/refresh-token`, {
+    const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ refreshToken: refreshTokenValue }),
@@ -104,30 +112,26 @@ async function doRefresh(refreshTokenValue: string): Promise<string> {
 }
 
 async function getToken(): Promise<string> {
-  // 1. Check in-memory cache (same lambda invocation)
+  // 1. Check in-memory cache
   if (cachedAccessToken && Date.now() < cachedExpiresAt - 60000) {
-    console.log('[NextApps] getToken → using in-memory cache')
     return cachedAccessToken
   }
 
   // 2. Check database for valid access token
   const accessRow = await loadToken('nextapps_access')
   if (accessRow && accessRow.expires_at && new Date(accessRow.expires_at).getTime() > Date.now() + 60000) {
-    console.log('[NextApps] getToken → using DB access token (expires:', accessRow.expires_at, ')')
     cachedAccessToken = accessRow.value
     cachedExpiresAt = new Date(accessRow.expires_at).getTime()
     return accessRow.value
   }
 
-  // 3. Try refresh token from database
+  // 3. Try refresh token
   const refreshRow = await loadToken('nextapps_refresh')
   if (refreshRow && refreshRow.expires_at && new Date(refreshRow.expires_at).getTime() > Date.now()) {
-    console.log('[NextApps] getToken → refreshing token')
     return await doRefresh(refreshRow.value)
   }
 
-  // 4. No valid tokens — full login
-  console.log('[NextApps] getToken → no valid tokens, doing full login')
+  // 4. Full login
   return await doLogin()
 }
 
@@ -140,14 +144,11 @@ async function authFetch(url: string, options: RequestInit = {}): Promise<Respon
   }
 
   let res = await fetch(url, { ...options, headers })
-  console.log('[NextApps] authFetch →', url, '| status:', res.status)
 
-  // Retry once on 401 (token expired between check and use)
+  // Retry once on 401
   if (res.status === 401) {
-    console.log('[NextApps] authFetch → 401 received, retrying with fresh token')
     cachedAccessToken = ''
     cachedExpiresAt = 0
-    // Clear stale access token from DB
     const supabase = createAdminClient()
     await supabase.from('system_tokens' as never).delete().eq('key' as never, 'nextapps_access' as never)
 
@@ -161,48 +162,128 @@ async function authFetch(url: string, options: RequestInit = {}): Promise<Respon
   return res
 }
 
-export async function sendMessage(
-  instanceId: string,
+// ─── Public API ───
+
+/**
+ * Resolve the NextTrack UUID for the instance.
+ * Uses env var NEXTRACK_INSTANCE_UUID or falls back to the Whatsmeow instance_id.
+ */
+export function getInstanceUUID(whatsmeowId?: string): string {
+  if (NEXTRACK_INSTANCE_UUID) return NEXTRACK_INSTANCE_UUID
+  // Fallback: use Whatsmeow ID (may not work for all endpoints)
+  return whatsmeowId || ''
+}
+
+/**
+ * Build full media URL from webhook path.
+ * Handles both relative paths and already-complete URLs.
+ */
+export function getMediaUrl(urlField: string | null | undefined): string | null {
+  if (!urlField) return null
+  if (urlField.startsWith('http://') || urlField.startsWith('https://')) return urlField
+  return `${S3_BASE}/${urlField}`
+}
+
+/**
+ * Send a text-only message (simpler endpoint).
+ */
+export async function sendTextMessage(
   phone: string,
-  message: string,
-  type?: string,
-  imageUrl?: string
+  message: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const body: Record<string, unknown> = {
-      phone,
-      message,
-      type: type || 'text',
-    }
-    if (imageUrl) body.imageUrl = imageUrl
+    const instanceUUID = getInstanceUUID()
+    if (!instanceUUID) return { success: false, error: 'NEXTRACK_INSTANCE_UUID not configured' }
 
-    const url = `${BASE_URL}/api/chats/instances/${instanceId}/send`
-    console.log('[NextApps] sendMessage URL:', url)
-    console.log('[NextApps] sendMessage body:', JSON.stringify(body))
-
-    const res = await authFetch(url, { method: 'POST', body: JSON.stringify(body) })
-
-    console.log('[NextApps] sendMessage response status:', res.status)
+    const url = `${BASE_URL}/api/chats/instances/${instanceUUID}/send-text`
+    const res = await authFetch(url, {
+      method: 'POST',
+      body: JSON.stringify({ phone, message }),
+    })
 
     if (!res.ok) {
       const text = await res.text()
-      console.error('[NextApps] sendMessage error:', res.status, text)
       return { success: false, error: `Send failed (${res.status}): ${text}` }
     }
 
     return { success: true }
   } catch (err) {
-    console.error('[NextApps] sendMessage exception:', err)
     return { success: false, error: String(err) }
   }
 }
 
+/**
+ * Send a media message (image, audio, video, document).
+ */
+export async function sendMediaMessage(
+  phone: string,
+  type: 'image' | 'audio' | 'video' | 'document',
+  mediaUrl: string,
+  caption?: string,
+  fileName?: string,
+  mimeType?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const instanceUUID = getInstanceUUID()
+    if (!instanceUUID) return { success: false, error: 'NEXTRACK_INSTANCE_UUID not configured' }
+
+    const url = `${BASE_URL}/api/chats/instances/${instanceUUID}/send`
+    const body: Record<string, unknown> = {
+      phone,
+      type,
+      imageUrl: mediaUrl, // API uses imageUrl for ALL media types
+    }
+    if (caption) body.message = caption
+    if (fileName) body.fileName = fileName
+    if (mimeType) body.mimeType = mimeType
+
+    const res = await authFetch(url, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+
+    if (!res.ok) {
+      const text = await res.text()
+      return { success: false, error: `Send failed (${res.status}): ${text}` }
+    }
+
+    return { success: true }
+  } catch (err) {
+    return { success: false, error: String(err) }
+  }
+}
+
+/**
+ * Legacy: send message (text or media). Used by existing send route.
+ */
+export async function sendMessage(
+  _instanceId: string, // ignored — we use NEXTRACK_INSTANCE_UUID
+  phone: string,
+  message: string,
+  type?: string,
+  imageUrl?: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!type || type === 'text') {
+    return sendTextMessage(phone, message)
+  }
+  return sendMediaMessage(
+    phone,
+    type as 'image' | 'audio' | 'video' | 'document',
+    imageUrl || '',
+    message
+  )
+}
+
+/**
+ * Get QR Code for instance connection.
+ */
 export async function getQRCode(
   instanceId: string
 ): Promise<{ ascii?: string; status?: boolean; error?: string }> {
   try {
+    const uuid = getInstanceUUID(instanceId)
     const res = await authFetch(
-      `${BASE_URL}/api/instances/${instanceId}/qrcode/image`,
+      `${BASE_URL}/api/instances/${uuid}/qrcode/image`,
       { method: 'GET' }
     )
 
@@ -213,6 +294,28 @@ export async function getQRCode(
 
     const data = await res.json()
     return { ascii: data.ascii, status: data.status }
+  } catch (err) {
+    return { error: String(err) }
+  }
+}
+
+/**
+ * Get instance connection status.
+ */
+export async function getInstanceStatus(
+  instanceId?: string
+): Promise<{ status?: string; isOnline?: boolean; error?: string }> {
+  try {
+    const uuid = getInstanceUUID(instanceId)
+    const res = await authFetch(`${BASE_URL}/api/instances/${uuid}/status`)
+
+    if (!res.ok) {
+      const text = await res.text()
+      return { error: `Status check failed (${res.status}): ${text}` }
+    }
+
+    const data = await res.json()
+    return { status: data.status, isOnline: data.isOnline }
   } catch (err) {
     return { error: String(err) }
   }

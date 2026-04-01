@@ -23,7 +23,12 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Shield, User, Plus, Pencil, Trash2, Package, MessageSquare, Wifi, WifiOff, Webhook } from 'lucide-react'
-import { WebhooksSection } from '@/components/admin-webhooks'
+import dynamic from 'next/dynamic'
+
+const WebhooksSection = dynamic(
+  () => import('@/components/admin-webhooks').then((mod) => ({ default: mod.WebhooksSection })),
+  { ssr: false, loading: () => <div className="flex items-center justify-center py-12"><div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" /></div> }
+)
 import {
   createUser,
   updateUser,

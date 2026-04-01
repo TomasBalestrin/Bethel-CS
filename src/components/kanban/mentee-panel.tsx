@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Image from 'next/image'
 // Sheet no longer used — panel is fullscreen overlay
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
@@ -1888,11 +1889,14 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
                   className="rounded-md max-h-48 w-full object-contain bg-black"
                 />
               ) : (
-                <img
+                <Image
                   src={item.attachment_url}
                   alt="Depoimento"
-                  className="rounded-md max-h-48 object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                  width={400}
+                  height={192}
+                  className="rounded-md max-h-48 w-full object-contain cursor-pointer hover:opacity-90 transition-opacity"
                   onClick={() => window.open(item.attachment_url!, '_blank')}
+                  unoptimized={!item.attachment_url.includes('supabase')}
                 />
               )}
             </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import Image from 'next/image'
 import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -664,8 +665,8 @@ function MessageContent({ msg, menteeName }: { msg: WppMessage; menteeName: stri
   if (msg.message_type === 'image' && mediaUrl) {
     return (
       <>
-        <a href={mediaUrl} target="_blank" rel="noopener noreferrer">
-          <img src={mediaUrl} alt="Imagem" className="max-w-full rounded-lg mb-1" loading="lazy" />
+        <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="block relative">
+          <Image src={mediaUrl} alt="Imagem" width={300} height={200} className="rounded-lg mb-1 w-full h-auto" unoptimized={!mediaUrl.includes('supabase')} />
         </a>
         {content && <p className="whitespace-pre-wrap break-words">{content}</p>}
       </>
@@ -705,8 +706,8 @@ function MessageContent({ msg, menteeName }: { msg: WppMessage; menteeName: stri
   // Image URL in text content
   if (isImageUrl(content)) {
     return (
-      <a href={content} target="_blank" rel="noopener noreferrer">
-        <img src={content} alt="Imagem" className="max-w-full rounded-lg" loading="lazy" />
+      <a href={content} target="_blank" rel="noopener noreferrer" className="block relative">
+        <Image src={content} alt="Imagem" width={300} height={200} className="rounded-lg w-full h-auto" unoptimized={!content.includes('supabase')} />
       </a>
     )
   }

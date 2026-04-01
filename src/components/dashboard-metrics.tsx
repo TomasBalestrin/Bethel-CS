@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -81,7 +82,11 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  function updateFilter(key: string, value: string) {
+  // Debounced date filters — wait 500ms before navigating
+  const [startLocal, setStartLocal] = useState(props.filters.startDate ?? '')
+  const [endLocal, setEndLocal] = useState(props.filters.endDate ?? '')
+
+  const pushParams = useCallback((key: string, value: string) => {
     const params = new URLSearchParams(searchParams.toString())
     if (value && value !== '__all__') {
       params.set(key, value)
@@ -89,6 +94,28 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
       params.delete(key)
     }
     router.push(`/?${params.toString()}`)
+  }, [router, searchParams])
+
+  // Debounce start date
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const current = searchParams.get('start') ?? ''
+      if (startLocal !== current) pushParams('start', startLocal)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [startLocal, searchParams, pushParams])
+
+  // Debounce end date
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const current = searchParams.get('end') ?? ''
+      if (endLocal !== current) pushParams('end', endLocal)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [endLocal, searchParams, pushParams])
+
+  function updateFilter(key: string, value: string) {
+    pushParams(key, value)
   }
 
   return (
@@ -122,11 +149,11 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Data início</Label>
-            <Input type="date" value={props.filters.startDate ?? ''} onChange={(e) => updateFilter('start', e.target.value)} />
+            <Input type="date" value={startLocal} onChange={(e) => setStartLocal(e.target.value)} />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Data fim</Label>
-            <Input type="date" value={props.filters.endDate ?? ''} onChange={(e) => updateFilter('end', e.target.value)} />
+            <Input type="date" value={endLocal} onChange={(e) => setEndLocal(e.target.value)} />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Cliente Fit</Label>

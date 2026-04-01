@@ -8,11 +8,11 @@ export default async function EtapasIniciaisPage() {
   // Fetch stages
   const { data: stages } = await supabase
     .from('kanban_stages')
-    .select('*')
+    .select('id, name, type, position, created_at')
     .eq('type', 'initial')
     .order('position')
 
-  // Fetch mentees in initial kanban
+  // Fetch mentees in initial kanban (needs all fields for MenteePanel)
   const { data: mentees } = await supabase
     .from('mentees')
     .select('*')

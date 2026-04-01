@@ -7,7 +7,7 @@ export default async function EtapasMentoriaPage() {
 
   const { data: stages } = await supabase
     .from('kanban_stages')
-    .select('*')
+    .select('id, name, type, position, created_at')
     .eq('type', 'mentorship')
     .order('position')
 

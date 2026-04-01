@@ -345,6 +345,8 @@ export async function addTestimonial(
     revenue_range?: string
     employee_count?: string
     categories?: TestimonialCategory[]
+    attachment_url?: string
+    attachment_type?: 'photo' | 'video'
   }
 ) {
   const supabase = createClient()
@@ -359,6 +361,8 @@ export async function addTestimonial(
     revenue_range: data.revenue_range || null,
     employee_count: data.employee_count || null,
     categories: data.categories ?? [],
+    attachment_url: data.attachment_url || null,
+    attachment_type: data.attachment_type || null,
     created_by: user.id,
   })
 
@@ -377,20 +381,28 @@ export async function updateTestimonial(
     revenue_range?: string
     employee_count?: string
     categories?: TestimonialCategory[]
+    attachment_url?: string
+    attachment_type?: 'photo' | 'video'
   }
 ) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autenticado' }
 
-  const { error } = await supabase.from('testimonials').update({
+  const updateData: Record<string, unknown> = {
     testimonial_date: data.testimonial_date,
     description: data.description,
     niche: data.niche || null,
     revenue_range: data.revenue_range || null,
     employee_count: data.employee_count || null,
     categories: data.categories ?? [],
-  }).eq('id', testimonialId)
+  }
+  if (data.attachment_url) {
+    updateData.attachment_url = data.attachment_url
+    updateData.attachment_type = data.attachment_type || null
+  }
+
+  const { error } = await supabase.from('testimonials').update(updateData).eq('id', testimonialId)
 
   if (error) return { error: error.message }
   revalidatePath('/etapas-iniciais')

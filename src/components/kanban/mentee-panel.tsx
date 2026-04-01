@@ -1639,6 +1639,8 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
   const [revenueRange, setRevenueRange] = useState('')
   const [employeeCount, setEmployeeCount] = useState('')
   const [categories, setCategories] = useState<TestimonialCategory[]>([])
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const supabase = createClient()
@@ -1662,7 +1664,7 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
 
   function resetForm() {
     setTestimonialDate(''); setDescription(''); setNiche(''); setRevenueRange('')
-    setEmployeeCount(''); setCategories([]); setEditingId(null)
+    setEmployeeCount(''); setCategories([]); setEditingId(null); setAttachmentFile(null)
   }
 
   function handleEdit(item: Testimonial) {
@@ -1693,6 +1695,36 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
     e.preventDefault()
     setLoading(true)
 
+    // Upload file if selected
+    let attachmentUrl: string | undefined
+    let attachmentType: 'photo' | 'video' | undefined
+
+    if (attachmentFile) {
+      setUploading(true)
+      const fileExt = attachmentFile.name.split('.').pop()?.toLowerCase() ?? ''
+      const isVideo = ['mp4', 'mov', 'avi', 'webm', 'mkv'].includes(fileExt)
+      attachmentType = isVideo ? 'video' : 'photo'
+      const filePath = `${menteeId}/${Date.now()}.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('testimonials')
+        .upload(filePath, attachmentFile)
+
+      if (uploadError) {
+        toast.error(`Erro no upload: ${uploadError.message}`)
+        setLoading(false)
+        setUploading(false)
+        return
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('testimonials')
+        .getPublicUrl(filePath)
+
+      attachmentUrl = urlData.publicUrl
+      setUploading(false)
+    }
+
     if (editingId) {
       await updateTestimonial(editingId, {
         testimonial_date: testimonialDate,
@@ -1701,6 +1733,8 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
         revenue_range: revenueRange || undefined,
         employee_count: employeeCount || undefined,
         categories,
+        attachment_url: attachmentUrl,
+        attachment_type: attachmentType,
       })
     } else {
       await addTestimonial(menteeId, {
@@ -1710,6 +1744,8 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
         revenue_range: revenueRange || undefined,
         employee_count: employeeCount || undefined,
         categories,
+        attachment_url: attachmentUrl,
+        attachment_type: attachmentType,
       })
     }
 
@@ -1769,9 +1805,31 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
               ))}
             </div>
           </div>
+          <div className="space-y-2">
+            <p className="label-xs">Anexo (foto ou vídeo)</p>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 rounded-md border border-dashed border-border px-3 py-2 cursor-pointer hover:bg-muted/50 transition-colors">
+                <Plus className="h-4 w-4 text-muted-foreground" />
+                <span className="text-xs text-muted-foreground">
+                  {attachmentFile ? attachmentFile.name : 'Selecionar arquivo'}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  className="hidden"
+                  onChange={(e) => setAttachmentFile(e.target.files?.[0] ?? null)}
+                />
+              </label>
+              {attachmentFile && (
+                <button type="button" onClick={() => setAttachmentFile(null)} className="text-xs text-destructive hover:underline">
+                  Remover
+                </button>
+              )}
+            </div>
+          </div>
           <div className="flex items-center gap-2">
-            <Button type="submit" size="sm" disabled={loading}>
-              {loading ? 'Salvando...' : editingId ? 'Atualizar' : 'Salvar'}
+            <Button type="submit" size="sm" disabled={loading || uploading}>
+              {uploading ? 'Enviando arquivo...' : loading ? 'Salvando...' : editingId ? 'Atualizar' : 'Salvar'}
             </Button>
             {editingId && (
               <Button type="button" size="sm" variant="ghost" onClick={handleCancelForm}>
@@ -1819,6 +1877,24 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
             {item.niche && <Badge variant="outline" className="text-[10px]">{item.niche}</Badge>}
           </div>
           <p className="mt-1 text-foreground">{item.description}</p>
+          {item.attachment_url && (
+            <div className="mt-2">
+              {item.attachment_type === 'video' ? (
+                <video
+                  src={item.attachment_url}
+                  controls
+                  className="rounded-md max-h-48 w-full object-contain bg-black"
+                />
+              ) : (
+                <img
+                  src={item.attachment_url}
+                  alt="Depoimento"
+                  className="rounded-md max-h-48 object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                  onClick={() => window.open(item.attachment_url!, '_blank')}
+                />
+              )}
+            </div>
+          )}
           {item.categories && item.categories.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
               {item.categories.map((cat) => (

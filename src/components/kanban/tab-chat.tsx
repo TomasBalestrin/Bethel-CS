@@ -372,7 +372,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
   // ─── Render ───
   return (
-    <div className="-mx-4 -mt-4 sm:-mx-6 lg:-mx-8 flex flex-col" style={{ height: 'calc(100dvh - 160px)' }}>
+    <div className="flex flex-col h-full">
       {/* Header — fixed top */}
       <div className="flex items-center justify-between border-b border-border px-4 py-2.5 shrink-0 bg-background">
         <div className="min-w-0">

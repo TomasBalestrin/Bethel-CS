@@ -387,16 +387,17 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
         <TabsContent value="revenue"><TabRevenue menteeId={mentee.id} /></TabsContent>
         <TabsContent value="testimonials"><TabTestimonials menteeId={mentee.id} /></TabsContent>
         <TabsContent value="engagement"><TabEngagement menteeId={mentee.id} /></TabsContent>
-        <TabsContent value="chat">
-          <TabChat
-            menteeId={mentee.id}
+      </ScrollArea>
+      {/* Chat tab — outside ScrollArea (manages its own scroll) */}
+      <TabsContent value="chat" className="flex-1 overflow-hidden">
+        <TabChat
+          menteeId={mentee.id}
             menteePhone={mentee.phone}
             menteeName={mentee.full_name}
             specialistId={mentee.created_by}
             onUnreadCountChange={setChatUnread}
           />
         </TabsContent>
-      </ScrollArea>
     </Tabs>
   )
 }

@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   title: 'Bethel CS',
   description: 'Sistema de Customer Success para Mentoria Elite Premium',
   manifest: '/manifest.json',
-  themeColor: '#060A16',
+  themeColor: '#001321',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',

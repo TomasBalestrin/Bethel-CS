@@ -48,11 +48,13 @@ interface DashboardMetricsProps {
     engByType: Record<string, number>
     totalTestimonials: number
     cancelados: number
+    totalStageChanges: number
   }
   section4: {
     totalLigacoes: number
     totalLigacaoDuration: number
     totalWhatsapp: number
+    totalWhatsappIn: number
     avgWhatsappDuration: number
   }
   section5: {
@@ -165,7 +167,7 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
         <div className="p-4">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <MetricCard icon={DollarSign} label="Receita nova gerada" value={formatBRL(props.section3.totalRevenue)} color="text-success" bg="bg-success/10" source="revenue_records" />
-            <MetricCard icon={TrendingUp} label="Avanço nas etapas" value="—" color="text-info" bg="bg-info/10" source="Pendente" note="Log de stage changes pendente" />
+            <MetricCard icon={TrendingUp} label="Avanço nas etapas" value={`${props.section3.totalStageChanges} movimentações`} color="text-info" bg="bg-info/10" source="stage_changes" />
             <MetricCard icon={BookOpen} label="Área de membros" value={`${props.section3.engByType.aula ?? 0} acessos`} color="text-accent" bg="bg-accent/10" source="engagement_records (aula)" />
             <MetricCard icon={Video} label="Mentorias ao vivo" value={`${props.section3.engByType.live ?? 0} presenças`} color="text-info" bg="bg-info/10" source="engagement_records (live)" />
             <MetricCard icon={CalendarCheck} label="Eventos" value={`${props.section3.engByType.evento ?? 0} participações`} color="text-warning" bg="bg-warning/10" source="engagement_records (evento)" />
@@ -183,11 +185,12 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
           <h2 className="text-sm font-semibold text-foreground">Trabalho do CS</h2>
         </div>
         <div className="p-4">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <MetricCard icon={Phone} label="Ligações realizadas" value={props.section4.totalLigacoes} color="text-warning" bg="bg-warning/10" source="cs_activities (ligacao)" />
-            <MetricCard icon={Phone} label="Tempo de ligações" value={formatMinutes(props.section4.totalLigacaoDuration)} color="text-warning" bg="bg-warning/10" source="cs_activities (duration)" />
-            <MetricCard icon={MessageCircle} label="Atendimentos WhatsApp" value={props.section4.totalWhatsapp} color="text-success" bg="bg-success/10" source="cs_activities (whatsapp)" />
-            <MetricCard icon={MessageCircle} label="Tempo médio WhatsApp" value={props.section4.avgWhatsappDuration > 0 ? `${props.section4.avgWhatsappDuration} min` : '—'} color="text-success" bg="bg-success/10" source="cs_activities (avg duration)" />
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+            <MetricCard icon={Phone} label="Ligações realizadas" value={props.section4.totalLigacoes} color="text-warning" bg="bg-warning/10" source="call_records / cs_activities" />
+            <MetricCard icon={Phone} label="Tempo de ligações" value={formatMinutes(props.section4.totalLigacaoDuration)} color="text-warning" bg="bg-warning/10" source="call_records (duration)" />
+            <MetricCard icon={MessageCircle} label="Mensagens enviadas" value={props.section4.totalWhatsapp} color="text-success" bg="bg-success/10" source="wpp_messages (outgoing)" />
+            <MetricCard icon={MessageCircle} label="Mensagens recebidas" value={props.section4.totalWhatsappIn} color="text-info" bg="bg-info/10" source="wpp_messages (incoming)" />
+            <MetricCard icon={MessageCircle} label="Tempo médio WhatsApp" value={props.section4.avgWhatsappDuration > 0 ? `${props.section4.avgWhatsappDuration} min` : '—'} color="text-success" bg="bg-success/10" source="cs_activities (avg)" />
           </div>
         </div>
       </section>

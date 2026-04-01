@@ -79,7 +79,7 @@ export function AppSidebar({ profile }: AppSidebarProps) {
         className={`fixed inset-y-0 left-0 z-50 flex w-[280px] md:w-[260px] flex-col transition-transform duration-[250ms] ease-out md:translate-x-0 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
-        style={{ backgroundColor: '#060A16' }}
+        style={{ backgroundColor: '#001321' }}
       >
         <div className="flex h-14 items-center justify-between border-b border-white/10 px-5 md:h-16">
           <div className="flex items-center gap-3">

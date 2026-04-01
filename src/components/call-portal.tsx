@@ -107,7 +107,7 @@ export function CallPortal() {
     <div
       className="fixed bottom-6 right-6 z-[9999] w-[340px] rounded-2xl overflow-hidden"
       style={{
-        backgroundColor: '#060A16',
+        backgroundColor: '#001321',
         boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
         height: 420,
       }}

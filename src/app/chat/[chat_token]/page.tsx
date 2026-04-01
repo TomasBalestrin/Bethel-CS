@@ -132,7 +132,7 @@ export default function MenteeChatPage() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-6 text-center" style={{ backgroundColor: '#060A16' }}>
+      <div className="flex min-h-screen flex-col items-center justify-center p-6 text-center" style={{ backgroundColor: '#001321' }}>
         <Image src="/logo.png" alt="Bethel CS" width={48} height={48} className="mb-4" />
         <p className="text-sm text-white/70">{error}</p>
       </div>
@@ -149,7 +149,7 @@ export default function MenteeChatPage() {
       style={{ height: '100dvh', paddingBottom: bottomPadding > 0 ? `${bottomPadding}px` : undefined }}
     >
       {/* Header */}
-      <header className="flex items-center justify-between shrink-0 px-4 py-3" style={{ backgroundColor: '#060A16' }}>
+      <header className="flex items-center justify-between shrink-0 px-4 py-3" style={{ backgroundColor: '#001321' }}>
         <div className="flex items-center gap-3">
           <Image src="/logo.png" alt="Bethel CS" width={32} height={32} className="rounded-md" />
           <div>

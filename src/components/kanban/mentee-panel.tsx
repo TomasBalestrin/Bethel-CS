@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Image from 'next/image'
 // Sheet no longer used — panel is fullscreen overlay
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
@@ -79,7 +80,7 @@ import {
   deleteMentee,
 } from '@/lib/actions/panel-actions'
 import dynamic from 'next/dynamic'
-import type { MenteeWithStats } from '@/types/kanban'
+import type { MenteeRow, MenteeWithStats } from '@/types/kanban'
 
 const TabChat = dynamic(
   () => import('./tab-chat').then((mod) => ({ default: mod.TabChat })),
@@ -123,14 +124,18 @@ interface MenteePanelProps {
   onTransitionToMentorship?: (mentee: MenteeWithStats) => void
 }
 
-export function MenteePanel({ mentee, open, onOpenChange, onMenteeDeleted, onMenteeUpdated, onTransitionToMentorship }: MenteePanelProps) {
+export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDeleted, onMenteeUpdated, onTransitionToMentorship }: MenteePanelProps) {
   const [userRole, setUserRole] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [fullData, setFullData] = useState<MenteeRow | null>(null)
+
+  // Merge summary props with full data (fetched on open)
+  const mentee = menteeProp ? { ...menteeProp, ...fullData } as MenteeWithStats : null
 
   useEffect(() => {
-    async function fetchRole() {
+    async function fetchRoleAndFullData() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
@@ -140,9 +145,22 @@ export function MenteePanel({ mentee, open, onOpenChange, onMenteeDeleted, onMen
         .eq('id', user.id)
         .single()
       setUserRole(profile?.role ?? null)
+
+      // Fetch full mentee data (all 53 fields) for the detail panel
+      if (menteeProp) {
+        const { data: full } = await supabase
+          .from('mentees')
+          .select('*')
+          .eq('id', menteeProp.id)
+          .single()
+        if (full) setFullData(full)
+      }
     }
-    if (open) fetchRole()
-  }, [open])
+    if (open) {
+      setFullData(null)
+      fetchRoleAndFullData()
+    }
+  }, [open, menteeProp?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset edit state when panel closes
   useEffect(() => {
@@ -1453,8 +1471,8 @@ function TabObjectives({ menteeId }: { menteeId: string }) {
                 {item.achieved_at && <p className="mt-1 text-xs text-muted-foreground">{formatDateBR(item.achieved_at)}</p>}
               </div>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditObj(item)}><Pencil className="h-3 w-3" /></Button>
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteObj(item.id)}><Trash2 className="h-3 w-3" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditObj(item)} aria-label="Editar objetivo"><Pencil className="h-3 w-3" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteObj(item.id)} aria-label="Excluir objetivo"><Trash2 className="h-3 w-3" /></Button>
               </div>
             </div>
           </div>
@@ -1519,8 +1537,8 @@ function TabObjectives({ menteeId }: { menteeId: string }) {
                 <p className="text-muted-foreground">{item.indicated_phone}</p>
               </div>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditInd(item)}><Pencil className="h-3 w-3" /></Button>
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteInd(item.id)}><Trash2 className="h-3 w-3" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditInd(item)} aria-label="Editar indicação"><Pencil className="h-3 w-3" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteInd(item.id)} aria-label="Excluir indicação"><Trash2 className="h-3 w-3" /></Button>
               </div>
             </div>
           </div>
@@ -1599,8 +1617,8 @@ function TabObjectives({ menteeId }: { menteeId: string }) {
                 )}
               </div>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditInt(item)}><Pencil className="h-3 w-3" /></Button>
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteInt(item.id)}><Trash2 className="h-3 w-3" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditInt(item)} aria-label="Editar intensivo"><Pencil className="h-3 w-3" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteInt(item.id)} aria-label="Excluir intensivo"><Trash2 className="h-3 w-3" /></Button>
               </div>
             </div>
           </div>
@@ -1888,11 +1906,14 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
                   className="rounded-md max-h-48 w-full object-contain bg-black"
                 />
               ) : (
-                <img
+                <Image
                   src={item.attachment_url}
                   alt="Depoimento"
-                  className="rounded-md max-h-48 object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                  width={400}
+                  height={192}
+                  className="rounded-md max-h-48 w-full object-contain cursor-pointer hover:opacity-90 transition-opacity"
                   onClick={() => window.open(item.attachment_url!, '_blank')}
+                  unoptimized={!item.attachment_url.includes('supabase')}
                 />
               )}
             </div>

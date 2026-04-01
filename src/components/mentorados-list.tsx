@@ -1,16 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import { useDebounce } from '@/hooks/use-debounce'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Phone, Mail, Calendar, Star, AtSign } from 'lucide-react'
 import { MenteePanel } from '@/components/kanban/mentee-panel'
 import { useUnreadCounts } from '@/hooks/use-unread-counts'
 import { formatDateBR } from '@/lib/format'
-import type { Database } from '@/types/database'
-import type { MenteeWithStats } from '@/types/kanban'
-
-type Mentee = Database['public']['Tables']['mentees']['Row']
+import type { MenteeSummary, MenteeWithStats } from '@/types/kanban'
 
 const LEVEL_COLORS: Record<number, string> = {
   1: '#888780',
@@ -21,19 +19,20 @@ const LEVEL_COLORS: Record<number, string> = {
 }
 
 interface MentoradosListProps {
-  mentees: Mentee[]
+  mentees: MenteeSummary[]
 }
 
 export function MentoradosList({ mentees: initialMentees }: MentoradosListProps) {
   const [menteeList, setMenteeList] = useState(initialMentees)
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 300)
   const { unreadMap } = useUnreadCounts()
   const [selectedMentee, setSelectedMentee] = useState<MenteeWithStats | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
 
   const filtered = menteeList.filter((m) => {
-    if (!search) return true
-    const term = search.toLowerCase()
+    if (!debouncedSearch) return true
+    const term = debouncedSearch.toLowerCase()
     return (
       m.full_name.toLowerCase().includes(term) ||
       m.phone.toLowerCase().includes(term) ||
@@ -42,7 +41,7 @@ export function MentoradosList({ mentees: initialMentees }: MentoradosListProps)
     )
   })
 
-  function handleCardClick(mentee: Mentee) {
+  function handleCardClick(mentee: MenteeSummary) {
     const menteeWithStats: MenteeWithStats = {
       ...mentee,
       attendance_count: 0,
@@ -68,7 +67,7 @@ export function MentoradosList({ mentees: initialMentees }: MentoradosListProps)
         />
       </div>
 
-      <div className="mt-6 grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-6 grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 min-h-[200px]">
         {filtered.map((m) => {
           const color = LEVEL_COLORS[m.priority_level] ?? LEVEL_COLORS[1]
           const location = [m.city, m.state].filter(Boolean).join(', ')

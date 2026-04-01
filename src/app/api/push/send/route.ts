@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
   const supabase = createClient()
 
   // Fetch subscriptions for the target
-  const query = supabase.from('push_subscriptions').select('*')
+  const query = supabase.from('push_subscriptions').select('id, endpoint, p256dh, auth')
   if (payload.user_id) {
     query.eq('user_id', payload.user_id)
   } else {

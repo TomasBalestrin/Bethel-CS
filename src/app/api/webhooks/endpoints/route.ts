@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+export const runtime = 'edge'
+
 /**
  * Helper: verifica se o usuário autenticado é admin.
  */
@@ -31,7 +33,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('webhook_endpoints')
-    .select('*')
+    .select('id, name, slug, description, platform, direction, auth_type, default_action, is_active, created_at, updated_at')
     .order('created_at', { ascending: false })
 
   if (error) {

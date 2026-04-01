@@ -1,19 +1,19 @@
 import { createClient } from '@/lib/supabase/server'
 import { KanbanBoard } from '@/components/kanban/kanban-board'
-import type { MenteeWithStats } from '@/types/kanban'
+import { MENTEE_SUMMARY_FIELDS, type MenteeWithStats } from '@/types/kanban'
 
 export default async function EtapasMentoriaPage() {
   const supabase = createClient()
 
   const { data: stages } = await supabase
     .from('kanban_stages')
-    .select('*')
+    .select('id, name, type, position, created_at')
     .eq('type', 'mentorship')
     .order('position')
 
   const { data: mentees } = await supabase
     .from('mentees')
-    .select('*')
+    .select(MENTEE_SUMMARY_FIELDS)
     .eq('kanban_type', 'mentorship')
 
   const { data: allMentees } = await supabase

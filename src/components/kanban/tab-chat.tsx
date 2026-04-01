@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import Image from 'next/image'
 import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -17,7 +18,7 @@ import { toast } from 'sonner'
 import type { Database } from '@/types/database'
 
 type WppMessage = Database['public']['Tables']['wpp_messages']['Row']
-type CallRecord = Database['public']['Tables']['call_records']['Row']
+type CallRecord = Pick<Database['public']['Tables']['call_records']['Row'], 'id' | 'mentee_id' | 'duration_seconds' | 'recording_status' | 'recording_url' | 'created_at'>
 
 interface TabChatProps {
   menteeId: string
@@ -120,7 +121,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         // Fetch call history
         const { data: calls } = await supabase
           .from('call_records')
-          .select('*')
+          .select('id, mentee_id, duration_seconds, recording_status, recording_url, created_at')
           .eq('mentee_id', menteeId)
           .order('created_at', { ascending: false })
           .limit(20)
@@ -477,7 +478,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           <div className="flex items-center gap-2 mb-2 rounded-lg bg-muted px-3 py-2 text-sm">
             <Paperclip className="h-4 w-4 text-muted-foreground shrink-0" />
             <span className="truncate flex-1">{attachedFile.name}</span>
-            <button onClick={() => setAttachedFile(null)}><X className="h-4 w-4 text-muted-foreground hover:text-foreground" /></button>
+            <button onClick={() => setAttachedFile(null)} aria-label="Remover arquivo"><X className="h-4 w-4 text-muted-foreground hover:text-foreground" /></button>
           </div>
         )}
 
@@ -488,7 +489,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
             <Button size="sm" onClick={handleSend} disabled={sending || uploading}>
               {uploading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
             </Button>
-            <button onClick={cancelAudio}><X className="h-4 w-4 text-muted-foreground hover:text-foreground" /></button>
+            <button onClick={cancelAudio} aria-label="Cancelar áudio"><X className="h-4 w-4 text-muted-foreground hover:text-foreground" /></button>
           </div>
         )}
 
@@ -525,6 +526,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
               className="h-9 w-9 shrink-0 text-muted-foreground"
               onClick={() => fileInputRef.current?.click()}
               disabled={!canSend}
+              aria-label="Anexar arquivo"
             >
               <Paperclip className="h-4 w-4" />
             </Button>
@@ -535,6 +537,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
               className="h-9 w-9 shrink-0 text-muted-foreground"
               onClick={startRecording}
               disabled={!canSend}
+              aria-label="Gravar áudio"
             >
               <Mic className="h-4 w-4" />
             </Button>
@@ -558,6 +561,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
               onClick={handleSend}
               disabled={(!input.trim() && !attachedFile) || sending || uploading || !canSend}
               className="h-9 w-9 shrink-0"
+              aria-label="Enviar mensagem"
             >
               {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </Button>
@@ -664,8 +668,8 @@ function MessageContent({ msg, menteeName }: { msg: WppMessage; menteeName: stri
   if (msg.message_type === 'image' && mediaUrl) {
     return (
       <>
-        <a href={mediaUrl} target="_blank" rel="noopener noreferrer">
-          <img src={mediaUrl} alt="Imagem" className="max-w-full rounded-lg mb-1" loading="lazy" />
+        <a href={mediaUrl} target="_blank" rel="noopener noreferrer" className="block relative min-h-[100px]">
+          <Image src={mediaUrl} alt="Imagem" width={300} height={200} className="rounded-lg mb-1 w-full h-auto" unoptimized={!mediaUrl.includes('supabase')} />
         </a>
         {content && <p className="whitespace-pre-wrap break-words">{content}</p>}
       </>
@@ -705,8 +709,8 @@ function MessageContent({ msg, menteeName }: { msg: WppMessage; menteeName: stri
   // Image URL in text content
   if (isImageUrl(content)) {
     return (
-      <a href={content} target="_blank" rel="noopener noreferrer">
-        <img src={content} alt="Imagem" className="max-w-full rounded-lg" loading="lazy" />
+      <a href={content} target="_blank" rel="noopener noreferrer" className="block relative min-h-[100px]">
+        <Image src={content} alt="Imagem" width={300} height={200} className="rounded-lg w-full h-auto" unoptimized={!content.includes('supabase')} />
       </a>
     )
   }

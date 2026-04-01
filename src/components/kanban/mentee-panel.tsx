@@ -23,6 +23,7 @@ import {
   AtSign,
   Pencil,
   Trash2,
+  FileDown,
   Headphones,
   Users,
   DollarSign,

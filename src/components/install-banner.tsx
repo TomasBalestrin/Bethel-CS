@@ -88,7 +88,7 @@ export function InstallBanner({ variant = 'default' }: InstallBannerProps) {
   return (
     <div
       className="fixed bottom-0 left-0 right-0 z-[9998] flex h-14 items-center justify-between px-4"
-      style={{ backgroundColor: '#060A16' }}
+      style={{ backgroundColor: '#001321' }}
     >
       <span className="text-sm text-white">{text}</span>
       <div className="flex items-center gap-2">

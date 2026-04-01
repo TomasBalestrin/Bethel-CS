@@ -26,7 +26,7 @@ export function SplashScreen({ subtitle }: SplashScreenProps) {
       className={`fixed inset-0 z-[9999] flex flex-col items-center justify-center transition-opacity duration-500 ${
         fadeOut ? 'opacity-0' : 'opacity-100'
       }`}
-      style={{ backgroundColor: '#060A16' }}
+      style={{ backgroundColor: '#001321' }}
     >
       {/* Logo "B" */}
       <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-white/10">

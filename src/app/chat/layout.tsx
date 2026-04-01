@@ -4,7 +4,7 @@ export const metadata: Metadata = {
   title: 'Chat Bethel CS',
   description: 'Chat com seu especialista Bethel CS',
   manifest: '/manifest-chat.json',
-  themeColor: '#060A16',
+  themeColor: '#001321',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',

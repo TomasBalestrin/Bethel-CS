@@ -102,7 +102,7 @@ export default function MenteeCallPage() {
   }
 
   return (
-    <div className="flex flex-col" style={{ backgroundColor: '#060A16', height: '100dvh' }}>
+    <div className="flex flex-col" style={{ backgroundColor: '#001321', height: '100dvh' }}>
       {/* Iframe container — always in DOM, visible when joining/active */}
       <div
         ref={containerRef}

@@ -37,7 +37,7 @@ export function Header({ profile }: HeaderProps) {
   return (
     <>
       {/* Mobile header — dark, 56px */}
-      <header className="flex h-14 items-center justify-between px-4 md:hidden" style={{ backgroundColor: '#060A16' }}>
+      <header className="flex h-14 items-center justify-between px-4 md:hidden" style={{ backgroundColor: '#001321' }}>
         {/* Spacer for hamburger (handled by sidebar) */}
         <div className="w-7" />
 

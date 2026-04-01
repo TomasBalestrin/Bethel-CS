@@ -60,7 +60,7 @@
 
 @layer components {
   .gradient-primary {
-    background: linear-gradient(135deg, #060A16 0%, #1F3A7D 100%);
+    background: linear-gradient(135deg, #001321 0%, #002C4A 100%);
   }
 
   .label-xs {
@@ -78,8 +78,8 @@
 
 /* ─── Stream Chat Bethel overrides ─── */
 .bethel-chat .str-chat {
-  --str-chat__primary-color: #1F3A7D;
-  --str-chat__active-primary-color: #162d63;
+  --str-chat__primary-color: #B19365;
+  --str-chat__active-primary-color: #9A7E56;
   --str-chat__font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
   font-family: var(--str-chat__font-family);
   height: 100%;
@@ -98,7 +98,7 @@
 }
 
 .bethel-chat .str-chat__send-button {
-  color: #1F3A7D;
+  color: #B19365;
 }
 
 /* Public chat page — full height */
@@ -108,8 +108,8 @@
 }
 
 .bethel-chat-public .str-chat {
-  --str-chat__primary-color: #1F3A7D;
-  --str-chat__active-primary-color: #162d63;
+  --str-chat__primary-color: #B19365;
+  --str-chat__active-primary-color: #9A7E56;
   --str-chat__font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
   font-family: var(--str-chat__font-family);
   height: 100%;
@@ -120,7 +120,7 @@
 }
 
 .bethel-chat-public .str-chat__send-button {
-  color: #1F3A7D;
+  color: #B19365;
 }
 
 .bethel-chat-public .str-chat__message-bubble {

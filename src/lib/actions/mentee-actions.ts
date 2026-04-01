@@ -130,6 +130,15 @@ export async function moveMentee(menteeId: string, newStageId: string) {
     return { error: 'Não autenticado' }
   }
 
+  // Get current stage before moving
+  const { data: mentee } = await supabase
+    .from('mentees')
+    .select('current_stage_id')
+    .eq('id', menteeId)
+    .single()
+
+  const fromStageId = mentee?.current_stage_id ?? null
+
   const { error } = await supabase
     .from('mentees')
     .update({ current_stage_id: newStageId })
@@ -138,6 +147,14 @@ export async function moveMentee(menteeId: string, newStageId: string) {
   if (error) {
     return { error: error.message }
   }
+
+  // Log stage change
+  await supabase.from('stage_changes' as never).insert({
+    mentee_id: menteeId,
+    from_stage_id: fromStageId,
+    to_stage_id: newStageId,
+    changed_by: user.id,
+  } as never)
 
   revalidatePath('/etapas-iniciais')
   revalidatePath('/etapas-mentoria')
@@ -149,6 +166,15 @@ export async function transitionToMentorship(menteeId: string) {
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autenticado' }
+
+  // Get current stage before transition
+  const { data: mentee } = await supabase
+    .from('mentees')
+    .select('current_stage_id')
+    .eq('id', menteeId)
+    .single()
+
+  const fromStageId = mentee?.current_stage_id ?? null
 
   // Get the first stage of the mentorship kanban
   const { data: firstStage } = await supabase
@@ -170,6 +196,14 @@ export async function transitionToMentorship(menteeId: string) {
     .eq('id', menteeId)
 
   if (error) return { error: error.message }
+
+  // Log stage change (transition)
+  await supabase.from('stage_changes' as never).insert({
+    mentee_id: menteeId,
+    from_stage_id: fromStageId,
+    to_stage_id: firstStage.id,
+    changed_by: user.id,
+  } as never)
 
   revalidatePath('/etapas-iniciais')
   revalidatePath('/etapas-mentoria')

@@ -67,6 +67,27 @@ export default async function DashboardPage({ searchParams }: Props) {
   if (endDate) csQuery = csQuery.lte('activity_date', endDate)
   if (specialistId) csQuery = csQuery.eq('specialist_id', specialistId)
 
+  // ─── Stage Changes (count for dashboard) ───
+  let stageChangesQuery = supabase.from('stage_changes' as never).select('id' as never, { count: 'exact', head: true } as never)
+  if (startDate) stageChangesQuery = (stageChangesQuery as any).gte('changed_at', startDate)
+  if (endDate) stageChangesQuery = (stageChangesQuery as any).lte('changed_at', endDate + 'T23:59:59')
+
+  // ─── Call Records (count + total duration) ───
+  let callsQuery = supabase.from('call_records').select('duration_seconds')
+  if (startDate) callsQuery = callsQuery.gte('created_at', startDate)
+  if (endDate) callsQuery = callsQuery.lte('created_at', endDate + 'T23:59:59')
+  if (specialistId) callsQuery = callsQuery.eq('specialist_id', specialistId)
+
+  // ─── WhatsApp Messages (count by direction) ───
+  let wppOutQuery = supabase.from('wpp_messages').select('id', { count: 'exact', head: true }).eq('direction', 'outgoing')
+  if (startDate) wppOutQuery = wppOutQuery.gte('sent_at', startDate)
+  if (endDate) wppOutQuery = wppOutQuery.lte('sent_at', endDate + 'T23:59:59')
+  if (specialistId) wppOutQuery = wppOutQuery.eq('specialist_id', specialistId)
+
+  let wppInQuery = supabase.from('wpp_messages').select('id', { count: 'exact', head: true }).eq('direction', 'incoming')
+  if (startDate) wppInQuery = wppInQuery.gte('sent_at', startDate)
+  if (endDate) wppInQuery = wppInQuery.lte('sent_at', endDate + 'T23:59:59')
+
   const [
     { data: mentees },
     { data: revenues },
@@ -74,6 +95,10 @@ export default async function DashboardPage({ searchParams }: Props) {
     { count: indicationCount },
     { data: engagements },
     { data: csActivities },
+    { count: stageChangeCount },
+    { data: callRecords },
+    { count: wppOutCount },
+    { count: wppInCount },
   ] = await Promise.all([
     menteesQuery,
     revenueQuery,
@@ -81,6 +106,10 @@ export default async function DashboardPage({ searchParams }: Props) {
     indicationsQuery,
     engagementQuery,
     csQuery,
+    stageChangesQuery as any,
+    callsQuery,
+    wppOutQuery,
+    wppInQuery,
   ])
 
   // ─── SEÇÃO 2: Visão Geral ───
@@ -99,15 +128,32 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   const totalTestimonials = testimonialCount ?? 0
 
-  // ─── SEÇÃO 4: Trabalho CS ───
+  // ─── SEÇÃO 3b: Stage changes ───
+  const totalStageChanges = (stageChangeCount as number) ?? 0
+
+  // ─── SEÇÃO 4: Trabalho CS (automático + manual) ───
+  // Manual CS activities
   const allCs = csActivities ?? []
-  const ligacoes = allCs.filter((c) => c.type === 'ligacao')
-  const whatsapps = allCs.filter((c) => c.type === 'whatsapp')
-  const totalLigacoes = ligacoes.length
-  const totalLigacaoDuration = ligacoes.reduce((s, c) => s + Number(c.duration_minutes), 0)
-  const totalWhatsapp = whatsapps.length
-  const totalWhatsappDuration = whatsapps.reduce((s, c) => s + Number(c.duration_minutes), 0)
-  const avgWhatsappDuration = totalWhatsapp > 0 ? Math.round(totalWhatsappDuration / totalWhatsapp) : 0
+  const ligacoesManuais = allCs.filter((c) => c.type === 'ligacao')
+  const whatsappsManuais = allCs.filter((c) => c.type === 'whatsapp')
+
+  // Automático: call_records + wpp_messages
+  const allCalls = callRecords ?? []
+  const totalCalls = allCalls.length
+  const totalCallDuration = allCalls.reduce((s, c) => s + Number(c.duration_seconds ?? 0), 0)
+  const totalCallMinutes = Math.round(totalCallDuration / 60)
+
+  const totalWppOut = (wppOutCount as number) ?? 0
+  const totalWppIn = (wppInCount as number) ?? 0
+
+  // Combinado: automático tem prioridade, fallback para manual
+  const totalLigacoes = totalCalls > 0 ? totalCalls : ligacoesManuais.length
+  const totalLigacaoDuration = totalCalls > 0 ? totalCallMinutes : ligacoesManuais.reduce((s, c) => s + Number(c.duration_minutes), 0)
+  const totalWhatsapp = totalWppOut > 0 ? totalWppOut : whatsappsManuais.length
+  const totalWhatsappIn = totalWppIn
+  const avgWhatsappDuration = whatsappsManuais.length > 0
+    ? Math.round(whatsappsManuais.reduce((s, c) => s + Number(c.duration_minutes), 0) / whatsappsManuais.length)
+    : 0
 
   // ─── SEÇÃO 5: Receita ───
   const revByType: Record<string, number> = {
@@ -134,11 +180,13 @@ export default async function DashboardPage({ searchParams }: Props) {
         engByType,
         totalTestimonials,
         cancelados,
+        totalStageChanges,
       }}
       section4={{
         totalLigacoes,
         totalLigacaoDuration,
         totalWhatsapp,
+        totalWhatsappIn,
         avgWhatsappDuration,
       }}
       section5={{

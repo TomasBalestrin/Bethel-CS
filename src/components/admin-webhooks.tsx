@@ -375,7 +375,7 @@ function EndpointCard({
           </div>
           <p className="text-xs text-muted-foreground mt-1 font-mono">{endpoint.slug}</p>
           <div className="flex items-center gap-1 mt-2">
-            <code className="text-[11px] text-muted-foreground truncate block max-w-[400px]">
+            <code className="text-[11px] text-muted-foreground truncate block max-w-[200px] sm:max-w-[400px]">
               {webhookUrl}
             </code>
             <button
@@ -730,7 +730,7 @@ function EndpointFormDialog({
                 const value = fm?.value ?? ''
                 return (
                   <div key={gf.key} className="flex items-center gap-2">
-                    <span className="text-sm shrink-0 w-36 flex items-center gap-1.5">
+                    <span className="text-xs sm:text-sm shrink-0 w-24 sm:w-36 flex items-center gap-1.5">
                       <span>{gf.icon}</span>
                       <span className="text-xs text-foreground">{gf.label}</span>
                       {gf.recommended && <span className="text-[9px] text-accent">*</span>}

@@ -744,7 +744,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
             </span>
           </div>
           <div className="p-4 space-y-3">
-            <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
               <MetricBox label="Fat. atual" value={mentee.faturamento_atual != null ? formatBRL(mentee.faturamento_atual) : '—'} highlight />
               <MetricBox label="Mês anterior" value={mentee.faturamento_mes_anterior != null ? formatBRL(mentee.faturamento_mes_anterior) : '—'} />
               <MetricBox label="Antes mentoria" value={mentee.faturamento_antes_mentoria != null ? formatBRL(mentee.faturamento_antes_mentoria) : '—'} />
@@ -753,7 +753,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
               <MetricBox label="Conversão" value={mentee.taxa_conversao != null ? `${mentee.taxa_conversao}%` : '—'} />
               <MetricBox label="Ticket médio" value={mentee.ticket_medio != null ? formatBRL(mentee.ticket_medio) : '—'} />
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
               <MetricBox label="Receita período" value={mentee.total_receita_periodo != null ? formatBRL(mentee.total_receita_periodo) : '—'} />
               <MetricBox label="Entrada período" value={mentee.total_entrada_periodo != null ? formatBRL(mentee.total_entrada_periodo) : '—'} />
               <MetricBox label="Dias acessou" value={mentee.dias_acessou_sistema ?? '—'} />
@@ -1219,7 +1219,7 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
               </SelectContent>
             </Select>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label htmlFor="rev-sale">Valor de venda *</Label>
               <Input
@@ -1774,7 +1774,7 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
             <Label htmlFor="test-desc">Descrição *</Label>
             <Textarea id="test-desc" value={description} onChange={(e) => setDescription(e.target.value)} required />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label htmlFor="test-niche">Nicho</Label>
               <Input id="test-niche" value={niche} onChange={(e) => setNiche(e.target.value)} />
@@ -2024,7 +2024,7 @@ function TabEngagement({ menteeId }: { menteeId: string }) {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label htmlFor="eng-value">Quantidade *</Label>
                   <Input id="eng-value" type="number" step="0.01" value={engValue} onChange={(e) => setEngValue(e.target.value)} required />
@@ -2052,7 +2052,7 @@ function TabEngagement({ menteeId }: { menteeId: string }) {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label htmlFor="cs-duration">Duração (min) *</Label>
                   <Input id="cs-duration" type="number" value={csDuration} onChange={(e) => setCsDuration(e.target.value)} required />

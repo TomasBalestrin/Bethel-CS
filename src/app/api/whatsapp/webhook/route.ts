@@ -23,12 +23,6 @@ function timestampToISO(momment: unknown): string {
   return new Date(ms).toISOString()
 }
 
-/**
- * Extract content text from message payload.
- * - text messages: data.text.message
- * - documents: data.text.message contains the friendly filename
- * - image/video with caption: data.image.caption / data.video.caption
- */
 function extractContent(data: Record<string, unknown>): string | null {
   const text = data.text as { message?: string } | undefined
   if (text?.message) return text.message
@@ -42,11 +36,6 @@ function extractContent(data: Record<string, unknown>): string | null {
   return null
 }
 
-/**
- * Extract media URL from the type-specific payload field.
- * Each type has its own nested object (audio.url, image.url, etc.)
- * Returns a full S3 URL or null.
- */
 function extractMediaUrl(data: Record<string, unknown>): string | null {
   const audio = data.audio as { url?: string; audioUrl?: string } | undefined
   if (audio?.url) return getMediaUrl(audio.url)
@@ -76,12 +65,26 @@ export async function POST(request: NextRequest) {
     const data = (body.data || body) as Record<string, unknown>
     const instanceId = (body.instanceId || data.instanceId) as string
 
+    console.log('[WPP Webhook] ═══ INCOMING ═══')
+    console.log('[WPP Webhook] event:', event)
+    console.log('[WPP Webhook] instanceId:', instanceId)
+    console.log('[WPP Webhook] data.phone:', data.phone)
+    console.log('[WPP Webhook] data.fromMe:', data.fromMe)
+    console.log('[WPP Webhook] data.fromApi:', data.fromApi)
+    console.log('[WPP Webhook] data.isGroup:', data.isGroup)
+    console.log('[WPP Webhook] data.messageType:', data.messageType)
+    console.log('[WPP Webhook] data.senderName:', data.senderName)
+    console.log('[WPP Webhook] data.messageId:', data.messageId)
+    console.log('[WPP Webhook] data.momment:', data.momment)
+
     const supabase = createAdminClient()
 
     // ─── Connection status events ───
     if (event === 'connected' || event === 'disconnected') {
       const connData = data as { instanceId?: string; connectedPhone?: string }
       const whatsmeowId = connData.instanceId || instanceId
+
+      console.log('[WPP Webhook] Connection event:', event, '| whatsmeowId:', whatsmeowId)
 
       if (whatsmeowId) {
         const status = event === 'connected' ? 'connected' : 'disconnected'
@@ -92,8 +95,8 @@ export async function POST(request: NextRequest) {
           .select('id')
 
         if (!updated || updated.length === 0) {
-          // Try matching by phone_number from data
           const phone = connData.connectedPhone
+          console.log('[WPP Webhook] No match by instance_id, trying phone:', phone)
           if (phone) {
             await supabase
               .from('wpp_instances')
@@ -108,16 +111,18 @@ export async function POST(request: NextRequest) {
     // ─── Message received ───
     if (event === 'message_received') {
       const phone = data.phone as string
-      if (!phone) return NextResponse.json({ ok: true })
-
-      // Filter: ignore group messages
-      if (data.isGroup === true) {
+      if (!phone) {
+        console.log('[WPP Webhook] SKIP: no phone in data')
         return NextResponse.json({ ok: true })
       }
 
-      // Filter: ignore messages sent via API to avoid duplicates
-      // (our send route already saves the outgoing message)
+      if (data.isGroup === true) {
+        console.log('[WPP Webhook] SKIP: group message')
+        return NextResponse.json({ ok: true })
+      }
+
       if (data.fromApi === true) {
+        console.log('[WPP Webhook] SKIP: fromApi=true (sent by our system)')
         return NextResponse.json({ ok: true })
       }
 
@@ -126,38 +131,50 @@ export async function POST(request: NextRequest) {
       let instance: { specialist_id: string } | null = null
 
       if (whatsmeowId) {
-        const { data: found } = await supabase
+        const { data: found, error: instErr } = await supabase
           .from('wpp_instances')
           .select('specialist_id')
           .eq('instance_id', whatsmeowId)
           .single()
         instance = found
+        console.log('[WPP Webhook] Instance lookup by', whatsmeowId, '→', found ? 'FOUND' : 'NOT FOUND', instErr?.message || '')
       }
 
       if (!instance) {
-        const { data: fallback } = await supabase
+        const { data: fallback, error: fbErr } = await supabase
           .from('wpp_instances')
           .select('specialist_id')
           .eq('status', 'connected')
           .limit(1)
           .single()
         instance = fallback
+        console.log('[WPP Webhook] Instance fallback (connected) →', fallback ? 'FOUND' : 'NOT FOUND', fbErr?.message || '')
       }
 
       if (!instance) {
-        console.warn('[WPP Webhook] No instance found for:', whatsmeowId)
+        console.error('[WPP Webhook] ABORT: No wpp_instance found at all')
         return NextResponse.json({ ok: true })
       }
 
+      console.log('[WPP Webhook] specialist_id:', instance.specialist_id)
+
       // 2. Find mentee by phone (last 9 digits match)
       const phoneDigits = normalizePhone(phone)
-      const { data: mentees } = await supabase
+      console.log('[WPP Webhook] Phone:', phone, '→ normalized:', phoneDigits, '→ LIKE %' + phoneDigits)
+
+      const { data: mentees, error: menteeErr } = await supabase
         .from('mentees')
-        .select('id')
+        .select('id, phone, full_name')
         .like('phone', `%${phoneDigits}`)
+
+      console.log('[WPP Webhook] Mentee search results:', mentees?.length ?? 0, menteeErr?.message || '')
+      if (mentees?.length) {
+        console.log('[WPP Webhook] Matched mentees:', mentees.map(m => `${m.full_name} (${m.phone})`).join(', '))
+      }
 
       const mentee = mentees?.[0]
       if (!mentee) {
+        console.warn('[WPP Webhook] ABORT: Mentee not found for phone:', phone, '(digits:', phoneDigits, ')')
         return NextResponse.json({ ok: true })
       }
 
@@ -171,6 +188,7 @@ export async function POST(request: NextRequest) {
           .maybeSingle()
 
         if (existing) {
+          console.log('[WPP Webhook] SKIP: duplicate messageId:', messageId)
           return NextResponse.json({ ok: true })
         }
       }
@@ -189,8 +207,10 @@ export async function POST(request: NextRequest) {
       const senderName = (data.senderName as string) || null
       const sentAt = timestampToISO(data.momment)
 
+      console.log('[WPP Webhook] INSERT → mentee:', mentee.full_name, '| direction:', direction, '| type:', messageType, '| content:', content?.slice(0, 50), '| mediaUrl:', mediaUrl?.slice(0, 60), '| sentAt:', sentAt)
+
       // 5. Insert message
-      await supabase.from('wpp_messages').insert({
+      const { error: insertErr } = await supabase.from('wpp_messages').insert({
         mentee_id: mentee.id,
         specialist_id: instance.specialist_id,
         instance_id: whatsmeowId,
@@ -203,6 +223,13 @@ export async function POST(request: NextRequest) {
         is_read: data.fromMe ? true : false,
         sent_at: sentAt,
       })
+
+      if (insertErr) {
+        console.error('[WPP Webhook] INSERT FAILED:', insertErr.message, insertErr.details, insertErr.hint)
+        return NextResponse.json({ ok: true })
+      }
+
+      console.log('[WPP Webhook] INSERT SUCCESS ✓')
 
       // 6. Update chat_metrics for the day
       const day = sentAt.slice(0, 10)
@@ -237,11 +264,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    // Unknown event — ignore
+    console.log('[WPP Webhook] Unknown event:', event)
     return NextResponse.json({ ok: true })
   } catch (err) {
-    console.error('[WPP Webhook] Error:', err)
-    // Always return 200 to avoid NextTrack marking as failure
+    console.error('[WPP Webhook] EXCEPTION:', err)
     return NextResponse.json({ ok: true })
   }
 }

@@ -68,9 +68,10 @@ export default async function DashboardPage({ searchParams }: Props) {
   if (specialistId) csQuery = csQuery.eq('specialist_id', specialistId)
 
   // ─── Stage Changes (count for dashboard) ───
-  let stageChangesQuery = supabase.from('stage_changes' as never).select('id' as never, { count: 'exact', head: true } as never)
-  if (startDate) stageChangesQuery = (stageChangesQuery as any).gte('changed_at', startDate)
-  if (endDate) stageChangesQuery = (stageChangesQuery as any).lte('changed_at', endDate + 'T23:59:59')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let stageChangesQuery = supabase.from('stage_changes' as never).select('id' as never, { count: 'exact', head: true } as never) as any
+  if (startDate) stageChangesQuery = stageChangesQuery.gte('changed_at', startDate)
+  if (endDate) stageChangesQuery = stageChangesQuery.lte('changed_at', endDate + 'T23:59:59')
 
   // ─── Call Records (count + total duration) ───
   let callsQuery = supabase.from('call_records').select('duration_seconds')
@@ -106,7 +107,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     indicationsQuery,
     engagementQuery,
     csQuery,
-    stageChangesQuery as any,
+    stageChangesQuery,
     callsQuery,
     wppOutQuery,
     wppInQuery,

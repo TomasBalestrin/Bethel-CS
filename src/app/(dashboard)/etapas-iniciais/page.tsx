@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { KanbanBoard } from '@/components/kanban/kanban-board'
-import type { MenteeWithStats } from '@/types/kanban'
+import { MENTEE_SUMMARY_FIELDS, type MenteeWithStats } from '@/types/kanban'
 
 export default async function EtapasIniciaisPage() {
   const supabase = createClient()
@@ -12,10 +12,10 @@ export default async function EtapasIniciaisPage() {
     .eq('type', 'initial')
     .order('position')
 
-  // Fetch mentees in initial kanban (needs all fields for MenteePanel)
+  // Fetch mentees in initial kanban (summary fields for cards)
   const { data: mentees } = await supabase
     .from('mentees')
-    .select('*')
+    .select(MENTEE_SUMMARY_FIELDS)
     .eq('kanban_type', 'initial')
 
   // Fetch all mentees for referral lookup

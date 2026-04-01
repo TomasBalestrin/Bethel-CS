@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
+export const runtime = 'edge'
+
 /**
  * Helper: verifica se o usuário autenticado é admin.
  */

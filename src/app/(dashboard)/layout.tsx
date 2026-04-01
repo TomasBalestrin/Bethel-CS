@@ -6,6 +6,7 @@ import { SplashScreen } from '@/components/splash-screen'
 import { PushPrompt } from '@/components/push-prompt'
 import { InstallBanner } from '@/components/install-banner'
 import { ErrorBoundaryWrapper } from '@/components/error-boundary-wrapper'
+import { QueryProvider } from '@/components/query-provider'
 
 export default async function DashboardLayout({
   children,
@@ -42,7 +43,9 @@ export default async function DashboardLayout({
         <div className="flex flex-1 flex-col md:pl-[260px]">
           <Header profile={profile} />
           <main className="flex-1 p-4 md:p-6 lg:p-8">
-            <ErrorBoundaryWrapper>{children}</ErrorBoundaryWrapper>
+            <QueryProvider>
+              <ErrorBoundaryWrapper>{children}</ErrorBoundaryWrapper>
+            </QueryProvider>
           </main>
         </div>
       </div>

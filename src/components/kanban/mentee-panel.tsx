@@ -80,7 +80,7 @@ import {
   deleteMentee,
 } from '@/lib/actions/panel-actions'
 import dynamic from 'next/dynamic'
-import type { MenteeWithStats } from '@/types/kanban'
+import type { MenteeRow, MenteeWithStats } from '@/types/kanban'
 
 const TabChat = dynamic(
   () => import('./tab-chat').then((mod) => ({ default: mod.TabChat })),
@@ -124,14 +124,18 @@ interface MenteePanelProps {
   onTransitionToMentorship?: (mentee: MenteeWithStats) => void
 }
 
-export function MenteePanel({ mentee, open, onOpenChange, onMenteeDeleted, onMenteeUpdated, onTransitionToMentorship }: MenteePanelProps) {
+export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDeleted, onMenteeUpdated, onTransitionToMentorship }: MenteePanelProps) {
   const [userRole, setUserRole] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [fullData, setFullData] = useState<MenteeRow | null>(null)
+
+  // Merge summary props with full data (fetched on open)
+  const mentee = menteeProp ? { ...menteeProp, ...fullData } as MenteeWithStats : null
 
   useEffect(() => {
-    async function fetchRole() {
+    async function fetchRoleAndFullData() {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
@@ -141,9 +145,22 @@ export function MenteePanel({ mentee, open, onOpenChange, onMenteeDeleted, onMen
         .eq('id', user.id)
         .single()
       setUserRole(profile?.role ?? null)
+
+      // Fetch full mentee data (all 53 fields) for the detail panel
+      if (menteeProp) {
+        const { data: full } = await supabase
+          .from('mentees')
+          .select('*')
+          .eq('id', menteeProp.id)
+          .single()
+        if (full) setFullData(full)
+      }
     }
-    if (open) fetchRole()
-  }, [open])
+    if (open) {
+      setFullData(null)
+      fetchRoleAndFullData()
+    }
+  }, [open, menteeProp?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Reset edit state when panel closes
   useEffect(() => {

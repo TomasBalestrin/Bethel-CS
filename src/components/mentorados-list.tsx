@@ -8,10 +8,7 @@ import { Phone, Mail, Calendar, Star, AtSign } from 'lucide-react'
 import { MenteePanel } from '@/components/kanban/mentee-panel'
 import { useUnreadCounts } from '@/hooks/use-unread-counts'
 import { formatDateBR } from '@/lib/format'
-import type { Database } from '@/types/database'
-import type { MenteeWithStats } from '@/types/kanban'
-
-type Mentee = Database['public']['Tables']['mentees']['Row']
+import type { MenteeSummary, MenteeWithStats } from '@/types/kanban'
 
 const LEVEL_COLORS: Record<number, string> = {
   1: '#888780',
@@ -22,7 +19,7 @@ const LEVEL_COLORS: Record<number, string> = {
 }
 
 interface MentoradosListProps {
-  mentees: Mentee[]
+  mentees: MenteeSummary[]
 }
 
 export function MentoradosList({ mentees: initialMentees }: MentoradosListProps) {
@@ -44,7 +41,7 @@ export function MentoradosList({ mentees: initialMentees }: MentoradosListProps)
     )
   })
 
-  function handleCardClick(mentee: Mentee) {
+  function handleCardClick(mentee: MenteeSummary) {
     const menteeWithStats: MenteeWithStats = {
       ...mentee,
       attendance_count: 0,

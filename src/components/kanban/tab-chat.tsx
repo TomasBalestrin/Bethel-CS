@@ -372,7 +372,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
   // ─── Render ───
   return (
-    <div className="-mx-4 -mt-4 sm:-mx-6 flex flex-col" style={{ height: 'calc(100dvh - 260px)' }}>
+    <div className="-mx-4 -mt-4 sm:-mx-6 lg:-mx-8 flex flex-col" style={{ height: 'calc(100dvh - 160px)' }}>
       {/* Header — fixed top */}
       <div className="flex items-center justify-between border-b border-border px-4 py-2.5 shrink-0 bg-background">
         <div className="min-w-0">
@@ -405,8 +405,8 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
             <PhoneCall className="h-3 w-3" />
             Ligações {callRecords.length > 0 && `(${callRecords.length})`}
           </Button>
-          <span className={`h-2 w-2 rounded-full ${instanceStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'}`} />
-          <span className="text-[10px] text-muted-foreground">
+          <span className={`h-2 w-2 rounded-full shrink-0 ${instanceStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'}`} />
+          <span className="text-[10px] text-muted-foreground hidden sm:inline">
             {instanceStatus === 'connected' ? 'Conectado' : 'Desconectado'}
           </span>
         </div>

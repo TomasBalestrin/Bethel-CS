@@ -422,17 +422,6 @@ function ContactRow({ icon: Icon, label, value, href, color, bg }: {
   )
 }
 
-// ─── Mini row with icon for mentoria/closer sections ───
-function MiniRow({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
-  return (
-    <div className="flex items-center gap-2 py-1">
-      <Icon className="h-3 w-3 text-muted-foreground shrink-0" />
-      <span className="text-xs text-muted-foreground shrink-0">{label}</span>
-      <span className="text-xs text-foreground ml-auto text-right truncate">{value}</span>
-    </div>
-  )
-}
-
 // ─── Metric box for performance data ───
 function MetricBox({ label, value, highlight }: { label: string; value: string | number; highlight?: boolean }) {
   return (

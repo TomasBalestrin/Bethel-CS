@@ -21,20 +21,24 @@ export async function POST(request: NextRequest) {
   if (call.recording_status === 'ready') return NextResponse.json({ status: 'ready' })
 
   // Check Daily API for recordings
-  const recordings = await getRecordings(call.daily_room_name)
+  try {
+    const recordings = await getRecordings(call.daily_room_name)
 
-  if (recordings.length > 0) {
-    const rec = recordings[0]
-    await supabase
-      .from('call_records')
-      .update({
-        recording_url: rec.download_url,
-        recording_status: 'ready',
-        duration_seconds: Math.round(rec.duration),
-      })
-      .eq('id', callId)
+    if (recordings.length > 0) {
+      const rec = recordings[0]
+      await supabase
+        .from('call_records')
+        .update({
+          recording_url: rec.download_url,
+          recording_status: 'ready',
+          duration_seconds: Math.round(rec.duration),
+        })
+        .eq('id', callId)
 
-    return NextResponse.json({ status: 'ready', recording_url: rec.download_url })
+      return NextResponse.json({ status: 'ready', recording_url: rec.download_url })
+    }
+  } catch (err) {
+    console.error('[check-recording] Daily API error:', err)
   }
 
   return NextResponse.json({ status: 'pending' })

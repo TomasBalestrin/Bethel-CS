@@ -47,6 +47,16 @@ export function CallPortal() {
       iframe.setAttribute('allow', 'camera; microphone; autoplay; display-capture')
     }
 
+    // Start cloud recording automatically when the specialist (owner) joins
+    frame.on('joined-meeting', () => {
+      try {
+        frame.startRecording()
+        console.log('[CallPortal] Cloud recording started')
+      } catch (err) {
+        console.error('[CallPortal] Failed to start recording:', err)
+      }
+    })
+
     frame.on('left-meeting', () => {
       const cid = useCallStore.getState().callId
       if (cid) {
@@ -56,11 +66,11 @@ export function CallPortal() {
           body: JSON.stringify({ callId: cid }),
         }).catch(() => {})
 
-        // Poll for recording (check every 10s for 2 minutes)
+        // Poll for recording (check every 15s for 5 minutes)
         let attempts = 0
         const recordingPoll = setInterval(async () => {
           attempts++
-          if (attempts > 12) { clearInterval(recordingPoll); return }
+          if (attempts > 20) { clearInterval(recordingPoll); return }
           try {
             const res = await fetch('/api/calls/check-recording', {
               method: 'POST',
@@ -70,7 +80,7 @@ export function CallPortal() {
             const data = await res.json()
             if (data.status === 'ready') clearInterval(recordingPoll)
           } catch { /* */ }
-        }, 10000)
+        }, 15000)
       }
       joinedRef.current = null
       if (callFrameRef.current) {

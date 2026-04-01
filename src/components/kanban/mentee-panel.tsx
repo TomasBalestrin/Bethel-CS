@@ -301,6 +301,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
   const tabsRef = useRef<HTMLDivElement>(null)
   const [showOverflow, setShowOverflow] = useState(false)
   const [chatUnread, setChatUnread] = useState(0)
+  const [activeTab, setActiveTab] = useState('info')
 
   useEffect(() => {
     function check() {
@@ -314,7 +315,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
   }, [])
 
   return (
-    <Tabs defaultValue="info" className="flex flex-col h-full">
+    <Tabs defaultValue="info" className="flex flex-col h-full" onValueChange={setActiveTab}>
       <div className="relative mx-4 mt-3 sm:mx-6">
         <div
           ref={tabsRef}
@@ -371,7 +372,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
           </button>
         )}
       </div>
-      <ScrollArea className="flex-1 px-4 py-4 sm:px-6 lg:px-8">
+      <ScrollArea className={`flex-1 px-4 py-4 sm:px-6 lg:px-8 ${activeTab === 'chat' ? 'hidden' : ''}`}>
         <TabsContent value="info">
           <TabInfo
             mentee={mentee}
@@ -389,7 +390,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
         <TabsContent value="engagement"><TabEngagement menteeId={mentee.id} /></TabsContent>
       </ScrollArea>
       {/* Chat tab — outside ScrollArea (manages its own scroll) */}
-      <TabsContent value="chat" className="flex-1 overflow-hidden">
+      <TabsContent value="chat" className={`flex-1 overflow-hidden ${activeTab !== 'chat' ? 'hidden' : ''}`}>
         <TabChat
           menteeId={mentee.id}
             menteePhone={mentee.phone}

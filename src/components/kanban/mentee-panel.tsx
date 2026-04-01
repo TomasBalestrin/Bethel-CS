@@ -37,6 +37,7 @@ import {
   Shield,
   Package,
   Clock,
+  Star,
   TrendingUp,
   Target,
   Briefcase,
@@ -601,30 +602,32 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
 
   return (
     <div className="animate-fade-in space-y-5">
-      {/* ── Summary strip — compact badges ── */}
+      {/* ── Summary strip — compact badges with labels ── */}
       <div className="flex flex-wrap items-center gap-2">
         <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${statusColor}`}>
           <span className={`h-1.5 w-1.5 rounded-full ${mentee.status === 'ativo' ? 'bg-success' : mentee.status === 'cancelado' ? 'bg-destructive' : 'bg-info'}`} />
           {statusLabel}
         </span>
         <Badge variant={({ 1: 'muted', 2: 'warning', 3: 'info', 4: 'success', 5: 'accent' } as const)[mentee.priority_level] ?? 'muted'}>
-          P{mentee.priority_level}
+          Prioridade P{mentee.priority_level}
         </Badge>
-        <div className="flex items-center"><ClienteFitToggle menteeId={mentee.id} initialValue={mentee.cliente_fit} /></div>
-        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground">
-          <Package className="h-3 w-3" /> {mentee.product_name}
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground">
+          <Star className="h-3 w-3" /> Fit <ClienteFitToggle menteeId={mentee.id} initialValue={mentee.cliente_fit} />
         </span>
         <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground">
-          <Calendar className="h-3 w-3" /> {mentee.start_date ? formatDateBR(mentee.start_date) : '—'}
+          <Package className="h-3 w-3" /> <span className="text-[9px] text-muted-foreground/60 uppercase">Produto:</span> {mentee.product_name}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground">
+          <Calendar className="h-3 w-3" /> <span className="text-[9px] text-muted-foreground/60 uppercase">Início:</span> {mentee.start_date ? formatDateBR(mentee.start_date) : '—'}
         </span>
         {mentee.contract_validity && (
           <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground">
-            <Clock className="h-3 w-3" /> {mentee.contract_validity}
+            <Clock className="h-3 w-3" /> <span className="text-[9px] text-muted-foreground/60 uppercase">Contrato:</span> {mentee.contract_validity}
           </span>
         )}
         {mentee.source && (
           <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground">
-            <Target className="h-3 w-3" /> {mentee.source}
+            <Target className="h-3 w-3" /> <span className="text-[9px] text-muted-foreground/60 uppercase">Origem:</span> {mentee.source}
           </span>
         )}
       </div>

@@ -33,42 +33,45 @@ export default async function DashboardPage({ searchParams }: Props) {
   const fitFilter = searchParams.fit || null // 'true' | 'false' | null
   const specialistId = searchParams.specialist || null
 
-  // ─── Mentees ───
-  let menteesQuery = supabase.from('mentees').select('*')
+  // ─── Mentees (only fields needed for dashboard) ───
+  let menteesQuery = supabase.from('mentees').select('id, status, cliente_fit, priority_level, created_by')
   if (fitFilter === 'true') menteesQuery = menteesQuery.eq('cliente_fit', true)
   if (fitFilter === 'false') menteesQuery = menteesQuery.eq('cliente_fit', false)
   if (specialistId) menteesQuery = menteesQuery.eq('created_by', specialistId)
 
-  // ─── Revenue ───
-  let revenueQuery = supabase.from('revenue_records').select('sale_value, revenue_type, created_at')
+  // ─── Revenue (only needed fields) ───
+  let revenueQuery = supabase.from('revenue_records').select('sale_value, revenue_type')
   if (startDate) revenueQuery = revenueQuery.gte('created_at', startDate)
   if (endDate) revenueQuery = revenueQuery.lte('created_at', endDate + 'T23:59:59')
+  if (specialistId) revenueQuery = revenueQuery.eq('registered_by', specialistId)
 
-  // ─── Testimonials ───
-  let testimonialsQuery = supabase.from('testimonials').select('id, created_at')
+  // ─── Testimonials (count only) ───
+  let testimonialsQuery = supabase.from('testimonials').select('id', { count: 'exact', head: true })
   if (startDate) testimonialsQuery = testimonialsQuery.gte('created_at', startDate)
   if (endDate) testimonialsQuery = testimonialsQuery.lte('created_at', endDate + 'T23:59:59')
 
-  // ─── Indications ───
-  let indicationsQuery = supabase.from('indications').select('id, created_at')
+  // ─── Indications (count only) ───
+  let indicationsQuery = supabase.from('indications').select('id', { count: 'exact', head: true })
   if (startDate) indicationsQuery = indicationsQuery.gte('created_at', startDate)
   if (endDate) indicationsQuery = indicationsQuery.lte('created_at', endDate + 'T23:59:59')
 
-  // ─── Engagement ───
-  let engagementQuery = supabase.from('engagement_records').select('type, value, recorded_at')
+  // ─── Engagement (only needed fields) ───
+  let engagementQuery = supabase.from('engagement_records').select('type, value')
   if (startDate) engagementQuery = engagementQuery.gte('recorded_at', startDate)
   if (endDate) engagementQuery = engagementQuery.lte('recorded_at', endDate)
+  if (specialistId) engagementQuery = engagementQuery.eq('specialist_id', specialistId)
 
-  // ─── CS Activities ───
-  let csQuery = supabase.from('cs_activities').select('type, duration_minutes, specialist_id, activity_date')
+  // ─── CS Activities (only needed fields) ───
+  let csQuery = supabase.from('cs_activities').select('type, duration_minutes')
   if (startDate) csQuery = csQuery.gte('activity_date', startDate)
   if (endDate) csQuery = csQuery.lte('activity_date', endDate)
+  if (specialistId) csQuery = csQuery.eq('specialist_id', specialistId)
 
   const [
     { data: mentees },
     { data: revenues },
-    { data: testimonials },
-    { data: indications },
+    { count: testimonialCount },
+    { count: indicationCount },
     { data: engagements },
     { data: csActivities },
   ] = await Promise.all([
@@ -85,7 +88,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   const totalMentees = allMentees.filter((m) => m.status === 'ativo').length
   const fitMentees = allMentees.filter((m) => m.cliente_fit && m.status === 'ativo').length
   const cancelados = allMentees.filter((m) => m.status === 'cancelado').length
-  const totalIndications = indications?.length ?? 0
+  const totalIndications = indicationCount ?? 0
 
   // ─── SEÇÃO 3: Sucesso ───
   const totalRevenue = revenues?.reduce((s, r) => s + Number(r.sale_value), 0) ?? 0
@@ -94,7 +97,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   const engByType: Record<string, number> = { aula: 0, live: 0, evento: 0, whatsapp_contato: 0 }
   engagements?.forEach((e) => { engByType[e.type] = (engByType[e.type] ?? 0) + Number(e.value) })
 
-  const totalTestimonials = testimonials?.length ?? 0
+  const totalTestimonials = testimonialCount ?? 0
 
   // ─── SEÇÃO 4: Trabalho CS ───
   const allCs = csActivities ?? []

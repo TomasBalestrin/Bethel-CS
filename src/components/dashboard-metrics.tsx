@@ -233,7 +233,7 @@ function MetricCard({
   highlight?: boolean
 }) {
   return (
-    <div className={`rounded-lg border p-3 sm:p-4 animate-slide-up ${highlight ? 'border-accent/20 bg-accent/5' : 'border-border bg-background'}`}>
+    <div className={`rounded-lg border p-3 sm:p-4 ${highlight ? 'border-accent/20 bg-accent/5' : 'border-border bg-background'}`}>
       <div className="flex items-start gap-2 sm:gap-3">
         <div className={`rounded-md p-1.5 sm:p-2 ${bg} shrink-0`}>
           <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${color}`} />

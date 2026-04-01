@@ -87,11 +87,6 @@ export default async function DashboardPage({ searchParams }: Props) {
   const cancelados = allMentees.filter((m) => m.status === 'cancelado').length
   const totalIndications = indications?.length ?? 0
 
-  const priorityDistribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
-  allMentees.filter((m) => m.status === 'ativo').forEach((m) => {
-    priorityDistribution[m.priority_level] = (priorityDistribution[m.priority_level] ?? 0) + 1
-  })
-
   // ─── SEÇÃO 3: Sucesso ───
   const totalRevenue = revenues?.reduce((s, r) => s + Number(r.sale_value), 0) ?? 0
 
@@ -130,7 +125,6 @@ export default async function DashboardPage({ searchParams }: Props) {
         fitMentees,
         totalIndications,
         cancelados,
-        priorityDistribution,
       }}
       section3={{
         totalRevenue,

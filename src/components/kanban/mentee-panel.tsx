@@ -30,6 +30,7 @@ import {
   ChevronRight,
   ArrowRight,
   MessageSquare,
+  Copy,
   Phone,
   Mail,
   MapPin,
@@ -1024,19 +1025,29 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
             {loading ? 'Gerando...' : 'Gerar Link'}
           </Button>
           {link && (
-            <div className="rounded-md bg-muted p-3">
-              <p className="label-xs mb-1">Link do formulário</p>
-              <div className="flex items-start gap-2">
-                <code className="flex-1 text-xs text-foreground break-all">{link}</code>
+            <div className="rounded-md border border-border bg-card p-3">
+              <p className="label-xs mb-2">Link do formulário</p>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2">
+                  <Link2 className="h-3.5 w-3.5 text-accent shrink-0" />
+                  <span className="text-sm text-foreground font-medium truncate">
+                    cs.bethelapps.com/plano/{token?.slice(0, 8)}...
+                  </span>
+                </div>
                 <Button
                   size="sm"
                   variant={copied ? 'default' : 'outline'}
                   onClick={handleCopyLink}
-                  className="shrink-0 text-xs"
+                  className="shrink-0 text-xs gap-1.5"
                 >
-                  {copied ? 'Link copiado!' : 'Copiar link'}
+                  {copied ? (
+                    <><span className="text-xs">Copiado!</span></>
+                  ) : (
+                    <><Copy className="h-3.5 w-3.5" /> Copiar</>
+                  )}
                 </Button>
               </div>
+              <p className="text-[10px] text-muted-foreground mt-1.5">Envie este link para o mentorado preencher o plano de ação</p>
             </div>
           )}
         </div>

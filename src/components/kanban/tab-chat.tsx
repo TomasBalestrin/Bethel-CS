@@ -567,7 +567,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
       {/* Call history modal */}
       <Dialog open={callsModalOpen} onOpenChange={(open) => { if (!open) { setCallsModalOpen(false); setPlayingRecording(null) } }}>
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-hidden">
+        <DialogContent className="max-w-full sm:max-w-lg max-h-[100dvh] sm:max-h-[80vh] overflow-hidden rounded-none sm:rounded-lg">
           <DialogHeader>
             <DialogTitle>Histórico de Ligações — {menteeName}</DialogTitle>
             <DialogDescription>{callRecords.length} ligação{callRecords.length !== 1 ? 'ões' : ''} registrada{callRecords.length !== 1 ? 's' : ''}</DialogDescription>

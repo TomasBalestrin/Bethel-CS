@@ -68,7 +68,7 @@ export function MentoradosList({ mentees: initialMentees }: MentoradosListProps)
         />
       </div>
 
-      <div className="mt-6 grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-6 grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 min-h-[200px]">
         {filtered.map((m) => {
           const color = LEVEL_COLORS[m.priority_level] ?? LEVEL_COLORS[1]
           const location = [m.city, m.state].filter(Boolean).join(', ')

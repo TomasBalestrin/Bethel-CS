@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useDebounce } from '@/hooks/use-debounce'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Phone, Mail, Calendar, Star, AtSign } from 'lucide-react'
@@ -27,13 +28,14 @@ interface MentoradosListProps {
 export function MentoradosList({ mentees: initialMentees }: MentoradosListProps) {
   const [menteeList, setMenteeList] = useState(initialMentees)
   const [search, setSearch] = useState('')
+  const debouncedSearch = useDebounce(search, 300)
   const { unreadMap } = useUnreadCounts()
   const [selectedMentee, setSelectedMentee] = useState<MenteeWithStats | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
 
   const filtered = menteeList.filter((m) => {
-    if (!search) return true
-    const term = search.toLowerCase()
+    if (!debouncedSearch) return true
+    const term = debouncedSearch.toLowerCase()
     return (
       m.full_name.toLowerCase().includes(term) ||
       m.phone.toLowerCase().includes(term) ||

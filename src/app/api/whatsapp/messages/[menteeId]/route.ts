@@ -17,7 +17,7 @@ export async function GET(
   // 1. Fetch last 100 messages
   const { data: messages, error } = await supabase
     .from('wpp_messages')
-    .select('*')
+    .select('id, mentee_id, specialist_id, instance_id, message_id, direction, message_type, content, media_url, sender_name, is_read, sent_at, created_at')
     .eq('mentee_id', menteeId)
     .order('sent_at', { ascending: true })
     .limit(100)

@@ -18,7 +18,7 @@ import { toast } from 'sonner'
 import type { Database } from '@/types/database'
 
 type WppMessage = Database['public']['Tables']['wpp_messages']['Row']
-type CallRecord = Database['public']['Tables']['call_records']['Row']
+type CallRecord = Pick<Database['public']['Tables']['call_records']['Row'], 'id' | 'mentee_id' | 'duration_seconds' | 'recording_status' | 'recording_url' | 'created_at'>
 
 interface TabChatProps {
   menteeId: string
@@ -121,7 +121,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         // Fetch call history
         const { data: calls } = await supabase
           .from('call_records')
-          .select('*')
+          .select('id, mentee_id, duration_seconds, recording_status, recording_url, created_at')
           .eq('mentee_id', menteeId)
           .order('created_at', { ascending: false })
           .limit(20)

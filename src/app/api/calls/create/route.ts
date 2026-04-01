@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
   if (!forceNew) {
     const { data: existingCall } = await supabase
       .from('call_records')
-      .select('*')
+      .select('id, daily_room_name, daily_room_url, created_at')
       .eq('mentee_id', menteeId)
       .is('ended_at', null)
       .order('created_at', { ascending: false })

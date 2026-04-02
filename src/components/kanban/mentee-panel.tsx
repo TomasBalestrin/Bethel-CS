@@ -66,9 +66,6 @@ import {
   addRevenueRecord,
   updateRevenueRecord,
   deleteRevenueRecord,
-  addObjective,
-  updateObjective,
-  deleteObjective,
   addTestimonial,
   updateTestimonial,
   deleteTestimonial,
@@ -91,7 +88,6 @@ import type { Database, TestimonialCategory, EngagementType, CsActivityType, Rev
 type Indication = Database['public']['Tables']['indications']['Row']
 type IntensivoRecord = Database['public']['Tables']['intensivo_records']['Row']
 type RevenueRecord = Database['public']['Tables']['revenue_records']['Row']
-type Objective = Database['public']['Tables']['objectives']['Row']
 type Testimonial = Database['public']['Tables']['testimonials']['Row']
 type ActionPlan = Database['public']['Tables']['action_plans']['Row']
 type Product = Database['public']['Tables']['products']['Row']
@@ -348,11 +344,8 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
             {[
               { value: 'info', label: 'Info' },
               { value: 'action-plan', label: 'Plano' },
-              { value: 'objectives', label: 'Objetivos' },
-              { value: 'revenue', label: 'Receita' },
-              { value: 'testimonials', label: 'Depoimentos' },
+              { value: 'acompanhamento', label: 'Acompanhamento' },
               { value: 'chat', label: 'Chat' },
-              { value: 'engagement', label: 'Engajamento' },
             ].map((tab) => (
               <TabsTrigger
                 key={tab.value}
@@ -402,10 +395,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
           />
         </TabsContent>
         <TabsContent value="action-plan"><TabActionPlan mentee={mentee} /></TabsContent>
-        <TabsContent value="objectives"><TabObjectives menteeId={mentee.id} /></TabsContent>
-        <TabsContent value="revenue"><TabRevenue menteeId={mentee.id} /></TabsContent>
-        <TabsContent value="testimonials"><TabTestimonials menteeId={mentee.id} /></TabsContent>
-        <TabsContent value="engagement"><TabEngagement menteeId={mentee.id} /></TabsContent>
+        <TabsContent value="acompanhamento"><TabAcompanhamento menteeId={mentee.id} /></TabsContent>
       </ScrollArea>
       {/* Chat tab — outside ScrollArea (manages its own scroll) */}
       <TabsContent value="chat" className={`flex-1 overflow-hidden ${activeTab !== 'chat' ? 'hidden' : ''}`}>
@@ -1076,6 +1066,33 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
   )
 }
 
+// ─── Tab: Acompanhamento (unified grid) ───
+function TabAcompanhamento({ menteeId }: { menteeId: string }) {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-fade-in">
+      {/* Card 1: Indicações */}
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <CardIndicacoes menteeId={menteeId} />
+      </div>
+
+      {/* Card 2: Receita */}
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <TabRevenue menteeId={menteeId} />
+      </div>
+
+      {/* Card 3: Depoimentos */}
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <TabTestimonials menteeId={menteeId} />
+      </div>
+
+      {/* Card 4: Engajamento */}
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <TabEngagement menteeId={menteeId} />
+      </div>
+    </div>
+  )
+}
+
 // ─── Tab: Receita Nova ───
 function TabRevenue({ menteeId }: { menteeId: string }) {
   const [items, setItems] = useState<RevenueRecord[]>([])
@@ -1175,14 +1192,16 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
   }
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center gap-4">
-        <div className="rounded-lg bg-success/10 px-4 py-2">
-          <p className="label-xs">Total Crossell/Upsell</p>
-          <p className="font-heading text-lg font-bold text-success tabular">
-            R$ {totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </p>
-        </div>
+    <div className="p-4 space-y-4">
+      {/* Card header */}
+      <div className="flex items-center gap-2 -mx-4 -mt-4 px-4 py-3 border-b border-border bg-muted/30">
+        <DollarSign className="h-4 w-4 text-success" />
+        <h3 className="font-heading font-semibold text-sm">Receita</h3>
+        <span className="text-xs font-medium text-success tabular ml-auto">
+          R$ {totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+        </span>
+      </div>
+      <div className="flex items-center justify-end">
         <Button size="sm" variant="outline" onClick={() => { resetForm(); setShowForm(!showForm) }}>
           <Plus className="mr-1 h-3 w-3" /> Registrar
         </Button>
@@ -1307,18 +1326,8 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
   )
 }
 
-// ─── Tab: Objetivos (unified: Objetivos + Indicações CS + Intensivo) ───
-function TabObjectives({ menteeId }: { menteeId: string }) {
-  // Objectives state
-  const [objectives, setObjectives] = useState<Objective[]>([])
-  const [showObjForm, setShowObjForm] = useState(false)
-  const [editingObjId, setEditingObjId] = useState<string | null>(null)
-  const [objTitle, setObjTitle] = useState('')
-  const [objDescription, setObjDescription] = useState('')
-  const [objAchievedAt, setObjAchievedAt] = useState('')
-  const [objLoading, setObjLoading] = useState(false)
-  const [confirmDeleteObj, setConfirmDeleteObj] = useState<string | null>(null)
-
+// ─── Card: Indicações (CS + Intensivo) ───
+function CardIndicacoes({ menteeId }: { menteeId: string }) {
   // Indications state
   const [indications, setIndications] = useState<Indication[]>([])
   const [showIndForm, setShowIndForm] = useState(false)
@@ -1342,8 +1351,6 @@ function TabObjectives({ menteeId }: { menteeId: string }) {
   const supabase = createClient()
 
   const fetchAll = useCallback(() => {
-    supabase.from('objectives').select('*').eq('mentee_id', menteeId)
-      .order('created_at', { ascending: false }).then(({ data }) => { if (data) setObjectives(data) })
     supabase.from('indications').select('*').eq('mentee_id', menteeId)
       .order('created_at', { ascending: false }).then(({ data }) => { if (data) setIndications(data) })
     supabase.from('intensivo_records').select('*').eq('mentee_id', menteeId)
@@ -1351,27 +1358,6 @@ function TabObjectives({ menteeId }: { menteeId: string }) {
   }, [menteeId, supabase])
 
   useEffect(() => { fetchAll() }, [fetchAll])
-
-  // ─── Objectives handlers ───
-  function openEditObj(obj: Objective) {
-    setEditingObjId(obj.id); setObjTitle(obj.title); setObjDescription(obj.description || ''); setObjAchievedAt(obj.achieved_at || '')
-    setShowObjForm(true)
-  }
-  function resetObjForm() {
-    setEditingObjId(null); setObjTitle(''); setObjDescription(''); setObjAchievedAt(''); setShowObjForm(false)
-  }
-  async function handleSubmitObj(e: React.FormEvent) {
-    e.preventDefault(); setObjLoading(true)
-    if (editingObjId) {
-      await updateObjective(editingObjId, { title: objTitle, description: objDescription || undefined, achieved_at: objAchievedAt || undefined })
-    } else {
-      await addObjective(menteeId, { title: objTitle, description: objDescription || undefined, achieved_at: objAchievedAt || undefined })
-    }
-    resetObjForm(); setObjLoading(false); fetchAll()
-  }
-  async function handleDeleteObj(id: string) {
-    await deleteObjective(id); setConfirmDeleteObj(null); fetchAll()
-  }
 
   // ─── Indications handlers ───
   function openEditInd(ind: Indication) {
@@ -1418,83 +1404,18 @@ function TabObjectives({ menteeId }: { menteeId: string }) {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      {/* ═══ SEÇÃO 1: Objetivos ═══ */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="label-xs uppercase">Objetivos ({objectives.length})</p>
-          <Button size="sm" variant="outline" onClick={() => { resetObjForm(); setShowObjForm(!showObjForm) }}>
-            <Plus className="mr-1 h-3 w-3" /> Registrar objetivo
-          </Button>
-        </div>
-
-        {/* Objective form dialog */}
-        <Dialog open={showObjForm} onOpenChange={(open) => { if (!open) resetObjForm() }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingObjId ? 'Editar objetivo' : 'Novo objetivo'}</DialogTitle>
-              <DialogDescription>Registre um objetivo atingido pelo mentorado.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmitObj} className="space-y-3">
-              <div className="space-y-1">
-                <Label htmlFor="obj-title">Título *</Label>
-                <Input id="obj-title" value={objTitle} onChange={(e) => setObjTitle(e.target.value)} required />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="obj-desc">Descrição</Label>
-                <Textarea id="obj-desc" value={objDescription} onChange={(e) => setObjDescription(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="obj-date">Data de conquista</Label>
-                <Input id="obj-date" type="date" value={objAchievedAt} onChange={(e) => setObjAchievedAt(e.target.value)} />
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={resetObjForm}>Cancelar</Button>
-                <Button type="submit" disabled={objLoading}>{objLoading ? 'Salvando...' : 'Salvar'}</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {objectives.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-            <Users className="h-8 w-8 mb-2 opacity-40" />
-            <p className="text-sm">Nenhum registro ainda</p>
-          </div>
-        )}
-        {objectives.map((item) => (
-          <div key={item.id} className="group rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:bg-muted/30">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="font-medium text-foreground">{item.title}</p>
-                {item.description && <p className="mt-1 text-muted-foreground">{item.description}</p>}
-                {item.achieved_at && <p className="mt-1 text-xs text-muted-foreground">{formatDateBR(item.achieved_at)}</p>}
-              </div>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditObj(item)} aria-label="Editar objetivo"><Pencil className="h-3 w-3" /></Button>
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteObj(item.id)} aria-label="Excluir objetivo"><Trash2 className="h-3 w-3" /></Button>
-              </div>
-            </div>
-          </div>
-        ))}
-        {/* Confirm delete objective */}
-        <Dialog open={!!confirmDeleteObj} onOpenChange={() => setConfirmDeleteObj(null)}>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Excluir objetivo?</DialogTitle><DialogDescription>Esta ação não pode ser desfeita.</DialogDescription></DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setConfirmDeleteObj(null)}>Cancelar</Button>
-              <Button variant="destructive" onClick={() => confirmDeleteObj && handleDeleteObj(confirmDeleteObj)}>Excluir</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+    <div className="p-4 space-y-4">
+      {/* Card header */}
+      <div className="flex items-center gap-2 -mx-4 -mt-4 px-4 py-3 border-b border-border bg-muted/30">
+        <Users className="h-4 w-4 text-accent" />
+        <h3 className="font-heading font-semibold text-sm">Indicações</h3>
+        <Badge variant="muted" className="text-[10px] ml-auto">{indications.length + intensivos.length}</Badge>
       </div>
 
-      <Separator className="border-border/50" />
-
-      {/* ═══ SEÇÃO 2: Indicações CS ═══ */}
+      {/* ═══ Indicações CS ═══ */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <p className="label-xs uppercase">Indicações CS ({indications.length})</p>
+          <p className="label-xs text-muted-foreground">Indicações CS ({indications.length})</p>
           <Button size="sm" variant="outline" onClick={() => { resetIndForm(); setShowIndForm(!showIndForm) }}>
             <Plus className="mr-1 h-3 w-3" /> Registrar indicação
           </Button>
@@ -1554,9 +1475,9 @@ function TabObjectives({ menteeId }: { menteeId: string }) {
         </Dialog>
       </div>
 
-      <Separator className="border-border/50" />
+      <Separator className="border-border/30" />
 
-      {/* ═══ SEÇÃO 3: Intensivo ═══ */}
+      {/* ═══ SEÇÃO 2: Intensivo ═══ */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <p className="label-xs uppercase">Intensivo ({intensivos.length})</p>
@@ -1775,9 +1696,14 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
   }
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <p className="label-xs">Depoimentos ({items.length})</p>
+    <div className="p-4 space-y-4">
+      {/* Card header */}
+      <div className="flex items-center gap-2 -mx-4 -mt-4 px-4 py-3 border-b border-border bg-muted/30">
+        <Mic className="h-4 w-4 text-info" />
+        <h3 className="font-heading font-semibold text-sm">Depoimentos</h3>
+        <Badge variant="muted" className="text-[10px] ml-auto">{items.length}</Badge>
+      </div>
+      <div className="flex items-center justify-end">
         <Button size="sm" variant="outline" onClick={() => { resetForm(); setShowForm(!showForm) }}>
           <Plus className="mr-1 h-3 w-3" /> Registrar
         </Button>
@@ -2012,9 +1938,14 @@ function TabEngagement({ menteeId }: { menteeId: string }) {
   }
 
   return (
-    <div className="space-y-4 animate-fade-in">
-      <div className="flex items-center justify-between">
-        <p className="label-xs">Engajamento & Atividades CS</p>
+    <div className="p-4 space-y-4">
+      {/* Card header */}
+      <div className="flex items-center gap-2 -mx-4 -mt-4 px-4 py-3 border-b border-border bg-muted/30">
+        <TrendingUp className="h-4 w-4 text-warning" />
+        <h3 className="font-heading font-semibold text-sm">Engajamento</h3>
+        <Badge variant="muted" className="text-[10px] ml-auto">{engagements.length + activities.length}</Badge>
+      </div>
+      <div className="flex items-center justify-end">
         <Button size="sm" variant="outline" onClick={() => setShowForm(!showForm)}>
           <Plus className="mr-1 h-3 w-3" /> Registrar
         </Button>

@@ -424,41 +424,68 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         {messages.map((msg, idx) => {
           const isOutgoing = msg.direction === 'outgoing'
           const prevMsg = messages[idx - 1]
+          const nextMsg = messages[idx + 1]
           const showDateSeparator = !prevMsg || getDateKey(msg.sent_at) !== getDateKey(prevMsg.sent_at)
+
+          // Group consecutive messages from same sender
+          const sameSenderAsPrev = prevMsg && prevMsg.direction === msg.direction && !showDateSeparator
+          const sameSenderAsNext = nextMsg && nextMsg.direction === msg.direction && getDateKey(msg.sent_at) === getDateKey(nextMsg?.sent_at ?? '')
+          const sameTimeAsPrev = sameSenderAsPrev && formatTime(prevMsg.sent_at) === formatTime(msg.sent_at)
+          const sameTimeAsNext = sameSenderAsNext && formatTime(msg.sent_at) === formatTime(nextMsg.sent_at)
+
+          // Show sender name only for first message in a group
+          const showSenderName = !isOutgoing && !sameSenderAsPrev
+          // Show time only for last message in a group with same time
+          const showTime = !sameTimeAsNext
+
+          // Bubble border radius based on position in group
+          const getBubbleRadius = () => {
+            if (isOutgoing) {
+              if (!sameSenderAsPrev && !sameSenderAsNext) return 'rounded-2xl rounded-tr-md'
+              if (!sameSenderAsPrev) return 'rounded-2xl rounded-tr-md rounded-br-md'
+              if (!sameSenderAsNext) return 'rounded-2xl rounded-tr-md rounded-r-md'
+              return 'rounded-2xl rounded-r-md'
+            }
+            if (!sameSenderAsPrev && !sameSenderAsNext) return 'rounded-2xl rounded-tl-md'
+            if (!sameSenderAsPrev) return 'rounded-2xl rounded-tl-md rounded-bl-md'
+            if (!sameSenderAsNext) return 'rounded-2xl rounded-tl-md rounded-l-md'
+            return 'rounded-2xl rounded-l-md'
+          }
 
           return (
             <div key={msg.id}>
               {/* Date separator */}
               {showDateSeparator && (
-                <div className="flex items-center justify-center my-3">
-                  <span className="rounded-full bg-muted px-3 py-0.5 text-[10px] text-muted-foreground">
+                <div className="flex items-center justify-center my-4">
+                  <span className="rounded-full bg-muted px-3 py-1 text-[10px] font-medium text-muted-foreground">
                     {formatDate(msg.sent_at)}
                   </span>
                 </div>
               )}
 
-              <div className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} mb-1`}>
-                <div className="max-w-[75%]">
-                  {/* Sender name — incoming only */}
-                  {!isOutgoing && (
-                    <p className="text-[10px] text-muted-foreground mb-0.5 px-1">
+              <div className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} ${sameSenderAsPrev ? 'mt-0.5' : 'mt-3'}`}>
+                <div className={`${isOutgoing ? 'max-w-[70%]' : 'max-w-[70%]'}`}>
+                  {/* Sender name — first in group only */}
+                  {showSenderName && (
+                    <p className="text-[10px] font-medium text-muted-foreground mb-1 px-1">
                       {msg.sender_name || menteeName}
                     </p>
                   )}
 
-                  <div className={`rounded-xl px-3 py-2 text-sm ${
+                  <div className={`px-3 py-2 text-sm shadow-sm ${getBubbleRadius()} ${
                     isOutgoing
-                      ? 'bg-accent/15 text-foreground rounded-tr-sm'
-                      : 'bg-muted text-foreground rounded-tl-sm'
+                      ? 'bg-accent/15 text-foreground'
+                      : 'bg-muted text-foreground'
                   }`}>
-                    {/* Media rendering */}
                     <MessageContent msg={msg} menteeName={menteeName} />
                   </div>
 
-                  {/* Time */}
-                  <p className={`text-[10px] text-muted-foreground/60 mt-0.5 px-1 ${isOutgoing ? 'text-right' : ''}`}>
-                    {formatTime(msg.sent_at)}
-                  </p>
+                  {/* Time — last in same-time group only */}
+                  {showTime && (
+                    <p className={`text-[10px] text-muted-foreground/50 mt-0.5 px-1 ${isOutgoing ? 'text-right' : ''}`}>
+                      {formatTime(msg.sent_at)}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

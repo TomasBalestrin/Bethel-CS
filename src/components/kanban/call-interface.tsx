@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback, memo } from 'react'
-import { Mic, MicOff, PhoneOff, Loader2, Copy, Check } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Mic, MicOff, PhoneOff, Loader2 } from 'lucide-react'
 import { getOrCreateCall, destroyCall, getActiveCall } from '@/lib/daily-call'
 
 interface CallInterfaceProps {
@@ -111,6 +110,13 @@ export const CallInterface = memo(function CallInterface({
       console.log('[Call] joined-meeting')
       setJoined(true)
       updateRemoteCount()
+      // Start cloud recording automatically
+      try {
+        call.startRecording()
+        console.log('[Call] Cloud recording started')
+      } catch (err) {
+        console.error('[Call] Failed to start recording:', err)
+      }
     })
     call.on('participant-joined', () => updateRemoteCount())
     call.on('participant-updated', () => updateRemoteCount())
@@ -160,48 +166,55 @@ export const CallInterface = memo(function CallInterface({
   const status = ended ? 'ended' : !joined ? 'connecting' : isActive ? 'active' : 'waiting'
 
   return (
-    <div className="flex flex-col items-center justify-center h-full bg-background py-8">
-      <p className="text-sm text-muted-foreground">Ligação com</p>
-      <h2 className="text-xl font-semibold text-foreground mt-1">{menteeName}</h2>
-      <p className="text-2xl font-mono text-foreground mt-4 tabular">{formatTimer}</p>
+    <div className="flex flex-col items-center justify-center h-full py-6 px-4">
+      <p className="text-xs text-white/50">Ligação de voz</p>
+      <h2 className="text-lg font-semibold text-white mt-1">{menteeName}</h2>
+      <p className="text-3xl font-mono text-white mt-4 tabular">{formatTimer}</p>
 
-      <div className="mt-6 flex items-center gap-2">
+      <div className="mt-4 flex items-center gap-2">
         {status === 'connecting' && (
-          <><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /><span className="text-sm text-muted-foreground">Conectando...</span></>
+          <><Loader2 className="h-4 w-4 animate-spin text-white/50" /><span className="text-xs text-white/50">Conectando...</span></>
         )}
         {status === 'waiting' && (
-          <><span className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" /><span className="text-sm text-muted-foreground">Aguardando mentorado entrar...</span></>
+          <><span className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" /><span className="text-xs text-white/50">Aguardando mentorado...</span></>
         )}
         {status === 'active' && (
-          <><span className="h-2 w-2 rounded-full bg-green-500" /><span className="text-sm text-green-600 font-medium">Em ligação</span></>
+          <><span className="h-2 w-2 rounded-full bg-green-500" /><span className="text-xs text-green-400 font-medium">Em ligação</span></>
         )}
-        {status === 'ended' && <span className="text-sm text-muted-foreground">Ligação encerrada</span>}
+        {status === 'ended' && <span className="text-xs text-white/50">Ligação encerrada</span>}
       </div>
 
       {(status === 'waiting' || status === 'connecting') && menteeLink && (
-        <div className="mt-6 w-full max-w-sm rounded-lg bg-muted/50 border border-border p-3 space-y-2">
-          <p className="text-xs text-muted-foreground font-medium">Link para o mentorado:</p>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 text-[11px] text-foreground bg-background rounded px-2 py-1.5 truncate border border-border">
+        <div className="mt-4 w-full rounded-lg bg-white/5 border border-white/10 p-2.5 space-y-1.5">
+          <p className="text-[10px] text-white/40 font-medium">Link para o mentorado:</p>
+          <div className="flex items-center gap-1.5">
+            <code className="flex-1 text-[10px] text-white/70 bg-white/5 rounded px-2 py-1 truncate">
               {menteeLink}
             </code>
-            <Button size="sm" variant="outline" className="h-8 shrink-0 gap-1 text-xs"
-              onClick={() => { navigator.clipboard.writeText(menteeLink); setCopied(true); setTimeout(() => setCopied(false), 2000) }}>
-              {copied ? <><Check className="h-3 w-3" /> Copiado!</> : <><Copy className="h-3 w-3" /> Copiar</>}
-            </Button>
+            <button
+              className="shrink-0 text-[10px] text-white/40 hover:text-white/70 transition-colors px-2 py-1 rounded bg-white/5 hover:bg-white/10"
+              onClick={() => { navigator.clipboard.writeText(menteeLink); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
+            >
+              {copied ? 'Copiado!' : 'Copiar'}
+            </button>
           </div>
-          <p className="text-[10px] text-muted-foreground">Envie este link para o mentorado entrar na ligação</p>
         </div>
       )}
 
       {status !== 'ended' && (
-        <div className="mt-10 flex items-center gap-6">
-          <Button size="lg" variant={muted ? 'destructive' : 'outline'} className="rounded-full h-14 w-14" onClick={toggleMute}>
-            {muted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-          </Button>
-          <Button size="lg" variant="destructive" className="rounded-full h-14 w-14" onClick={doEnd}>
-            <PhoneOff className="h-5 w-5" />
-          </Button>
+        <div className="mt-8 flex items-center gap-5">
+          <button
+            className={`rounded-full h-12 w-12 flex items-center justify-center transition-colors ${muted ? 'bg-red-500 hover:bg-red-600' : 'bg-white/10 hover:bg-white/20'}`}
+            onClick={toggleMute}
+          >
+            {muted ? <MicOff className="h-5 w-5 text-white" /> : <Mic className="h-5 w-5 text-white" />}
+          </button>
+          <button
+            className="rounded-full h-12 w-12 flex items-center justify-center bg-red-500 hover:bg-red-600 transition-colors"
+            onClick={doEnd}
+          >
+            <PhoneOff className="h-5 w-5 text-white" />
+          </button>
         </div>
       )}
     </div>

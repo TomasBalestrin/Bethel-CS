@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
-import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play } from 'lucide-react'
+import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -261,13 +261,16 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   }
 
   // ─── Start call ───
-  async function handleCall(forceNew = false) {
+  const [showCallMenu, setShowCallMenu] = useState(false)
+
+  async function handleCall(callType: 'voice' | 'video' = 'voice') {
+    setShowCallMenu(false)
     setCallingLoading(true)
     try {
       const res = await fetch('/api/calls/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ menteeId, forceNew }),
+        body: JSON.stringify({ menteeId, callType }),
       })
       if (!res.ok) throw new Error('Falha ao criar ligação')
       const data = await res.json()
@@ -278,6 +281,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         callId: data.callId,
         menteeName,
         menteeLink: data.menteeLink,
+        callType: data.callType || callType,
       })
       if (data.reused) {
         toast.success('Ligação em andamento — reconectando')
@@ -385,16 +389,52 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {canSend && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1.5 text-xs"
-              onClick={() => handleCall()}
-              disabled={callingLoading || callStore.isActive}
-            >
-              {callingLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Phone className="h-3 w-3" />}
-              Ligar
-            </Button>
+            <div className="relative">
+              <div className="flex">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5 text-xs rounded-r-none border-r-0"
+                  onClick={() => handleCall('voice')}
+                  disabled={callingLoading || callStore.isActive}
+                >
+                  {callingLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Phone className="h-3 w-3" />}
+                  Ligar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 px-1.5 rounded-l-none"
+                  onClick={() => setShowCallMenu(!showCallMenu)}
+                  disabled={callingLoading || callStore.isActive}
+                >
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </div>
+              {showCallMenu && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowCallMenu(false)} />
+                  <div className="absolute right-0 top-full mt-1 z-20 w-44 rounded-lg border border-border bg-card shadow-lg py-1">
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
+                      onClick={() => handleCall('voice')}
+                    >
+                      <Phone className="h-3.5 w-3.5" />
+                      Ligação de voz
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
+                      onClick={() => handleCall('video')}
+                    >
+                      <Video className="h-3.5 w-3.5" />
+                      Videochamada
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           )}
           <Button
             size="sm"

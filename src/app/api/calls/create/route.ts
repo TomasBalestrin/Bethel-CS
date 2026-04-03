@@ -86,6 +86,7 @@ export async function POST(request: NextRequest) {
       daily_room_name: room.name,
       daily_room_url: room.url,
       recording_status: 'pending',
+      call_type: callType as 'voice' | 'video',
       started_at: new Date().toISOString(),
     })
     .select('id')

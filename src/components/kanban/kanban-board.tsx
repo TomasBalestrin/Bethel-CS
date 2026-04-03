@@ -38,6 +38,8 @@ interface KanbanBoardProps {
   stages: KanbanStage[]
   initialMentees: MenteeWithStats[]
   existingMentees: { id: string; full_name: string }[]
+  isAdmin?: boolean
+  specialists?: { id: string; full_name: string }[]
 }
 
 export function KanbanBoard({
@@ -46,6 +48,8 @@ export function KanbanBoard({
   stages,
   initialMentees,
   existingMentees,
+  isAdmin = false,
+  specialists = [],
 }: KanbanBoardProps) {
   const [mentees, setMentees] = useState<MenteeWithStats[]>(initialMentees)
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -245,6 +249,8 @@ export function KanbanBoard({
         onOpenChange={setDialogOpen}
         existingMentees={existingMentees}
         kanbanType={kanbanType}
+        isAdmin={isAdmin}
+        specialists={specialists}
       />
 
       <MenteePanel

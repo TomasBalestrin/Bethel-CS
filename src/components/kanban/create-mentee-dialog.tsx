@@ -34,6 +34,8 @@ interface CreateMenteeDialogProps {
   onOpenChange: (open: boolean) => void
   existingMentees: { id: string; full_name: string }[]
   kanbanType?: KanbanType
+  isAdmin?: boolean
+  specialists?: { id: string; full_name: string }[]
 }
 
 export function CreateMenteeDialog({
@@ -41,12 +43,15 @@ export function CreateMenteeDialog({
   onOpenChange,
   existingMentees,
   kanbanType = 'initial',
+  isAdmin = false,
+  specialists = [],
 }: CreateMenteeDialogProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Form state
+  const [specialistId, setSpecialistId] = useState('')
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
   const [productName, setProductName] = useState('')
@@ -66,6 +71,7 @@ export function CreateMenteeDialog({
   const [priorityLevel, setPriorityLevel] = useState('1')
 
   function resetForm() {
+    setSpecialistId('')
     setFullName('')
     setPhone('')
     setProductName('')
@@ -110,6 +116,7 @@ export function CreateMenteeDialog({
       referred_by_mentee_id: referredByMenteeId || undefined,
       priority_level: parseInt(priorityLevel, 10),
       kanban_type: kanbanType,
+      specialist_id: specialistId || undefined,
     })
 
     setLoading(false)
@@ -136,6 +143,26 @@ export function CreateMenteeDialog({
 
         <ScrollArea className="max-h-[70vh]">
           <form onSubmit={handleSubmit} className="space-y-4 pr-4">
+            {/* Especialista (admin only) */}
+            {isAdmin && specialists.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="label-xs">Vincular a Especialista</h3>
+                <div className="space-y-1">
+                  <Label htmlFor="specialist">Especialista responsável *</Label>
+                  <Select value={specialistId} onValueChange={setSpecialistId}>
+                    <SelectTrigger id="specialist">
+                      <SelectValue placeholder="Selecione o especialista" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {specialists.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
             {/* Dados da mentoria */}
             <div className="space-y-3">
               <h3 className="label-xs">Dados da Mentoria</h3>

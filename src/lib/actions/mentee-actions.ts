@@ -26,6 +26,7 @@ interface CreateMenteeInput {
   referred_by_mentee_id?: string
   priority_level?: number
   kanban_type?: KanbanType
+  specialist_id?: string
 }
 
 export async function createMentee(input: CreateMenteeInput) {
@@ -81,7 +82,7 @@ export async function createMentee(input: CreateMenteeInput) {
     priority_level: input.priority_level ?? 1,
     current_stage_id: firstStage.id,
     kanban_type: kanbanType,
-    created_by: user.id,
+    created_by: input.specialist_id || user.id,
   }
 
   const { data: newMentee, error } = await supabase

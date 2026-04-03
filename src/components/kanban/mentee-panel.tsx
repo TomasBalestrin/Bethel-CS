@@ -37,7 +37,6 @@ import {
   MapPin,
   Calendar,
   Shield,
-  Package,
   Clock,
   Star,
   TrendingUp,

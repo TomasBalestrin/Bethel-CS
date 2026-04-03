@@ -142,9 +142,9 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           .limit(1)
         if (notes && notes.length > 0) setLatestNote(notes[0])
 
-        // Find any connected WPP instance (not filtered by specialist)
+        // Find any WPP instance (connected or not)
         const { data: instance } = await supabase
-          .from('wpp_instances').select('status').eq('status', 'connected').limit(1).single()
+          .from('wpp_instances').select('status').limit(1).single()
 
         if (instance) setInstanceStatus(instance.status)
         else setNoInstance(true)

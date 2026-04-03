@@ -5,6 +5,14 @@ import { MENTEE_SUMMARY_FIELDS, type MenteeWithStats } from '@/types/kanban'
 export default async function EtapasIniciaisPage() {
   const supabase = createClient()
 
+  // Get current user role
+  const { data: { user } } = await supabase.auth.getUser()
+  let userRole = 'especialista'
+  if (user) {
+    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    userRole = profile?.role ?? 'especialista'
+  }
+
   // Fetch stages
   const { data: stages } = await supabase
     .from('kanban_stages')
@@ -12,11 +20,15 @@ export default async function EtapasIniciaisPage() {
     .eq('type', 'initial')
     .order('position')
 
-  // Fetch mentees in initial kanban (summary fields for cards)
-  const { data: mentees } = await supabase
+  // Fetch mentees in initial kanban (filtered by specialist if not admin)
+  let menteesQuery = supabase
     .from('mentees')
     .select(MENTEE_SUMMARY_FIELDS)
     .eq('kanban_type', 'initial')
+  if (userRole !== 'admin' && user) {
+    menteesQuery = menteesQuery.eq('created_by', user.id)
+  }
+  const { data: mentees } = await menteesQuery
 
   // Fetch all mentees for referral lookup
   const { data: allMentees } = await supabase

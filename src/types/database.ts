@@ -133,6 +133,8 @@ export interface Database {
           ticket_medio: number | null
           funis_ativos: Json | null
           metrics_updated_at: string | null
+          personal_tags: string[] | null
+          notes: string | null
         }
         Insert: {
           id?: string
@@ -188,6 +190,8 @@ export interface Database {
           ticket_medio?: number | null
           funis_ativos?: Json | null
           metrics_updated_at?: string | null
+          personal_tags?: string[] | null
+          notes?: string | null
         }
         Update: {
           full_name?: string
@@ -239,6 +243,8 @@ export interface Database {
           ticket_medio?: number | null
           funis_ativos?: Json | null
           metrics_updated_at?: string | null
+          personal_tags?: string[] | null
+          notes?: string | null
         }
         Relationships: []
       }

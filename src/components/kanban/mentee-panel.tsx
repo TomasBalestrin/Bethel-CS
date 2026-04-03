@@ -419,16 +419,16 @@ function ContactRow({ icon: Icon, label, value, href, color, bg }: {
   icon: React.ElementType; label: string; value: string; href?: string; color: string; bg: string
 }) {
   return (
-    <div className="flex items-center gap-3 py-1.5">
-      <div className={`rounded-md p-1.5 ${bg}`}>
-        <Icon className={`h-3.5 w-3.5 ${color}`} />
+    <div className="flex items-center gap-2.5 py-1">
+      <div className={`rounded-md p-1 ${bg}`}>
+        <Icon className={`h-3 w-3 ${color}`} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[10px] text-muted-foreground leading-none">{label}</p>
+        <p className="text-[9px] text-muted-foreground/70 leading-none">{label}</p>
         {href ? (
-          <a href={href} target="_blank" rel="noopener noreferrer" className="text-sm text-accent hover:underline truncate block">{value}</a>
+          <a href={href} target="_blank" rel="noopener noreferrer" className="text-[13px] text-accent hover:underline truncate block leading-tight">{value}</a>
         ) : (
-          <p className="text-sm text-foreground truncate">{value}</p>
+          <p className="text-[13px] text-foreground truncate leading-tight">{value}</p>
         )}
       </div>
     </div>
@@ -616,46 +616,42 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
 
   return (
     <div className="animate-fade-in space-y-5">
-      {/* ── Summary strip — compact badges with labels ── */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${statusColor}`}>
+      {/* ── Summary strip — only essential badges ── */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${statusColor}`}>
           <span className={`h-1.5 w-1.5 rounded-full ${mentee.status === 'ativo' ? 'bg-success' : mentee.status === 'cancelado' ? 'bg-destructive' : 'bg-info'}`} />
           {statusLabel}
         </span>
-        <Badge variant={({ 1: 'muted', 2: 'warning', 3: 'info', 4: 'success', 5: 'accent' } as const)[mentee.priority_level] ?? 'muted'}>
-          Prioridade P{mentee.priority_level}
-        </Badge>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-0.5 text-[11px] text-muted-foreground">
           <Star className="h-3 w-3" /> Fit <ClienteFitToggle menteeId={mentee.id} initialValue={mentee.cliente_fit} />
         </span>
-        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground">
-          <Package className="h-3 w-3" /> <span className="text-[9px] text-muted-foreground/60 uppercase">Produto:</span> {mentee.product_name}
-        </span>
-        <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground">
-          <Calendar className="h-3 w-3" /> <span className="text-[9px] text-muted-foreground/60 uppercase">Início:</span> {mentee.start_date ? formatDateBR(mentee.start_date) : '—'}
-        </span>
         {mentee.contract_validity && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground">
-            <Clock className="h-3 w-3" /> <span className="text-[9px] text-muted-foreground/60 uppercase">Contrato:</span> {mentee.contract_validity}
+          <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-0.5 text-[11px] text-muted-foreground">
+            <Clock className="h-3 w-3" /> {mentee.contract_validity}
           </span>
         )}
-        {mentee.source && (
-          <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-1 text-[11px] text-muted-foreground">
-            <Target className="h-3 w-3" /> <span className="text-[9px] text-muted-foreground/60 uppercase">Origem:</span> {mentee.source}
-          </span>
+        {isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onTransitionToMentorship(mentee)}
+            className="ml-auto h-7 text-[11px] border-accent/30 text-accent hover:bg-accent/5"
+          >
+            Enviar para Mentoria <ArrowRight className="ml-1 h-3 w-3" />
+          </Button>
         )}
       </div>
 
-      {/* ── Main grid — always 3 cols on desktop ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* ── Main grid — adaptive: 2 cols when no closer, 3 when closer exists ── */}
+      <div className={`grid grid-cols-1 md:grid-cols-2 ${hasCloserData ? 'lg:grid-cols-3' : ''} gap-3`}>
 
         {/* Contact card */}
         <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
             <Phone className="h-3.5 w-3.5 text-accent" />
-            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Contato</h3>
+            <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Contato</h3>
           </div>
-          <div className="p-4 space-y-0.5">
+          <div className="px-3 py-2 space-y-0">
             {mentee.phone && <ContactRow icon={Phone} label="Telefone" value={mentee.phone} color="text-accent" bg="bg-accent/10" />}
             {mentee.email && <ContactRow icon={Mail} label="Email" value={mentee.email} color="text-info" bg="bg-info/10" />}
             {instHandle && <ContactRow icon={AtSign} label="Instagram" value={`@${instHandle}`} href={`https://instagram.com/${instHandle}`} color="text-pink-500" bg="bg-pink-500/10" />}
@@ -665,85 +661,53 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
           </div>
         </div>
 
-        {/* Mentoria data card — only data, no actions */}
+        {/* Mentoria card */}
         <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-gradient-to-r from-success/5 to-transparent">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-success/5 to-transparent">
             <Briefcase className="h-3.5 w-3.5 text-success" />
-            <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Mentoria</h3>
+            <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Mentoria</h3>
           </div>
-          <div className="p-4 space-y-0.5">
+          <div className="px-3 py-2 space-y-0">
             {mentee.end_date && <ContactRow icon={Calendar} label="Término" value={formatDateBR(mentee.end_date)} color="text-info" bg="bg-info/10" />}
             {mentee.seller_name && <ContactRow icon={Users} label="Vendedor" value={mentee.seller_name} color="text-success" bg="bg-success/10" />}
             {mentee.funnel_origin && <ContactRow icon={Target} label="Funil" value={mentee.funnel_origin} color="text-warning" bg="bg-warning/10" />}
             {mentee.has_partner && <ContactRow icon={Users} label="Sócio" value={mentee.partner_name || 'Sim'} color="text-accent" bg="bg-accent/10" />}
             {mentee.source && <ContactRow icon={Target} label="Origem" value={mentee.source} color="text-muted-foreground" bg="bg-muted" />}
             {!hasMentoriaDetails && (
-              <div className="py-4 text-center">
-                <Briefcase className="h-7 w-7 text-muted-foreground/15 mx-auto mb-1.5" />
-                <p className="text-[11px] text-muted-foreground/60">Sem dados adicionais</p>
+              <div className="py-3 text-center">
+                <p className="text-[11px] text-muted-foreground/50">Sem dados adicionais</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* Right column: Actions + Closer (or empty state) */}
-        <div className="space-y-4">
-          {/* Actions card — transition only */}
-          {isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship && (
-            <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
-                <ArrowRight className="h-3.5 w-3.5 text-accent" />
-                <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Ações</h3>
-              </div>
-              <div className="p-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => onTransitionToMentorship(mentee)}
-                  className="w-full text-xs border-accent/30 text-accent hover:bg-accent/5"
-                >
-                  Enviar para Etapas Mentoria <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                </Button>
-              </div>
+        {/* Closer card — only shown when data exists */}
+        {hasCloserData && (
+          <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-warning/5 to-transparent">
+              <Mic className="h-3.5 w-3.5 text-warning" />
+              <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Closer / Venda</h3>
             </div>
-          )}
-
-          {/* Closer card */}
-          {hasCloserData && (
-            <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-              <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-gradient-to-r from-warning/5 to-transparent">
-                <Mic className="h-3.5 w-3.5 text-warning" />
-                <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Closer / Venda</h3>
-              </div>
-              <div className="p-4 space-y-0.5">
-                {mentee.closer_name && <ContactRow icon={Users} label="Closer" value={mentee.closer_name} color="text-warning" bg="bg-warning/10" />}
-                {mentee.niche && <ContactRow icon={Target} label="Nicho" value={mentee.niche} color="text-accent" bg="bg-accent/10" />}
-                {mentee.main_pain && <ContactRow icon={TrendingUp} label="Dor principal" value={mentee.main_pain} color="text-destructive" bg="bg-destructive/10" />}
-                {mentee.main_difficulty && <ContactRow icon={Shield} label="Dificuldade" value={mentee.main_difficulty} color="text-info" bg="bg-info/10" />}
-                {mentee.transcription && (
-                  <div className="pt-2 mt-1 border-t border-border/50">
-                    <p className="text-[10px] text-muted-foreground mb-1">Transcrição</p>
-                    <div className="rounded bg-muted/50 p-2.5 text-xs text-foreground max-h-24 overflow-y-auto whitespace-pre-wrap leading-relaxed">
-                      {mentee.transcription}
-                    </div>
+            <div className="px-3 py-2 space-y-0">
+              {mentee.closer_name && <ContactRow icon={Users} label="Closer" value={mentee.closer_name} color="text-warning" bg="bg-warning/10" />}
+              {mentee.niche && <ContactRow icon={Target} label="Nicho" value={mentee.niche} color="text-accent" bg="bg-accent/10" />}
+              {mentee.main_pain && <ContactRow icon={TrendingUp} label="Dor principal" value={mentee.main_pain} color="text-destructive" bg="bg-destructive/10" />}
+              {mentee.main_difficulty && <ContactRow icon={Shield} label="Dificuldade" value={mentee.main_difficulty} color="text-info" bg="bg-info/10" />}
+              {mentee.transcription && (
+                <div className="pt-1.5 mt-1 border-t border-border/50">
+                  <p className="text-[10px] text-muted-foreground mb-1">Transcrição</p>
+                  <div className="rounded bg-muted/50 p-2 text-xs text-foreground max-h-20 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                    {mentee.transcription}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
-          )}
-
-          {/* Empty state for right column when no closer and no actions */}
-          {!hasCloserData && !(isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship) && (
-            <div className="rounded-lg border border-dashed border-border bg-muted/10 p-5 text-center">
-              <Mic className="h-7 w-7 text-muted-foreground/15 mx-auto mb-1.5" />
-              <p className="text-[11px] text-muted-foreground/60">Dados do Closer aparecerão aqui via webhook</p>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* ── Informações Pessoais + Observações ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      {/* ── Informações Pessoais + Observações — equal height ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <PersonalTagsCard menteeId={mentee.id} initialTags={mentee.personal_tags ?? []} />
         <NotesCard menteeId={mentee.id} initialNotes={mentee.notes ?? ''} />
       </div>
@@ -751,16 +715,16 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
       {/* ── Performance (Bethel Metrics) ── */}
       {hasMetrics && (
         <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
             <div className="flex items-center gap-2">
               <TrendingUp className="h-3.5 w-3.5 text-accent" />
-              <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Performance</h3>
+              <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Performance</h3>
             </div>
             <span className="text-[10px] text-muted-foreground">
-              Atualizado {new Date(mentee.metrics_updated_at!).toLocaleDateString('pt-BR')}
+              {new Date(mentee.metrics_updated_at!).toLocaleDateString('pt-BR')}
             </span>
           </div>
-          <div className="p-4 space-y-3">
+          <div className="p-3 space-y-2">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
               <MetricBox label="Fat. atual" value={mentee.faturamento_atual != null ? formatBRL(mentee.faturamento_atual) : '—'} highlight />
               <MetricBox label="Mês anterior" value={mentee.faturamento_mes_anterior != null ? formatBRL(mentee.faturamento_mes_anterior) : '—'} />
@@ -791,13 +755,12 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
         </div>
       )}
 
-      {/* Empty state for metrics */}
+      {/* Empty state for metrics — minimal */}
       {!hasMetrics && (
-        <div className="rounded-lg border border-dashed border-border bg-muted/10 p-5 text-center">
-          <TrendingUp className="h-8 w-8 text-muted-foreground/15 mx-auto mb-2" />
-          <p className="text-xs font-medium text-muted-foreground/60">Métricas de performance</p>
-          <p className="text-[11px] text-muted-foreground/40 mt-0.5">
-            Serão preenchidas automaticamente pelo Bethel Metrics via webhook semanal.
+        <div className="rounded-lg border border-dashed border-border/50 bg-muted/5 px-4 py-3 flex items-center gap-3">
+          <TrendingUp className="h-5 w-5 text-muted-foreground/20 shrink-0" />
+          <p className="text-[11px] text-muted-foreground/40">
+            Métricas de performance serão preenchidas automaticamente via Bethel Metrics.
           </p>
         </div>
       )}
@@ -841,18 +804,18 @@ function PersonalTagsCard({ menteeId, initialTags }: { menteeId: string; initial
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
+    <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden h-full">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
         <Users className="h-3.5 w-3.5 text-accent" />
-        <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Informações Pessoais</h3>
+        <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Informações Pessoais</h3>
         {saving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-auto" />}
       </div>
-      <div className="p-4 space-y-3">
-        <div className="flex flex-wrap gap-1.5">
+      <div className="p-3 space-y-2.5">
+        <div className="flex flex-wrap gap-1.5 min-h-[32px]">
           {tags.map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center gap-1 rounded-full bg-accent/10 border border-accent/20 px-2.5 py-1 text-xs font-medium text-foreground"
+              className="inline-flex items-center gap-1 rounded-full bg-accent/10 border border-accent/20 px-2.5 py-0.5 text-[11px] font-medium text-foreground"
             >
               {tag}
               <button
@@ -865,18 +828,18 @@ function PersonalTagsCard({ menteeId, initialTags }: { menteeId: string; initial
             </span>
           ))}
           {tags.length === 0 && (
-            <p className="text-xs text-muted-foreground/50">Nenhuma informação adicionada</p>
+            <p className="text-[11px] text-muted-foreground/40 italic">Adicione informações pessoais abaixo</p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ex: Casado, 2 filhos, Futebol..."
-            className="h-8 text-xs"
+            className="h-7 text-xs"
           />
-          <Button size="sm" variant="outline" className="h-8 shrink-0" onClick={handleAdd} disabled={!input.trim()}>
+          <Button size="sm" variant="outline" className="h-7 px-2 shrink-0" onClick={handleAdd} disabled={!input.trim()}>
             <Plus className="h-3 w-3" />
           </Button>
         </div>
@@ -904,20 +867,19 @@ function NotesCard({ menteeId, initialNotes }: { menteeId: string; initialNotes:
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border bg-gradient-to-r from-warning/5 to-transparent">
+    <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden h-full">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-warning/5 to-transparent">
         <Pencil className="h-3.5 w-3.5 text-warning" />
-        <h3 className="text-xs font-semibold text-foreground uppercase tracking-wide">Observações</h3>
-        {saving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-auto" />}
+        <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Observações</h3>
+        <span className="text-[9px] text-muted-foreground/40 ml-auto">{saving ? 'Salvando...' : 'Auto-save'}</span>
       </div>
-      <div className="p-4">
+      <div className="p-3">
         <Textarea
           value={notes}
           onChange={(e) => handleChange(e.target.value)}
           placeholder="Anotações sobre o mentorado..."
-          className="min-h-[100px] text-sm resize-none"
+          className="min-h-[80px] text-xs resize-none border-0 bg-transparent p-0 focus-visible:ring-0 shadow-none"
         />
-        <p className="text-[10px] text-muted-foreground/40 mt-1.5">Salva automaticamente ao digitar</p>
       </div>
     </div>
   )

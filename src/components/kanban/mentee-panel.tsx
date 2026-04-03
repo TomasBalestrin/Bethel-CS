@@ -641,10 +641,10 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
         )}
       </div>
 
-      {/* ── Main grid — adaptive: 2 cols when no closer, 3 when closer exists ── */}
-      <div className={`grid grid-cols-1 md:grid-cols-2 ${hasCloserData ? 'lg:grid-cols-3' : ''} gap-3`}>
+      {/* ── Main layout: Contato (left) | Mentoria + Info Pessoais + Observações (right) ── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 
-        {/* Contact card */}
+        {/* Left: Contact card — full height */}
         <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
           <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
             <Phone className="h-3.5 w-3.5 text-accent" />
@@ -660,58 +660,65 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
           </div>
         </div>
 
-        {/* Mentoria card */}
-        <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-          <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-success/5 to-transparent">
-            <Briefcase className="h-3.5 w-3.5 text-success" />
-            <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Mentoria</h3>
-          </div>
-          <div className="px-3 py-2 space-y-0">
-            {mentee.end_date && <ContactRow icon={Calendar} label="Término" value={formatDateBR(mentee.end_date)} color="text-info" bg="bg-info/10" />}
-            {mentee.seller_name && <ContactRow icon={Users} label="Vendedor" value={mentee.seller_name} color="text-success" bg="bg-success/10" />}
-            {mentee.funnel_origin && <ContactRow icon={Target} label="Funil" value={mentee.funnel_origin} color="text-warning" bg="bg-warning/10" />}
-            {mentee.has_partner && <ContactRow icon={Users} label="Sócio" value={mentee.partner_name || 'Sim'} color="text-accent" bg="bg-accent/10" />}
-            {mentee.source && <ContactRow icon={Target} label="Origem" value={mentee.source} color="text-muted-foreground" bg="bg-muted" />}
-            {!hasMentoriaDetails && (
-              <div className="py-3 text-center">
-                <p className="text-[11px] text-muted-foreground/50">Sem dados adicionais</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Closer card — only shown when data exists */}
-        {hasCloserData && (
+        {/* Right: Mentoria + Info Pessoais + Observações stacked */}
+        <div className="space-y-3">
+          {/* Mentoria card */}
           <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-            <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-warning/5 to-transparent">
-              <Mic className="h-3.5 w-3.5 text-warning" />
-              <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Closer / Venda</h3>
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-success/5 to-transparent">
+              <Briefcase className="h-3.5 w-3.5 text-success" />
+              <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Mentoria</h3>
             </div>
             <div className="px-3 py-2 space-y-0">
-              {mentee.closer_name && <ContactRow icon={Users} label="Closer" value={mentee.closer_name} color="text-warning" bg="bg-warning/10" />}
-              {mentee.niche && <ContactRow icon={Target} label="Nicho" value={mentee.niche} color="text-accent" bg="bg-accent/10" />}
-              {mentee.main_pain && <ContactRow icon={TrendingUp} label="Dor principal" value={mentee.main_pain} color="text-destructive" bg="bg-destructive/10" />}
-              {mentee.main_difficulty && <ContactRow icon={Shield} label="Dificuldade" value={mentee.main_difficulty} color="text-info" bg="bg-info/10" />}
-              {mentee.transcription && (
-                <div className="pt-1.5 mt-1 border-t border-border/50">
-                  <p className="text-[10px] text-muted-foreground mb-1">Transcrição</p>
-                  <div className="rounded bg-muted/50 p-2 text-xs text-foreground max-h-20 overflow-y-auto whitespace-pre-wrap leading-relaxed">
-                    {mentee.transcription}
-                  </div>
+              {mentee.end_date && <ContactRow icon={Calendar} label="Término" value={formatDateBR(mentee.end_date)} color="text-info" bg="bg-info/10" />}
+              {mentee.seller_name && <ContactRow icon={Users} label="Vendedor" value={mentee.seller_name} color="text-success" bg="bg-success/10" />}
+              {mentee.funnel_origin && <ContactRow icon={Target} label="Funil" value={mentee.funnel_origin} color="text-warning" bg="bg-warning/10" />}
+              {mentee.has_partner && <ContactRow icon={Users} label="Sócio" value={mentee.partner_name || 'Sim'} color="text-accent" bg="bg-accent/10" />}
+              {mentee.source && <ContactRow icon={Target} label="Origem" value={mentee.source} color="text-muted-foreground" bg="bg-muted" />}
+              {!hasMentoriaDetails && (
+                <div className="py-2 text-center">
+                  <p className="text-[11px] text-muted-foreground/50">Sem dados adicionais</p>
                 </div>
               )}
             </div>
           </div>
-        )}
+
+          {/* Info Pessoais card */}
+          <PersonalTagsCard menteeId={mentee.id} initialTags={mentee.personal_tags ?? []} />
+
+          {/* Observações card */}
+          <NotesCard menteeId={mentee.id} initialNotes={mentee.notes ?? ''} />
+        </div>
       </div>
 
-      {/* ── Informações Pessoais + Observações — equal height ── */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <PersonalTagsCard menteeId={mentee.id} initialTags={mentee.personal_tags ?? []} />
-        <NotesCard menteeId={mentee.id} initialNotes={mentee.notes ?? ''} />
-      </div>
+      {/* ── Webhook data blocks (full width below) ── */}
 
-      {/* ── Performance (Bethel Metrics) ── */}
+      {/* Closer / Venda — only when data exists */}
+      {hasCloserData && (
+        <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-warning/5 to-transparent">
+            <Mic className="h-3.5 w-3.5 text-warning" />
+            <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Closer / Venda</h3>
+          </div>
+          <div className="px-3 py-2">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-0">
+              {mentee.closer_name && <ContactRow icon={Users} label="Closer" value={mentee.closer_name} color="text-warning" bg="bg-warning/10" />}
+              {mentee.niche && <ContactRow icon={Target} label="Nicho" value={mentee.niche} color="text-accent" bg="bg-accent/10" />}
+              {mentee.main_pain && <ContactRow icon={TrendingUp} label="Dor principal" value={mentee.main_pain} color="text-destructive" bg="bg-destructive/10" />}
+              {mentee.main_difficulty && <ContactRow icon={Shield} label="Dificuldade" value={mentee.main_difficulty} color="text-info" bg="bg-info/10" />}
+            </div>
+            {mentee.transcription && (
+              <div className="pt-1.5 mt-1.5 border-t border-border/50">
+                <p className="text-[10px] text-muted-foreground mb-1">Transcrição</p>
+                <div className="rounded bg-muted/50 p-2 text-xs text-foreground max-h-20 overflow-y-auto whitespace-pre-wrap leading-relaxed">
+                  {mentee.transcription}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Performance (Bethel Metrics) */}
       {hasMetrics && (
         <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
           <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
@@ -803,7 +810,7 @@ function PersonalTagsCard({ menteeId, initialTags }: { menteeId: string; initial
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden h-full">
+    <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
         <Users className="h-3.5 w-3.5 text-accent" />
         <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Informações Pessoais</h3>
@@ -866,7 +873,7 @@ function NotesCard({ menteeId, initialNotes }: { menteeId: string; initialNotes:
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden h-full">
+    <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-warning/5 to-transparent">
         <Pencil className="h-3.5 w-3.5 text-warning" />
         <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Observações</h3>

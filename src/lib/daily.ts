@@ -6,15 +6,15 @@
 const DAILY_API_KEY = process.env.DAILY_API_KEY || ''
 const DAILY_DOMAIN = process.env.NEXT_PUBLIC_DAILY_DOMAIN || ''
 
-export async function createRoom(): Promise<{ name: string; url: string }> {
-  console.log('[Daily] createRoom - API key exists:', !!DAILY_API_KEY, 'length:', DAILY_API_KEY?.length)
+export async function createRoom(enableVideo = false): Promise<{ name: string; url: string }> {
+  console.log('[Daily] createRoom - API key exists:', !!DAILY_API_KEY, 'length:', DAILY_API_KEY?.length, 'video:', enableVideo)
 
   const body = {
     privacy: 'private',
     properties: {
       max_participants: 2,
       exp: Math.floor(Date.now() / 1000) + 7200,
-      start_video_off: true,
+      start_video_off: !enableVideo,
       start_audio_off: false,
       enable_recording: 'cloud',
     },

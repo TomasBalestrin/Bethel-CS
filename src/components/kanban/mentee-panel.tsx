@@ -345,6 +345,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
               { value: 'info', label: 'Info' },
               { value: 'action-plan', label: 'Plano' },
               { value: 'acompanhamento', label: 'Acompanhamento' },
+              { value: 'intensivo', label: 'Intensivo' },
               { value: 'chat', label: 'Chat' },
             ].map((tab) => (
               <TabsTrigger
@@ -396,6 +397,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
         </TabsContent>
         <TabsContent value="action-plan"><TabActionPlan mentee={mentee} /></TabsContent>
         <TabsContent value="acompanhamento"><TabAcompanhamento menteeId={mentee.id} /></TabsContent>
+        <TabsContent value="intensivo"><TabIntensivo menteeId={mentee.id} /></TabsContent>
       </ScrollArea>
       {/* Chat tab — outside ScrollArea (manages its own scroll) */}
       <TabsContent value="chat" className={`flex-1 overflow-hidden ${activeTab !== 'chat' ? 'hidden' : ''}`}>
@@ -1326,7 +1328,7 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
   )
 }
 
-// ─── Card: Indicações (CS + Intensivo) ───
+// ─── Card: Indicações CS ───
 function CardIndicacoes({ menteeId }: { menteeId: string }) {
   // Indications state
   const [indications, setIndications] = useState<Indication[]>([])
@@ -1337,24 +1339,11 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
   const [indLoading, setIndLoading] = useState(false)
   const [confirmDeleteInd, setConfirmDeleteInd] = useState<string | null>(null)
 
-  // Intensivo state
-  const [intensivos, setIntensivos] = useState<IntensivoRecord[]>([])
-  const [showIntForm, setShowIntForm] = useState(false)
-  const [editingIntId, setEditingIntId] = useState<string | null>(null)
-  const [intParticipated, setIntParticipated] = useState(false)
-  const [intDate, setIntDate] = useState('')
-  const [intIndName, setIntIndName] = useState('')
-  const [intIndPhone, setIntIndPhone] = useState('')
-  const [intLoading, setIntLoading] = useState(false)
-  const [confirmDeleteInt, setConfirmDeleteInt] = useState<string | null>(null)
-
   const supabase = createClient()
 
   const fetchAll = useCallback(() => {
     supabase.from('indications').select('*').eq('mentee_id', menteeId)
       .order('created_at', { ascending: false }).then(({ data }) => { if (data) setIndications(data) })
-    supabase.from('intensivo_records').select('*').eq('mentee_id', menteeId)
-      .order('created_at', { ascending: false }).then(({ data }) => { if (data) setIntensivos(data) })
   }, [menteeId, supabase])
 
   useEffect(() => { fetchAll() }, [fetchAll])
@@ -1380,61 +1369,176 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
     await deleteIndication(id); setConfirmDeleteInd(null); fetchAll()
   }
 
-  // ─── Intensivo handlers ───
-  function openEditInt(rec: IntensivoRecord) {
-    setEditingIntId(rec.id); setIntParticipated(rec.participated); setIntDate(rec.participation_date || '')
-    setIntIndName(rec.indication_name || ''); setIntIndPhone(rec.indication_phone || '')
-    setShowIntForm(true)
-  }
-  function resetIntForm() {
-    setEditingIntId(null); setIntParticipated(false); setIntDate(''); setIntIndName(''); setIntIndPhone(''); setShowIntForm(false)
-  }
-  async function handleSubmitInt(e: React.FormEvent) {
-    e.preventDefault(); setIntLoading(true)
-    const data = { participated: intParticipated, participation_date: intDate || undefined, indication_name: intIndName || undefined, indication_phone: intIndPhone || undefined }
-    if (editingIntId) {
-      await updateIntensivoRecord(editingIntId, data)
-    } else {
-      await addIntensivoRecord(menteeId, data)
-    }
-    resetIntForm(); setIntLoading(false); fetchAll()
-  }
-  async function handleDeleteInt(id: string) {
-    await deleteIntensivoRecord(id); setConfirmDeleteInt(null); fetchAll()
-  }
-
   return (
     <div className="p-4 space-y-4">
       {/* Card header */}
       <div className="flex items-center gap-2 -mx-4 -mt-4 px-4 py-3 border-b border-border bg-muted/30">
         <Users className="h-4 w-4 text-accent" />
         <h3 className="font-heading font-semibold text-sm">Indicações</h3>
-        <Badge variant="muted" className="text-[10px] ml-auto">{indications.length + intensivos.length}</Badge>
+        <Badge variant="muted" className="text-[10px] ml-auto">{indications.length}</Badge>
       </div>
 
-      {/* ═══ Indicações CS ═══ */}
+      <div className="flex items-center justify-end">
+        <Button size="sm" variant="outline" onClick={() => { resetIndForm(); setShowIndForm(!showIndForm) }}>
+          <Plus className="mr-1 h-3 w-3" /> Registrar indicação
+        </Button>
+      </div>
+
+      <Dialog open={showIndForm} onOpenChange={(open) => { if (!open) resetIndForm() }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingIndId ? 'Editar indicação' : 'Nova indicação'}</DialogTitle>
+            <DialogDescription>Registre uma indicação feita pelo mentorado.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmitInd} className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="ind-name">Nome do indicado *</Label>
+              <Input id="ind-name" value={indName} onChange={(e) => setIndName(e.target.value)} required />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="ind-phone">Telefone *</Label>
+              <Input id="ind-phone" value={indPhone} onChange={(e) => setIndPhone(e.target.value)} required />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={resetIndForm}>Cancelar</Button>
+              <Button type="submit" disabled={indLoading}>{indLoading ? 'Salvando...' : 'Salvar'}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {indications.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+          <Users className="h-8 w-8 mb-2 opacity-40" />
+          <p className="text-sm">Nenhum registro ainda</p>
+        </div>
+      )}
+      {indications.map((item) => (
+        <div key={item.id} className="group rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:bg-muted/30">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="font-medium text-foreground">{item.indicated_name}</p>
+              <p className="text-muted-foreground">{item.indicated_phone}</p>
+            </div>
+            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditInd(item)} aria-label="Editar indicação"><Pencil className="h-3 w-3" /></Button>
+              <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteInd(item.id)} aria-label="Excluir indicação"><Trash2 className="h-3 w-3" /></Button>
+            </div>
+          </div>
+        </div>
+      ))}
+      <Dialog open={!!confirmDeleteInd} onOpenChange={() => setConfirmDeleteInd(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Excluir indicação?</DialogTitle><DialogDescription>Esta ação não pode ser desfeita.</DialogDescription></DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDeleteInd(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => confirmDeleteInd && handleDeleteInd(confirmDeleteInd)}>Excluir</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+// ─── Tab: Intensivo ───
+function TabIntensivo({ menteeId }: { menteeId: string }) {
+  const [intensivos, setIntensivos] = useState<IntensivoRecord[]>([])
+
+  // Indicação form state
+  const [showIndForm, setShowIndForm] = useState(false)
+  const [editingIndId, setEditingIndId] = useState<string | null>(null)
+  const [indName, setIndName] = useState('')
+  const [indPhone, setIndPhone] = useState('')
+  const [indLoading, setIndLoading] = useState(false)
+
+  // Participação form state
+  const [showPartForm, setShowPartForm] = useState(false)
+  const [editingPartId, setEditingPartId] = useState<string | null>(null)
+  const [partDate, setPartDate] = useState('')
+  const [partLoading, setPartLoading] = useState(false)
+
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const supabase = createClient()
+
+  const fetchData = useCallback(() => {
+    supabase.from('intensivo_records').select('*').eq('mentee_id', menteeId)
+      .order('created_at', { ascending: false }).then(({ data }) => { if (data) setIntensivos(data) })
+  }, [menteeId, supabase])
+
+  useEffect(() => { fetchData() }, [fetchData])
+
+  // Split records into two lists
+  const indicacoes = intensivos.filter((r) => r.indication_name)
+  const participacoes = intensivos.filter((r) => r.participated)
+
+  // ─── Indicação handlers ───
+  function resetIndForm() {
+    setEditingIndId(null); setIndName(''); setIndPhone(''); setShowIndForm(false)
+  }
+  function openEditInd(rec: IntensivoRecord) {
+    setEditingIndId(rec.id); setIndName(rec.indication_name || ''); setIndPhone(rec.indication_phone || '')
+    setShowIndForm(true)
+  }
+  async function handleSubmitInd(e: React.FormEvent) {
+    e.preventDefault(); setIndLoading(true)
+    const data = { participated: false, indication_name: indName, indication_phone: indPhone || undefined }
+    if (editingIndId) {
+      await updateIntensivoRecord(editingIndId, data)
+    } else {
+      await addIntensivoRecord(menteeId, data)
+    }
+    resetIndForm(); setIndLoading(false); fetchData()
+  }
+
+  // ─── Participação handlers ───
+  function resetPartForm() {
+    setEditingPartId(null); setPartDate(''); setShowPartForm(false)
+  }
+  function openEditPart(rec: IntensivoRecord) {
+    setEditingPartId(rec.id); setPartDate(rec.participation_date || '')
+    setShowPartForm(true)
+  }
+  async function handleSubmitPart(e: React.FormEvent) {
+    e.preventDefault(); setPartLoading(true)
+    const data = { participated: true, participation_date: partDate || undefined }
+    if (editingPartId) {
+      await updateIntensivoRecord(editingPartId, data)
+    } else {
+      await addIntensivoRecord(menteeId, data)
+    }
+    resetPartForm(); setPartLoading(false); fetchData()
+  }
+
+  // ─── Delete handler ───
+  async function handleDelete(id: string) {
+    await deleteIntensivoRecord(id); setConfirmDeleteId(null); fetchData()
+  }
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      {/* ═══ SEÇÃO 1: Indicação para o Intensivo ═══ */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <p className="label-xs text-muted-foreground">Indicações CS ({indications.length})</p>
+          <p className="label-xs uppercase">Indicação para o Intensivo ({indicacoes.length})</p>
           <Button size="sm" variant="outline" onClick={() => { resetIndForm(); setShowIndForm(!showIndForm) }}>
-            <Plus className="mr-1 h-3 w-3" /> Registrar indicação
+            <Plus className="mr-1 h-3 w-3" /> Registrar
           </Button>
         </div>
 
         <Dialog open={showIndForm} onOpenChange={(open) => { if (!open) resetIndForm() }}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{editingIndId ? 'Editar indicação' : 'Nova indicação'}</DialogTitle>
-              <DialogDescription>Registre uma indicação feita pelo mentorado.</DialogDescription>
+              <DialogTitle>{editingIndId ? 'Editar indicação' : 'Nova indicação para o intensivo'}</DialogTitle>
+              <DialogDescription>Registre uma indicação feita pelo mentorado para o intensivo.</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleSubmitInd} className="space-y-3">
               <div className="space-y-1">
-                <Label htmlFor="ind-name">Nome do indicado *</Label>
-                <Input id="ind-name" value={indName} onChange={(e) => setIndName(e.target.value)} required />
+                <Label htmlFor="int-ind-name">Nome do indicado *</Label>
+                <Input id="int-ind-name" value={indName} onChange={(e) => setIndName(e.target.value)} required />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="ind-phone">Telefone *</Label>
-                <Input id="ind-phone" value={indPhone} onChange={(e) => setIndPhone(e.target.value)} required />
+                <Label htmlFor="int-ind-phone">Telefone</Label>
+                <Input id="int-ind-phone" value={indPhone} onChange={(e) => setIndPhone(e.target.value)} />
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={resetIndForm}>Cancelar</Button>
@@ -1444,116 +1548,90 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
           </DialogContent>
         </Dialog>
 
-        {indications.length === 0 && (
+        {indicacoes.length === 0 && (
           <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
             <Users className="h-8 w-8 mb-2 opacity-40" />
-            <p className="text-sm">Nenhum registro ainda</p>
+            <p className="text-sm">Nenhuma indicação registrada</p>
           </div>
         )}
-        {indications.map((item) => (
+        {indicacoes.map((item) => (
           <div key={item.id} className="group rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:bg-muted/30">
             <div className="flex items-start justify-between">
               <div>
-                <p className="font-medium text-foreground">{item.indicated_name}</p>
-                <p className="text-muted-foreground">{item.indicated_phone}</p>
+                <p className="font-medium text-foreground">{item.indication_name}</p>
+                {item.indication_phone && <p className="text-muted-foreground">{item.indication_phone}</p>}
               </div>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditInd(item)} aria-label="Editar indicação"><Pencil className="h-3 w-3" /></Button>
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteInd(item.id)} aria-label="Excluir indicação"><Trash2 className="h-3 w-3" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditInd(item)} aria-label="Editar"><Pencil className="h-3 w-3" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteId(item.id)} aria-label="Excluir"><Trash2 className="h-3 w-3" /></Button>
               </div>
             </div>
           </div>
         ))}
-        <Dialog open={!!confirmDeleteInd} onOpenChange={() => setConfirmDeleteInd(null)}>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Excluir indicação?</DialogTitle><DialogDescription>Esta ação não pode ser desfeita.</DialogDescription></DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setConfirmDeleteInd(null)}>Cancelar</Button>
-              <Button variant="destructive" onClick={() => confirmDeleteInd && handleDeleteInd(confirmDeleteInd)}>Excluir</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
 
-      <Separator className="border-border/30" />
+      <Separator className="border-border/50" />
 
-      {/* ═══ SEÇÃO 2: Intensivo ═══ */}
+      {/* ═══ SEÇÃO 2: Participação do Intensivo ═══ */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <p className="label-xs uppercase">Intensivo ({intensivos.length})</p>
-          <Button size="sm" variant="outline" onClick={() => { resetIntForm(); setShowIntForm(!showIntForm) }}>
+          <p className="label-xs uppercase">Participação do Intensivo ({participacoes.length})</p>
+          <Button size="sm" variant="outline" onClick={() => { resetPartForm(); setShowPartForm(!showPartForm) }}>
             <Plus className="mr-1 h-3 w-3" /> Registrar
           </Button>
         </div>
 
-        <Dialog open={showIntForm} onOpenChange={(open) => { if (!open) resetIntForm() }}>
+        <Dialog open={showPartForm} onOpenChange={(open) => { if (!open) resetPartForm() }}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{editingIntId ? 'Editar registro' : 'Novo registro intensivo'}</DialogTitle>
-              <DialogDescription>Registre participação ou indicação para o intensivo.</DialogDescription>
+              <DialogTitle>{editingPartId ? 'Editar participação' : 'Nova participação no intensivo'}</DialogTitle>
+              <DialogDescription>Registre a participação do mentorado no intensivo.</DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmitInt} className="space-y-3">
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="int-part" checked={intParticipated} onChange={(e) => setIntParticipated(e.target.checked)} className="h-4 w-4 rounded border-input" />
-                <Label htmlFor="int-part">Participou</Label>
-              </div>
-              {intParticipated && (
-                <div className="space-y-1">
-                  <Label htmlFor="int-date">Data de participação</Label>
-                  <Input id="int-date" type="date" value={intDate} onChange={(e) => setIntDate(e.target.value)} />
-                </div>
-              )}
+            <form onSubmit={handleSubmitPart} className="space-y-3">
               <div className="space-y-1">
-                <Label htmlFor="int-ind-name">Nome indicação intensivo</Label>
-                <Input id="int-ind-name" value={intIndName} onChange={(e) => setIntIndName(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="int-ind-phone">Telefone indicação</Label>
-                <Input id="int-ind-phone" value={intIndPhone} onChange={(e) => setIntIndPhone(e.target.value)} />
+                <Label htmlFor="int-part-date">Data de participação *</Label>
+                <Input id="int-part-date" type="date" value={partDate} onChange={(e) => setPartDate(e.target.value)} required />
               </div>
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={resetIntForm}>Cancelar</Button>
-                <Button type="submit" disabled={intLoading}>{intLoading ? 'Salvando...' : 'Salvar'}</Button>
+                <Button type="button" variant="outline" onClick={resetPartForm}>Cancelar</Button>
+                <Button type="submit" disabled={partLoading}>{partLoading ? 'Salvando...' : 'Salvar'}</Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
 
-        {intensivos.length === 0 && (
+        {participacoes.length === 0 && (
           <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-            <Users className="h-8 w-8 mb-2 opacity-40" />
-            <p className="text-sm">Nenhum registro ainda</p>
+            <Calendar className="h-8 w-8 mb-2 opacity-40" />
+            <p className="text-sm">Nenhuma participação registrada</p>
           </div>
         )}
-        {intensivos.map((item) => (
+        {participacoes.map((item) => (
           <div key={item.id} className="group rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:bg-muted/30">
             <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  {item.participated ? <Badge variant="success">Participou</Badge> : <Badge variant="muted">Não participou</Badge>}
-                  {item.participation_date && <span className="text-muted-foreground text-xs">{formatDateBR(item.participation_date)}</span>}
-                </div>
-                {item.indication_name && (
-                  <p className="mt-1 text-muted-foreground">Indicação: {item.indication_name} — {item.indication_phone}</p>
-                )}
+              <div className="flex items-center gap-2">
+                <Badge variant="success">Participou</Badge>
+                {item.participation_date && <span className="text-muted-foreground text-xs">{formatDateBR(item.participation_date)}</span>}
               </div>
               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditInt(item)} aria-label="Editar intensivo"><Pencil className="h-3 w-3" /></Button>
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteInt(item.id)} aria-label="Excluir intensivo"><Trash2 className="h-3 w-3" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditPart(item)} aria-label="Editar"><Pencil className="h-3 w-3" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteId(item.id)} aria-label="Excluir"><Trash2 className="h-3 w-3" /></Button>
               </div>
             </div>
           </div>
         ))}
-        <Dialog open={!!confirmDeleteInt} onOpenChange={() => setConfirmDeleteInt(null)}>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Excluir registro?</DialogTitle><DialogDescription>Esta ação não pode ser desfeita.</DialogDescription></DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setConfirmDeleteInt(null)}>Cancelar</Button>
-              <Button variant="destructive" onClick={() => confirmDeleteInt && handleDeleteInt(confirmDeleteInt)}>Excluir</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
+
+      {/* Confirm delete dialog (shared) */}
+      <Dialog open={!!confirmDeleteId} onOpenChange={() => setConfirmDeleteId(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>Excluir registro?</DialogTitle><DialogDescription>Esta ação não pode ser desfeita.</DialogDescription></DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => confirmDeleteId && handleDelete(confirmDeleteId)}>Excluir</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

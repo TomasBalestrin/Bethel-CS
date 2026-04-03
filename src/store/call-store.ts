@@ -7,6 +7,7 @@ interface StartCallParams {
   callId: string
   menteeName: string
   menteeLink: string
+  callType: 'voice' | 'video'
 }
 
 interface CallState {
@@ -17,6 +18,7 @@ interface CallState {
   callId: string | null
   menteeName: string | null
   menteeLink: string | null
+  callType: 'voice' | 'video'
   status: 'idle' | 'connecting' | 'waiting' | 'active' | 'ended'
   muted: boolean
   seconds: number
@@ -37,6 +39,7 @@ export const useCallStore = create<CallState>((set) => ({
   callId: null,
   menteeName: null,
   menteeLink: null,
+  callType: 'voice',
   status: 'idle',
   muted: false,
   seconds: 0,
@@ -54,6 +57,7 @@ export const useCallStore = create<CallState>((set) => ({
       callId: params.callId,
       menteeName: params.menteeName,
       menteeLink: params.menteeLink,
+      callType: params.callType,
     })
   },
   endCall: () => set({
@@ -65,6 +69,7 @@ export const useCallStore = create<CallState>((set) => ({
     callId: null,
     menteeName: null,
     menteeLink: null,
+    callType: 'voice',
     muted: false,
     seconds: 0,
     remoteCount: 0,

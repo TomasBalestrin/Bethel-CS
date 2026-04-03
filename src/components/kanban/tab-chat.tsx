@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
-import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play } from 'lucide-react'
+import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -261,13 +261,16 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   }
 
   // ─── Start call ───
-  async function handleCall(forceNew = false) {
+  const [showCallMenu, setShowCallMenu] = useState(false)
+
+  async function handleCall(callType: 'voice' | 'video' = 'voice') {
+    setShowCallMenu(false)
     setCallingLoading(true)
     try {
       const res = await fetch('/api/calls/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ menteeId, forceNew }),
+        body: JSON.stringify({ menteeId, callType }),
       })
       if (!res.ok) throw new Error('Falha ao criar ligação')
       const data = await res.json()
@@ -278,6 +281,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         callId: data.callId,
         menteeName,
         menteeLink: data.menteeLink,
+        callType: data.callType || callType,
       })
       if (data.reused) {
         toast.success('Ligação em andamento — reconectando')
@@ -385,16 +389,52 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {canSend && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1.5 text-xs"
-              onClick={() => handleCall()}
-              disabled={callingLoading || callStore.isActive}
-            >
-              {callingLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Phone className="h-3 w-3" />}
-              Ligar
-            </Button>
+            <div className="relative">
+              <div className="flex">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5 text-xs rounded-r-none border-r-0"
+                  onClick={() => handleCall('voice')}
+                  disabled={callingLoading || callStore.isActive}
+                >
+                  {callingLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Phone className="h-3 w-3" />}
+                  Ligar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 px-1.5 rounded-l-none"
+                  onClick={() => setShowCallMenu(!showCallMenu)}
+                  disabled={callingLoading || callStore.isActive}
+                >
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </div>
+              {showCallMenu && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setShowCallMenu(false)} />
+                  <div className="absolute right-0 top-full mt-1 z-20 w-44 rounded-lg border border-border bg-card shadow-lg py-1">
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
+                      onClick={() => handleCall('voice')}
+                    >
+                      <Phone className="h-3.5 w-3.5" />
+                      Ligação de voz
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
+                      onClick={() => handleCall('video')}
+                    >
+                      <Video className="h-3.5 w-3.5" />
+                      Videochamada
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           )}
           <Button
             size="sm"
@@ -424,41 +464,67 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         {messages.map((msg, idx) => {
           const isOutgoing = msg.direction === 'outgoing'
           const prevMsg = messages[idx - 1]
+          const nextMsg = messages[idx + 1]
           const showDateSeparator = !prevMsg || getDateKey(msg.sent_at) !== getDateKey(prevMsg.sent_at)
+
+          // Group consecutive messages from same sender
+          const sameSenderAsPrev = prevMsg && prevMsg.direction === msg.direction && !showDateSeparator
+          const sameSenderAsNext = nextMsg && nextMsg.direction === msg.direction && getDateKey(msg.sent_at) === getDateKey(nextMsg?.sent_at ?? '')
+          const sameTimeAsNext = sameSenderAsNext && formatTime(msg.sent_at) === formatTime(nextMsg.sent_at)
+
+          // Show sender name only for first message in a group
+          const showSenderName = !isOutgoing && !sameSenderAsPrev
+          // Show time only for last message in a group with same time
+          const showTime = !sameTimeAsNext
+
+          // Bubble border radius based on position in group
+          const getBubbleRadius = () => {
+            if (isOutgoing) {
+              if (!sameSenderAsPrev && !sameSenderAsNext) return 'rounded-2xl rounded-tr-md'
+              if (!sameSenderAsPrev) return 'rounded-2xl rounded-tr-md rounded-br-md'
+              if (!sameSenderAsNext) return 'rounded-2xl rounded-tr-md rounded-r-md'
+              return 'rounded-2xl rounded-r-md'
+            }
+            if (!sameSenderAsPrev && !sameSenderAsNext) return 'rounded-2xl rounded-tl-md'
+            if (!sameSenderAsPrev) return 'rounded-2xl rounded-tl-md rounded-bl-md'
+            if (!sameSenderAsNext) return 'rounded-2xl rounded-tl-md rounded-l-md'
+            return 'rounded-2xl rounded-l-md'
+          }
 
           return (
             <div key={msg.id}>
               {/* Date separator */}
               {showDateSeparator && (
-                <div className="flex items-center justify-center my-3">
-                  <span className="rounded-full bg-muted px-3 py-0.5 text-[10px] text-muted-foreground">
+                <div className="flex items-center justify-center my-4">
+                  <span className="rounded-full bg-muted px-3 py-1 text-[10px] font-medium text-muted-foreground">
                     {formatDate(msg.sent_at)}
                   </span>
                 </div>
               )}
 
-              <div className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} mb-1`}>
-                <div className="max-w-[75%]">
-                  {/* Sender name — incoming only */}
-                  {!isOutgoing && (
-                    <p className="text-[10px] text-muted-foreground mb-0.5 px-1">
+              <div className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} ${sameSenderAsPrev ? 'mt-0.5' : 'mt-3'}`}>
+                <div className={`${isOutgoing ? 'max-w-[70%]' : 'max-w-[70%]'}`}>
+                  {/* Sender name — first in group only */}
+                  {showSenderName && (
+                    <p className="text-[10px] font-medium text-muted-foreground mb-1 px-1">
                       {msg.sender_name || menteeName}
                     </p>
                   )}
 
-                  <div className={`rounded-xl px-3 py-2 text-sm ${
+                  <div className={`px-3 py-2 text-sm shadow-sm ${getBubbleRadius()} ${
                     isOutgoing
-                      ? 'bg-accent/15 text-foreground rounded-tr-sm'
-                      : 'bg-muted text-foreground rounded-tl-sm'
+                      ? 'bg-accent/15 text-foreground'
+                      : 'bg-muted text-foreground'
                   }`}>
-                    {/* Media rendering */}
                     <MessageContent msg={msg} menteeName={menteeName} />
                   </div>
 
-                  {/* Time */}
-                  <p className={`text-[10px] text-muted-foreground/60 mt-0.5 px-1 ${isOutgoing ? 'text-right' : ''}`}>
-                    {formatTime(msg.sent_at)}
-                  </p>
+                  {/* Time — last in same-time group only */}
+                  {showTime && (
+                    <p className={`text-[10px] text-muted-foreground/50 mt-0.5 px-1 ${isOutgoing ? 'text-right' : ''}`}>
+                      {formatTime(msg.sent_at)}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

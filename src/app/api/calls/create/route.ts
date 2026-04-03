@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  const { menteeId, forceNew } = await request.json()
+  const { menteeId, forceNew, callType = 'voice' } = await request.json()
   if (!menteeId) return NextResponse.json({ error: 'menteeId obrigatório' }, { status: 400 })
 
   // Get mentee info
@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
         token,
         menteeLink,
         reused: true,
+        callType,
       })
     }
   } else {
@@ -69,7 +70,7 @@ export async function POST(request: NextRequest) {
   console.log('[Calls/Create] Creating new room for mentee:', mentee.full_name)
   let room
   try {
-    room = await createRoom()
+    room = await createRoom(callType === 'video')
   } catch (err) {
     console.error('[Calls/Create] createRoom failed:', err)
     return NextResponse.json({ error: String(err) }, { status: 500 })
@@ -121,5 +122,6 @@ export async function POST(request: NextRequest) {
     token: specialistToken,
     menteeLink,
     reused: false,
+    callType,
   })
 }

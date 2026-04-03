@@ -641,23 +641,69 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
         )}
       </div>
 
-      {/* ── Main layout: Contato (left) | Mentoria + Info Pessoais + Observações (right) ── */}
+      {/* ── Main layout: Contato + Metrics (left) | Mentoria + Info Pessoais + Observações (right) ── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 
-        {/* Left: Contact card — full height */}
-        <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-          <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
-            <Phone className="h-3.5 w-3.5 text-accent" />
-            <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Contato</h3>
+        {/* Left: Contact + Metrics stacked */}
+        <div className="space-y-3">
+          <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
+              <Phone className="h-3.5 w-3.5 text-accent" />
+              <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Contato</h3>
+            </div>
+            <div className="px-3 py-2 space-y-0">
+              {mentee.phone && <ContactRow icon={Phone} label="Telefone" value={mentee.phone} color="text-accent" bg="bg-accent/10" />}
+              {mentee.email && <ContactRow icon={Mail} label="Email" value={mentee.email} color="text-info" bg="bg-info/10" />}
+              {instHandle && <ContactRow icon={AtSign} label="Instagram" value={`@${instHandle}`} href={`https://instagram.com/${instHandle}`} color="text-pink-500" bg="bg-pink-500/10" />}
+              {(mentee.city || mentee.state) && <ContactRow icon={MapPin} label="Local" value={[mentee.city, mentee.state].filter(Boolean).join(', ')} color="text-warning" bg="bg-warning/10" />}
+              {mentee.cpf && <ContactRow icon={Shield} label="CPF" value={mentee.cpf} color="text-muted-foreground" bg="bg-muted" />}
+              {mentee.birth_date && <ContactRow icon={Calendar} label="Nascimento" value={formatDateBR(mentee.birth_date)} color="text-muted-foreground" bg="bg-muted" />}
+            </div>
           </div>
-          <div className="px-3 py-2 space-y-0">
-            {mentee.phone && <ContactRow icon={Phone} label="Telefone" value={mentee.phone} color="text-accent" bg="bg-accent/10" />}
-            {mentee.email && <ContactRow icon={Mail} label="Email" value={mentee.email} color="text-info" bg="bg-info/10" />}
-            {instHandle && <ContactRow icon={AtSign} label="Instagram" value={`@${instHandle}`} href={`https://instagram.com/${instHandle}`} color="text-pink-500" bg="bg-pink-500/10" />}
-            {(mentee.city || mentee.state) && <ContactRow icon={MapPin} label="Local" value={[mentee.city, mentee.state].filter(Boolean).join(', ')} color="text-warning" bg="bg-warning/10" />}
-            {mentee.cpf && <ContactRow icon={Shield} label="CPF" value={mentee.cpf} color="text-muted-foreground" bg="bg-muted" />}
-            {mentee.birth_date && <ContactRow icon={Calendar} label="Nascimento" value={formatDateBR(mentee.birth_date)} color="text-muted-foreground" bg="bg-muted" />}
-          </div>
+
+          {/* Performance (Bethel Metrics) — fills the space below contact */}
+          {hasMetrics ? (
+            <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-3.5 w-3.5 text-accent" />
+                  <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Performance</h3>
+                </div>
+                <span className="text-[10px] text-muted-foreground">
+                  {new Date(mentee.metrics_updated_at!).toLocaleDateString('pt-BR')}
+                </span>
+              </div>
+              <div className="p-3 space-y-2">
+                <div className="grid grid-cols-2 gap-1.5">
+                  <MetricBox label="Fat. atual" value={mentee.faturamento_atual != null ? formatBRL(mentee.faturamento_atual) : '—'} highlight />
+                  <MetricBox label="Mês anterior" value={mentee.faturamento_mes_anterior != null ? formatBRL(mentee.faturamento_mes_anterior) : '—'} />
+                  <MetricBox label="Antes mentoria" value={mentee.faturamento_antes_mentoria != null ? formatBRL(mentee.faturamento_antes_mentoria) : '—'} />
+                  <MetricBox label="Ticket médio" value={mentee.ticket_medio != null ? formatBRL(mentee.ticket_medio) : '—'} />
+                  <MetricBox label="Leads" value={mentee.total_leads ?? '—'} />
+                  <MetricBox label="Vendas" value={mentee.total_vendas ?? '—'} />
+                  <MetricBox label="Conversão" value={mentee.taxa_conversao != null ? `${mentee.taxa_conversao}%` : '—'} />
+                  <MetricBox label="Dias acessou" value={mentee.dias_acessou_sistema ?? '—'} />
+                </div>
+                {mentee.funis_ativos && Array.isArray(mentee.funis_ativos) && (mentee.funis_ativos as Array<{nome: string}>).length > 0 && (
+                  <div>
+                    <p className="text-[10px] text-muted-foreground mb-1">Funis ativos</p>
+                    <div className="flex flex-wrap gap-1">
+                      {(mentee.funis_ativos as Array<{id?: string; nome: string; slug?: string}>).map((f, i) => (
+                        <Badge key={f.id ?? i} variant="muted" className="text-[10px]">{f.nome}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-border/50 bg-muted/5 px-3 py-2.5 flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-muted-foreground/20 shrink-0" />
+              <p className="text-[11px] text-muted-foreground/40">
+                Métricas via Bethel Metrics (webhook semanal)
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Right: Mentoria + Info Pessoais + Observações stacked */}
@@ -690,9 +736,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
         </div>
       </div>
 
-      {/* ── Webhook data blocks (full width below) ── */}
-
-      {/* Closer / Venda — only when data exists */}
+      {/* ── Closer / Venda (full width) — only when data exists ── */}
       {hasCloserData && (
         <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
           <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-warning/5 to-transparent">
@@ -718,58 +762,6 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
         </div>
       )}
 
-      {/* Performance (Bethel Metrics) */}
-      {hasMetrics && (
-        <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-          <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-3.5 w-3.5 text-accent" />
-              <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Performance</h3>
-            </div>
-            <span className="text-[10px] text-muted-foreground">
-              {new Date(mentee.metrics_updated_at!).toLocaleDateString('pt-BR')}
-            </span>
-          </div>
-          <div className="p-3 space-y-2">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
-              <MetricBox label="Fat. atual" value={mentee.faturamento_atual != null ? formatBRL(mentee.faturamento_atual) : '—'} highlight />
-              <MetricBox label="Mês anterior" value={mentee.faturamento_mes_anterior != null ? formatBRL(mentee.faturamento_mes_anterior) : '—'} />
-              <MetricBox label="Antes mentoria" value={mentee.faturamento_antes_mentoria != null ? formatBRL(mentee.faturamento_antes_mentoria) : '—'} />
-              <MetricBox label="Leads" value={mentee.total_leads ?? '—'} />
-              <MetricBox label="Vendas" value={mentee.total_vendas ?? '—'} />
-              <MetricBox label="Conversão" value={mentee.taxa_conversao != null ? `${mentee.taxa_conversao}%` : '—'} />
-              <MetricBox label="Ticket médio" value={mentee.ticket_medio != null ? formatBRL(mentee.ticket_medio) : '—'} />
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-              <MetricBox label="Receita período" value={mentee.total_receita_periodo != null ? formatBRL(mentee.total_receita_periodo) : '—'} />
-              <MetricBox label="Entrada período" value={mentee.total_entrada_periodo != null ? formatBRL(mentee.total_entrada_periodo) : '—'} />
-              <MetricBox label="Dias acessou" value={mentee.dias_acessou_sistema ?? '—'} />
-              <MetricBox label="Dias preencheu" value={mentee.dias_preencheu ?? '—'} />
-              <MetricBox label="Último acesso" value={mentee.ultimo_acesso ? new Date(mentee.ultimo_acesso).toLocaleDateString('pt-BR') : '—'} />
-            </div>
-            {mentee.funis_ativos && Array.isArray(mentee.funis_ativos) && (mentee.funis_ativos as Array<{nome: string}>).length > 0 && (
-              <div>
-                <p className="text-[10px] text-muted-foreground mb-1.5">Funis ativos</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {(mentee.funis_ativos as Array<{id?: string; nome: string; slug?: string}>).map((f, i) => (
-                    <Badge key={f.id ?? i} variant="muted" className="text-[10px]">{f.nome}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Empty state for metrics — minimal */}
-      {!hasMetrics && (
-        <div className="rounded-lg border border-dashed border-border/50 bg-muted/5 px-4 py-3 flex items-center gap-3">
-          <TrendingUp className="h-5 w-5 text-muted-foreground/20 shrink-0" />
-          <p className="text-[11px] text-muted-foreground/40">
-            Métricas de performance serão preenchidas automaticamente via Bethel Metrics.
-          </p>
-        </div>
-      )}
     </div>
   )
 }

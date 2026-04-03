@@ -661,6 +661,43 @@ export interface Database {
         }
         Relationships: []
       }
+      attendance_notes: {
+        Row: {
+          id: string
+          mentee_id: string
+          specialist_id: string | null
+          attendance_date: string
+          summary: string
+          questions: string | null
+          difficulties: string | null
+          next_steps: string | null
+          generated_by_ai: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          mentee_id: string
+          specialist_id?: string | null
+          attendance_date?: string
+          summary: string
+          questions?: string | null
+          difficulties?: string | null
+          next_steps?: string | null
+          generated_by_ai?: boolean
+          created_at?: string
+        }
+        Update: {
+          mentee_id?: string
+          specialist_id?: string | null
+          attendance_date?: string
+          summary?: string
+          questions?: string | null
+          difficulties?: string | null
+          next_steps?: string | null
+          generated_by_ai?: boolean
+        }
+        Relationships: []
+      }
       wpp_instances: {
         Row: {
           id: string

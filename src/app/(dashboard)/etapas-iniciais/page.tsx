@@ -76,6 +76,13 @@ export default async function EtapasIniciaisPage() {
     revenue_total: revenueMap.get(m.id) ?? 0,
   }))
 
+  // Fetch specialists list for admin
+  const { data: specialists } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .eq('role', 'especialista')
+    .order('full_name')
+
   return (
     <KanbanBoard
       title="Etapas Iniciais"
@@ -83,6 +90,8 @@ export default async function EtapasIniciaisPage() {
       stages={stages ?? []}
       initialMentees={menteesWithStats}
       existingMentees={allMentees ?? []}
+      isAdmin={userRole === 'admin'}
+      specialists={specialists ?? []}
     />
   )
 }

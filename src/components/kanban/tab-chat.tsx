@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
-import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown } from 'lucide-react'
+import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown, Sparkles, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -19,6 +19,7 @@ import type { Database } from '@/types/database'
 
 type WppMessage = Database['public']['Tables']['wpp_messages']['Row']
 type CallRecord = Pick<Database['public']['Tables']['call_records']['Row'], 'id' | 'mentee_id' | 'duration_seconds' | 'recording_status' | 'recording_url' | 'created_at'>
+type AttendanceNote = Database['public']['Tables']['attendance_notes']['Row']
 
 interface TabChatProps {
   menteeId: string
@@ -83,6 +84,11 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const [callsModalOpen, setCallsModalOpen] = useState(false)
   const [playingRecording, setPlayingRecording] = useState<string | null>(null)
 
+  // Attendance summary
+  const [latestNote, setLatestNote] = useState<AttendanceNote | null>(null)
+  const [summarizing, setSummarizing] = useState(false)
+  const [summaryExpanded, setSummaryExpanded] = useState(false)
+
   // Audio recording
   const [recording, setRecording] = useState(false)
   const [recordingTime, setRecordingTime] = useState(0)
@@ -126,6 +132,15 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           .order('created_at', { ascending: false })
           .limit(20)
         if (calls) setCallRecords(calls)
+
+        // Fetch latest attendance note
+        const { data: notes } = await supabase
+          .from('attendance_notes')
+          .select('*')
+          .eq('mentee_id', menteeId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+        if (notes && notes.length > 0) setLatestNote(notes[0])
 
         // Find any connected WPP instance (not filtered by specialist)
         const { data: instance } = await supabase
@@ -296,6 +311,30 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
     }
   }
 
+  // ─── Generate AI summary ───
+  async function handleSummarize() {
+    setSummarizing(true)
+    try {
+      const res = await fetch('/api/chat/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ menteeId }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Erro ao gerar resumo')
+      }
+      const { note } = await res.json()
+      setLatestNote(note)
+      setSummaryExpanded(true)
+      toast.success('Resumo gerado com sucesso')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Erro ao gerar resumo')
+    } finally {
+      setSummarizing(false)
+    }
+  }
+
   // ─── Audio recording ───
   async function startRecording() {
     try {
@@ -451,6 +490,70 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
             {instanceStatus === 'connected' ? 'Conectado' : 'Desconectado'}
           </span>
         </div>
+      </div>
+
+      {/* Summary bar */}
+      <div className="border-b border-border px-4 py-2 shrink-0 bg-muted/30">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0">
+            {latestNote ? (
+              <button
+                type="button"
+                onClick={() => setSummaryExpanded(!summaryExpanded)}
+                className="flex items-center gap-1.5 text-xs text-foreground hover:text-accent transition-colors min-w-0"
+              >
+                <Sparkles className="h-3 w-3 text-accent shrink-0" />
+                <span className="truncate font-medium">Último resumo: {new Date(latestNote.created_at).toLocaleDateString('pt-BR')}</span>
+                <ChevronUp className={`h-3 w-3 text-muted-foreground shrink-0 transition-transform ${summaryExpanded ? '' : 'rotate-180'}`} />
+              </button>
+            ) : (
+              <span className="text-[11px] text-muted-foreground/50 flex items-center gap-1.5">
+                <Sparkles className="h-3 w-3" />
+                Nenhum resumo gerado
+              </span>
+            )}
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1.5 text-[11px] shrink-0"
+            onClick={handleSummarize}
+            disabled={summarizing || messages.length === 0}
+          >
+            {summarizing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            {summarizing ? 'Gerando...' : 'Gerar resumo'}
+          </Button>
+        </div>
+
+        {/* Expanded summary */}
+        {summaryExpanded && latestNote && (
+          <div className="mt-2 rounded-lg bg-card border border-border p-3 space-y-2 text-xs">
+            <div>
+              <p className="font-medium text-foreground">{latestNote.summary}</p>
+            </div>
+            {latestNote.questions && (
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">Dúvidas</p>
+                <p className="text-foreground">{latestNote.questions}</p>
+              </div>
+            )}
+            {latestNote.difficulties && (
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">Dificuldades</p>
+                <p className="text-foreground">{latestNote.difficulties}</p>
+              </div>
+            )}
+            {latestNote.next_steps && (
+              <div>
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase mb-0.5">Próximos passos</p>
+                <p className="text-foreground">{latestNote.next_steps}</p>
+              </div>
+            )}
+            <p className="text-[9px] text-muted-foreground/40">
+              {latestNote.generated_by_ai ? 'Gerado por IA' : 'Manual'} — {new Date(latestNote.created_at).toLocaleString('pt-BR')}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Messages — scrollable */}

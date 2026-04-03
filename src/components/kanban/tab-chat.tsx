@@ -470,7 +470,6 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           // Group consecutive messages from same sender
           const sameSenderAsPrev = prevMsg && prevMsg.direction === msg.direction && !showDateSeparator
           const sameSenderAsNext = nextMsg && nextMsg.direction === msg.direction && getDateKey(msg.sent_at) === getDateKey(nextMsg?.sent_at ?? '')
-          const sameTimeAsPrev = sameSenderAsPrev && formatTime(prevMsg.sent_at) === formatTime(msg.sent_at)
           const sameTimeAsNext = sameSenderAsNext && formatTime(msg.sent_at) === formatTime(nextMsg.sent_at)
 
           // Show sender name only for first message in a group

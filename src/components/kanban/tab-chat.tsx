@@ -202,7 +202,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
   // ─── Send message ───
   async function handleSend() {
-    let text = input.trim()
+    const text = input.trim()
     if ((!text && !attachedFile && !audioBlob) || sending || uploading) return
 
     setSending(true)

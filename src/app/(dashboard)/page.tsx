@@ -16,11 +16,13 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name')
+    .select('full_name, role')
     .eq('id', user!.id)
     .single()
 
-  // Specialists for filter
+  const isAdmin = profile?.role === 'admin'
+
+  // Specialists for filter (admin only)
   const { data: specialists } = await supabase
     .from('profiles')
     .select('id, full_name')
@@ -30,14 +32,19 @@ export default async function DashboardPage({ searchParams }: Props) {
   // Filters
   const startDate = searchParams.start || null
   const endDate = searchParams.end || null
-  const fitFilter = searchParams.fit || null // 'true' | 'false' | null
-  const specialistId = searchParams.specialist || null
+  const fitFilter = searchParams.fit || null
+  // Specialist: admin can pick from URL, specialist always uses own ID
+  const specialistId = isAdmin ? (searchParams.specialist || null) : user!.id
 
   // ─── Mentees (only fields needed for dashboard) ───
   let menteesQuery = supabase.from('mentees').select('id, status, cliente_fit, priority_level, created_by')
   if (fitFilter === 'true') menteesQuery = menteesQuery.eq('cliente_fit', true)
   if (fitFilter === 'false') menteesQuery = menteesQuery.eq('cliente_fit', false)
   if (specialistId) menteesQuery = menteesQuery.eq('created_by', specialistId)
+
+  // Get mentee IDs for filtering related tables
+  const { data: mentees } = await menteesQuery
+  const menteeIds = (mentees ?? []).map((m) => m.id)
 
   // ─── Revenue (only needed fields) ───
   let revenueQuery = supabase.from('revenue_records').select('sale_value, revenue_type')
@@ -49,11 +56,13 @@ export default async function DashboardPage({ searchParams }: Props) {
   let testimonialsQuery = supabase.from('testimonials').select('id', { count: 'exact', head: true })
   if (startDate) testimonialsQuery = testimonialsQuery.gte('created_at', startDate)
   if (endDate) testimonialsQuery = testimonialsQuery.lte('created_at', endDate + 'T23:59:59')
+  if (specialistId && menteeIds.length > 0) testimonialsQuery = testimonialsQuery.in('mentee_id', menteeIds)
 
   // ─── Indications (count only) ───
   let indicationsQuery = supabase.from('indications').select('id', { count: 'exact', head: true })
   if (startDate) indicationsQuery = indicationsQuery.gte('created_at', startDate)
   if (endDate) indicationsQuery = indicationsQuery.lte('created_at', endDate + 'T23:59:59')
+  if (specialistId && menteeIds.length > 0) indicationsQuery = indicationsQuery.in('mentee_id', menteeIds)
 
   // ─── Engagement (only needed fields) ───
   let engagementQuery = supabase.from('engagement_records').select('type, value')
@@ -90,7 +99,6 @@ export default async function DashboardPage({ searchParams }: Props) {
   if (endDate) wppInQuery = wppInQuery.lte('sent_at', endDate + 'T23:59:59')
 
   const [
-    { data: mentees },
     { data: revenues },
     { count: testimonialCount },
     { count: indicationCount },
@@ -101,7 +109,6 @@ export default async function DashboardPage({ searchParams }: Props) {
     { count: wppOutCount },
     { count: wppInCount },
   ] = await Promise.all([
-    menteesQuery,
     revenueQuery,
     testimonialsQuery,
     indicationsQuery,
@@ -169,6 +176,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     <DashboardMetrics
       userName={profile?.full_name ?? ''}
       specialists={specialists ?? []}
+      isAdmin={isAdmin}
       filters={{ specialistId, startDate, endDate, fitFilter }}
       section2={{
         totalMentees,

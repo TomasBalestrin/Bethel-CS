@@ -32,6 +32,7 @@ import {
 interface DashboardMetricsProps {
   userName: string
   specialists: { id: string; full_name: string }[]
+  isAdmin?: boolean
   filters: {
     specialistId: string | null
     startDate: string | null
@@ -134,19 +135,21 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
           <Database className="h-3.5 w-3.5 text-muted-foreground" />
           <p className="label-xs">Filtros</p>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
-          <div className="space-y-1">
-            <Label className="text-xs">Especialista</Label>
-            <Select value={props.filters.specialistId ?? '__all__'} onValueChange={(v) => updateFilter('specialist', v)}>
-              <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__all__">Todos</SelectItem>
-                {props.specialists.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className={`grid grid-cols-1 gap-3 sm:grid-cols-2 ${props.isAdmin ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
+          {props.isAdmin && (
+            <div className="space-y-1">
+              <Label className="text-xs">Especialista</Label>
+              <Select value={props.filters.specialistId ?? '__all__'} onValueChange={(v) => updateFilter('specialist', v)}>
+                <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todos</SelectItem>
+                  {props.specialists.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="space-y-1">
             <Label className="text-xs">Data início</Label>
             <Input type="date" value={startLocal} onChange={(e) => setStartLocal(e.target.value)} />

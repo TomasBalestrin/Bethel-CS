@@ -94,6 +94,20 @@ export default async function DashboardPage({ searchParams }: Props) {
   if (endDate) callsQuery = callsQuery.lte('created_at', endDate + 'T23:59:59')
   if (specialistId) callsQuery = callsQuery.eq('specialist_id', specialistId)
 
+  // ─── Attendance gap setting ───
+  const { data: gapSetting } = await supabase
+    .from('system_settings')
+    .select('value')
+    .eq('key', 'attendance_gap_minutes')
+    .single()
+  const gapMs = (parseInt(gapSetting?.value ?? '120', 10)) * 60 * 1000
+
+  // ─── Attendance sessions (from wpp_messages timestamps) ───
+  let attendanceMsgsQuery = supabase.from('wpp_messages').select('mentee_id, sent_at').order('sent_at', { ascending: true })
+  if (startDate) attendanceMsgsQuery = attendanceMsgsQuery.gte('sent_at', startDate)
+  if (endDate) attendanceMsgsQuery = attendanceMsgsQuery.lte('sent_at', endDate + 'T23:59:59')
+  if (specialistId) attendanceMsgsQuery = attendanceMsgsQuery.eq('specialist_id', specialistId)
+
   // ─── WhatsApp Messages (count by direction) ───
   let wppOutQuery = supabase.from('wpp_messages').select('id', { count: 'exact', head: true }).eq('direction', 'outgoing')
   if (startDate) wppOutQuery = wppOutQuery.gte('sent_at', startDate)
@@ -115,6 +129,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     { data: callRecords },
     { count: wppOutCount },
     { count: wppInCount },
+    { data: attendanceMsgs },
   ] = await Promise.all([
     revenueQuery,
     testimonialsQuery,
@@ -125,7 +140,25 @@ export default async function DashboardPage({ searchParams }: Props) {
     callsQuery,
     wppOutQuery,
     wppInQuery,
+    attendanceMsgsQuery,
   ])
+
+  // ─── Calculate attendance sessions ───
+  let totalAttendanceSessions = 0
+  if (attendanceMsgs && attendanceMsgs.length > 0) {
+    const byMentee: Record<string, string[]> = {}
+    for (const m of attendanceMsgs) {
+      if (!byMentee[m.mentee_id]) byMentee[m.mentee_id] = []
+      byMentee[m.mentee_id].push(m.sent_at)
+    }
+    for (const times of Object.values(byMentee)) {
+      let sessions = 1
+      for (let i = 1; i < times.length; i++) {
+        if (new Date(times[i]).getTime() - new Date(times[i - 1]).getTime() > gapMs) sessions++
+      }
+      totalAttendanceSessions += sessions
+    }
+  }
 
   // ─── SEÇÃO 2: Visão Geral ───
   const allMentees = mentees ?? []
@@ -204,6 +237,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         totalWhatsapp,
         totalWhatsappIn,
         avgWhatsappDuration,
+        totalAtendimentos: totalAttendanceSessions,
       }}
       section5={{
         crossell: revByType.crossell,

@@ -58,6 +58,7 @@ interface DashboardMetricsProps {
     totalWhatsapp: number
     totalWhatsappIn: number
     avgWhatsappDuration: number
+    totalAtendimentos: number
   }
   section5: {
     crossell: number
@@ -215,7 +216,8 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
           <h2 className="text-sm font-semibold text-foreground">Trabalho do CS</h2>
         </div>
         <div className="p-4">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+            <MetricCard icon={Headphones} label="Atendimentos" value={props.section4.totalAtendimentos} color="text-accent" bg="bg-accent/10" source="sessões de chat (gap configurável)" />
             <MetricCard icon={Phone} label="Ligações realizadas" value={props.section4.totalLigacoes} color="text-warning" bg="bg-warning/10" source="call_records / cs_activities" />
             <MetricCard icon={Phone} label="Tempo de ligações" value={formatMinutes(props.section4.totalLigacaoDuration)} color="text-warning" bg="bg-warning/10" source="call_records (duration)" />
             <MetricCard icon={MessageCircle} label="Mensagens enviadas" value={props.section4.totalWhatsapp} color="text-success" bg="bg-success/10" source="wpp_messages (outgoing)" />

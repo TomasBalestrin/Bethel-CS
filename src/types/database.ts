@@ -661,6 +661,27 @@ export interface Database {
         }
         Relationships: []
       }
+      system_settings: {
+        Row: {
+          key: string
+          value: string
+          label: string
+          description: string | null
+          updated_at: string
+        }
+        Insert: {
+          key: string
+          value: string
+          label: string
+          description?: string | null
+        }
+        Update: {
+          value?: string
+          label?: string
+          description?: string | null
+        }
+        Relationships: []
+      }
       attendance_notes: {
         Row: {
           id: string

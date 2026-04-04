@@ -1007,7 +1007,7 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
       .eq('mentee_id', mentee.id)
       .maybeSingle()
       .then(({ data }) => { if (data) setPlan(data) })
-  }, [mentee.id, supabase])
+  }, [mentee.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleGenerateLink() {
     setLoading(true)
@@ -1201,7 +1201,7 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
       .eq('mentee_id', menteeId)
       .order('created_at', { ascending: false })
       .then(({ data }) => { if (data) setItems(data) })
-  }, [menteeId, supabase])
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchProducts = useCallback(() => {
     supabase
@@ -1428,7 +1428,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
   const fetchAll = useCallback(() => {
     supabase.from('indications').select('*').eq('mentee_id', menteeId)
       .order('created_at', { ascending: false }).then(({ data }) => { if (data) setIndications(data) })
-  }, [menteeId, supabase])
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
@@ -1547,7 +1547,7 @@ function TabIntensivo({ menteeId }: { menteeId: string }) {
   const fetchData = useCallback(() => {
     supabase.from('intensivo_records').select('*').eq('mentee_id', menteeId)
       .order('created_at', { ascending: false }).then(({ data }) => { if (data) setIntensivos(data) })
-  }, [menteeId, supabase])
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -1757,7 +1757,7 @@ function TabEngajamento({ menteeId, mentee }: { menteeId: string; mentee: Mentee
           minutes: Math.round(data.reduce((s, c) => s + Number(c.duration_seconds ?? 0), 0) / 60),
         })
       })
-  }, [menteeId, supabase])
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const daysSinceContact = lastMsgDate
     ? Math.floor((Date.now() - new Date(lastMsgDate).getTime()) / 86400000)
@@ -1942,7 +1942,7 @@ function TabHistorico({ menteeId }: { menteeId: string }) {
           id: `test-${t.id}`,
           type: 'testimonial',
           title: 'Depoimento coletado',
-          description: t.description.length > 80 ? t.description.slice(0, 80) + '...' : t.description,
+          description: t.description && t.description.length > 80 ? t.description.slice(0, 80) + '...' : (t.description || ''),
           date: t.created_at,
         })
       })
@@ -1982,7 +1982,7 @@ function TabHistorico({ menteeId }: { menteeId: string }) {
       setLoading(false)
     }
     fetchAll()
-  }, [menteeId, supabase])
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const typeStyles: Record<string, { icon: string; color: string; bg: string }> = {
     call: { icon: '📞', color: 'text-info', bg: 'bg-info/10' },
@@ -2087,7 +2087,7 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
       .eq('mentee_id', menteeId)
       .order('created_at', { ascending: false })
       .then(({ data }) => { if (data) setItems(data) })
-  }, [menteeId, supabase])
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -2399,7 +2399,7 @@ function TabEngagement({ menteeId }: { menteeId: string }) {
       .eq('mentee_id', menteeId)
       .order('activity_date', { ascending: false })
       .then(({ data }) => { if (data) setActivities(data) })
-  }, [menteeId, supabase])
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchData() }, [fetchData])
 

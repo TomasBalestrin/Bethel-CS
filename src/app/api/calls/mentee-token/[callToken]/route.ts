@@ -44,7 +44,13 @@ export async function GET(
     if (profile) specialistName = profile.full_name
   }
 
-  const token = await createMeetingToken(call.daily_room_name, false)
+  let token: string
+  try {
+    token = await createMeetingToken(call.daily_room_name, false)
+  } catch (err) {
+    console.error('[MenteeToken] createMeetingToken failed:', err)
+    return NextResponse.json({ error: 'Falha ao gerar token' }, { status: 500 })
+  }
 
   return NextResponse.json({
     token,

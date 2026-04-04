@@ -6,6 +6,7 @@ import {
   MessageSquareQuote,
   Target,
   Shield,
+  UserCog,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -23,5 +24,6 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Mentorados', href: '/mentorados', icon: Users },
   { label: 'Depoimentos', href: '/depoimentos', icon: MessageSquareQuote },
   { label: 'Objetivos', href: '/objetivos', icon: Target },
+  { label: 'Especialistas', href: '/especialistas', icon: UserCog, adminOnly: true },
   { label: 'Admin', href: '/admin', icon: Shield, adminOnly: true },
 ]

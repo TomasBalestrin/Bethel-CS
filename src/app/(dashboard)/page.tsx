@@ -71,7 +71,8 @@ export default async function DashboardPage({ searchParams }: Props) {
   let engagementQuery = supabase.from('engagement_records').select('type, value')
   if (startDate) engagementQuery = engagementQuery.gte('recorded_at', startDate)
   if (endDate) engagementQuery = engagementQuery.lte('recorded_at', endDate)
-  if (specialistId) engagementQuery = engagementQuery.eq('specialist_id', specialistId)
+  if (specialistId && menteeIds.length > 0) engagementQuery = engagementQuery.in('mentee_id', menteeIds)
+  else if (specialistId && menteeIds.length === 0) engagementQuery = engagementQuery.eq('mentee_id', 'none')
 
   // ─── CS Activities (only needed fields) ───
   let csQuery = supabase.from('cs_activities').select('type, duration_minutes')

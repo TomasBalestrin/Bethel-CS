@@ -124,7 +124,7 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
       {/* Header */}
       <div>
         <h1 className="font-heading text-xl sm:text-2xl font-bold text-foreground">
-          Bem-vindo, {props.userName}
+          Bem-vindo, {props.userName || 'Especialista'}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">Painel do Customer Success</p>
       </div>

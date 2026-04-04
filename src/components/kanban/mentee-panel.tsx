@@ -1276,12 +1276,27 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
   }
 
   async function handleDelete(recordId: string) {
-    const confirmed = window.confirm('Excluir este registro de receita?')
-    if (!confirmed) return
     setDeletingId(recordId)
-    await deleteRevenueRecord(recordId)
-    setDeletingId(null)
-    fetchData()
+    // Optimistically remove from UI
+    setItems((prev) => prev.filter((i) => i.id !== recordId))
+
+    const undoTimeout = setTimeout(async () => {
+      await deleteRevenueRecord(recordId)
+      setDeletingId(null)
+      fetchData()
+    }, 5000)
+
+    toast('Registro excluído', {
+      action: {
+        label: 'Desfazer',
+        onClick: () => {
+          clearTimeout(undoTimeout)
+          setDeletingId(null)
+          fetchData() // Restore from DB
+        },
+      },
+      duration: 5000,
+    })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -1483,7 +1498,10 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
     resetIndForm(); setIndLoading(false); fetchAll()
   }
   async function handleDeleteInd(id: string) {
-    await deleteIndication(id); setConfirmDeleteInd(null); fetchAll()
+    setConfirmDeleteInd(null)
+    setIndications((prev) => prev.filter((i) => i.id !== id))
+    const undoTimeout = setTimeout(async () => { await deleteIndication(id); fetchAll() }, 5000)
+    toast('Indicação excluída', { action: { label: 'Desfazer', onClick: () => { clearTimeout(undoTimeout); fetchAll() } }, duration: 5000 })
   }
 
   return (
@@ -1631,7 +1649,10 @@ function TabIntensivo({ menteeId }: { menteeId: string }) {
 
   // ─── Delete handler ───
   async function handleDelete(id: string) {
-    await deleteIntensivoRecord(id); setConfirmDeleteId(null); fetchData()
+    setConfirmDeleteId(null)
+    setIntensivos((prev) => prev.filter((i) => i.id !== id))
+    const undoTimeout = setTimeout(async () => { await deleteIntensivoRecord(id); fetchData() }, 5000)
+    toast('Registro excluído', { action: { label: 'Desfazer', onClick: () => { clearTimeout(undoTimeout); fetchData() } }, duration: 5000 })
   }
 
   return (
@@ -2161,11 +2182,24 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
   }
 
   async function handleDelete(id: string) {
-    setLoading(true)
-    await deleteTestimonial(id)
     setConfirmDeleteId(null)
-    setLoading(false)
-    fetchData()
+    setItems((prev) => prev.filter((i) => i.id !== id))
+
+    const undoTimeout = setTimeout(async () => {
+      await deleteTestimonial(id)
+      fetchData()
+    }, 5000)
+
+    toast('Depoimento excluído', {
+      action: {
+        label: 'Desfazer',
+        onClick: () => {
+          clearTimeout(undoTimeout)
+          fetchData()
+        },
+      },
+      duration: 5000,
+    })
   }
 
   async function handleSubmit(e: React.FormEvent) {

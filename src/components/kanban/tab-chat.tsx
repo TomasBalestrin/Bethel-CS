@@ -209,37 +209,111 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
     setUploading(true)
 
     try {
-      // Handle file attachment
+      // Handle file attachment — send as native media
       if (attachedFile) {
         const url = await uploadFile(attachedFile, attachedFile.name)
-        if (url) {
-          text = `📎 Arquivo: ${attachedFile.name}\n${url}`
-        } else {
-          setSending(false); setUploading(false)
-          return
+        if (!url) { setSending(false); setUploading(false); return }
+
+        setUploading(false)
+
+        const isImage = attachedFile.type.startsWith('image/')
+        const isVideo = attachedFile.type.startsWith('video/')
+        const isAudioFile = attachedFile.type.startsWith('audio/')
+        const mediaType = isImage ? 'image' : isVideo ? 'video' : isAudioFile ? 'audio' : 'document'
+
+        const optimistic: WppMessage = {
+          id: `temp-${Date.now()}`,
+          mentee_id: menteeId,
+          specialist_id: specialistId || '',
+          instance_id: '',
+          message_id: null,
+          direction: 'outgoing',
+          message_type: mediaType,
+          content: text || null,
+          media_url: url,
+          sender_name: 'Você',
+          is_read: true,
+          sent_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
         }
+        setMessages((prev) => [...prev, optimistic])
+        setInput('')
         setAttachedFile(null)
+
+        const res = await fetch('/api/whatsapp/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            menteeId,
+            message: text || undefined,
+            type: mediaType,
+            imageUrl: url,
+            fileName: attachedFile.name,
+            mimeType: attachedFile.type,
+          }),
+        })
+
+        if (!res.ok) {
+          setMessages((prev) => prev.filter((m) => m.id !== optimistic.id))
+          toast.error('Erro ao enviar arquivo')
+        }
+        setSending(false)
+        textareaRef.current?.focus()
+        return
       }
 
-      // Handle audio
+      // Handle audio — send as native audio
       if (audioBlob) {
         const url = await uploadFile(audioBlob, `audio_${Date.now()}.ogg`)
-        if (url) {
-          text = `🎤 Áudio: ${url}`
-        } else {
-          setSending(false); setUploading(false)
-          return
+        if (!url) { setSending(false); setUploading(false); return }
+
+        setUploading(false)
+
+        const optimistic: WppMessage = {
+          id: `temp-${Date.now()}`,
+          mentee_id: menteeId,
+          specialist_id: specialistId || '',
+          instance_id: '',
+          message_id: null,
+          direction: 'outgoing',
+          message_type: 'audio',
+          content: null,
+          media_url: url,
+          sender_name: 'Você',
+          is_read: true,
+          sent_at: new Date().toISOString(),
+          created_at: new Date().toISOString(),
         }
+        setMessages((prev) => [...prev, optimistic])
         setAudioBlob(null)
         setAudioUrl(null)
+
+        const res = await fetch('/api/whatsapp/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            menteeId,
+            type: 'audio',
+            imageUrl: url,
+            mimeType: 'audio/ogg',
+          }),
+        })
+
+        if (!res.ok) {
+          setMessages((prev) => prev.filter((m) => m.id !== optimistic.id))
+          toast.error('Erro ao enviar áudio')
+        }
+        setSending(false)
+        textareaRef.current?.focus()
+        return
       }
 
+      // Handle text message
       setUploading(false)
       if (!text) { setSending(false); return }
 
       setInput('')
 
-      // Optimistic
       const optimistic: WppMessage = {
         id: `temp-${Date.now()}`,
         mentee_id: menteeId,
@@ -265,6 +339,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
       if (!res.ok) {
         setMessages((prev) => prev.filter((m) => m.id !== optimistic.id))
+        toast.error('Erro ao enviar mensagem')
       }
     } catch {
       // Revert handled above

@@ -77,6 +77,7 @@ import {
   deleteMentee,
 } from '@/lib/actions/panel-actions'
 import dynamic from 'next/dynamic'
+import { ErrorBoundary } from '@/components/error-boundary'
 import type { MenteeRow, MenteeWithStats } from '@/types/kanban'
 
 const TabChat = dynamic(
@@ -163,15 +164,27 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
     if (!open) setEditing(false)
   }, [open])
 
+  // Guard close when editing
+  function handleClose() {
+    if (editing) {
+      if (window.confirm('Você tem alterações não salvas. Deseja sair?')) {
+        setEditing(false)
+        onOpenChange(false)
+      }
+    } else {
+      onOpenChange(false)
+    }
+  }
+
   // Close on Escape key
   useEffect(() => {
     if (!open) return
     function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !deleteOpen) onOpenChange(false)
+      if (e.key === 'Escape' && !deleteOpen) handleClose()
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [open, deleteOpen, onOpenChange])
+  }, [open, deleteOpen, editing]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleDelete() {
     if (!mentee) return
@@ -192,6 +205,7 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
 
   const isAdmin = userRole === 'admin'
   const priorityLabel = `P${mentee.priority_level}`
+  const isLoading = !fullData
 
   if (!open) return null
 
@@ -202,7 +216,7 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
         <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
-            onClick={() => onOpenChange(false)}
+            onClick={handleClose}
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0 min-h-[44px]"
           >
             <ChevronRight className="h-4 w-4 rotate-180" />
@@ -265,6 +279,24 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
 
       {/* Content */}
       <div className="flex-1 overflow-hidden">
+        {isLoading ? (
+          <div className="p-6 space-y-4 animate-pulse">
+            <div className="flex gap-2">
+              {[1,2,3,4,5,6,7].map((i) => <div key={i} className="h-8 w-20 rounded bg-muted" />)}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+              <div className="space-y-3">
+                <div className="h-40 rounded-lg bg-muted" />
+                <div className="h-28 rounded-lg bg-muted" />
+              </div>
+              <div className="space-y-3">
+                <div className="h-24 rounded-lg bg-muted" />
+                <div className="h-20 rounded-lg bg-muted" />
+                <div className="h-20 rounded-lg bg-muted" />
+              </div>
+            </div>
+          </div>
+        ) : (
         <PanelTabs
           mentee={mentee}
           editing={editing}
@@ -273,6 +305,7 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
           isAdmin={isAdmin}
           onTransitionToMentorship={onTransitionToMentorship}
         />
+        )}
       </div>
 
       {/* Delete confirmation dialog */}
@@ -387,7 +420,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
         )}
       </div>
       <ScrollArea className={`flex-1 px-4 py-4 sm:px-6 lg:px-8 ${activeTab === 'chat' ? 'hidden' : ''}`}>
-        <TabsContent value="info">
+        <TabsContent value="info"><ErrorBoundary>
           <TabInfo
             mentee={mentee}
             editing={editing}
@@ -396,22 +429,22 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
             isAdmin={isAdmin}
             onTransitionToMentorship={onTransitionToMentorship}
           />
-        </TabsContent>
-        <TabsContent value="action-plan"><TabActionPlan mentee={mentee} /></TabsContent>
-        <TabsContent value="acompanhamento"><TabAcompanhamento menteeId={mentee.id} /></TabsContent>
-        <TabsContent value="engajamento"><TabEngajamento menteeId={mentee.id} mentee={mentee} /></TabsContent>
-        <TabsContent value="historico"><TabHistorico menteeId={mentee.id} /></TabsContent>
-        <TabsContent value="intensivo"><TabIntensivo menteeId={mentee.id} /></TabsContent>
+        </ErrorBoundary></TabsContent>
+        <TabsContent value="action-plan"><ErrorBoundary><TabActionPlan mentee={mentee} /></ErrorBoundary></TabsContent>
+        <TabsContent value="acompanhamento"><ErrorBoundary><TabAcompanhamento menteeId={mentee.id} /></ErrorBoundary></TabsContent>
+        <TabsContent value="engajamento"><ErrorBoundary><TabEngajamento menteeId={mentee.id} mentee={mentee} /></ErrorBoundary></TabsContent>
+        <TabsContent value="historico"><ErrorBoundary><TabHistorico menteeId={mentee.id} /></ErrorBoundary></TabsContent>
+        <TabsContent value="intensivo"><ErrorBoundary><TabIntensivo menteeId={mentee.id} /></ErrorBoundary></TabsContent>
       </ScrollArea>
       {/* Chat tab — outside ScrollArea (manages its own scroll) */}
       <TabsContent value="chat" className={`flex-1 overflow-hidden ${activeTab !== 'chat' ? 'hidden' : ''}`}>
-        <TabChat
+        <ErrorBoundary><TabChat
           menteeId={mentee.id}
             menteePhone={mentee.phone}
             menteeName={mentee.full_name}
             specialistId={mentee.created_by}
             onUnreadCountChange={setChatUnread}
-          />
+          /></ErrorBoundary>
         </TabsContent>
     </Tabs>
   )
@@ -1494,7 +1527,10 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
       {indications.length === 0 && (
         <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
           <Users className="h-8 w-8 mb-2 opacity-40" />
-          <p className="text-sm">Nenhum registro ainda</p>
+          <p className="text-sm">Nenhuma indicação registrada</p>
+          <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => { resetIndForm(); setShowIndForm(true) }}>
+            <Plus className="h-3 w-3 mr-1" /> Registrar primeira
+          </Button>
         </div>
       )}
       {indications.map((item) => (
@@ -1636,6 +1672,9 @@ function TabIntensivo({ menteeId }: { menteeId: string }) {
           <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
             <Users className="h-8 w-8 mb-2 opacity-40" />
             <p className="text-sm">Nenhuma indicação registrada</p>
+            <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => { resetIndForm(); setShowIndForm(true) }}>
+              <Plus className="h-3 w-3 mr-1" /> Registrar primeira
+            </Button>
           </div>
         )}
         {indicacoes.map((item) => (
@@ -1688,6 +1727,9 @@ function TabIntensivo({ menteeId }: { menteeId: string }) {
           <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
             <Calendar className="h-8 w-8 mb-2 opacity-40" />
             <p className="text-sm">Nenhuma participação registrada</p>
+            <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => { resetPartForm(); setShowPartForm(true) }}>
+              <Plus className="h-3 w-3 mr-1" /> Registrar primeira
+            </Button>
           </div>
         )}
         {participacoes.map((item) => (
@@ -2553,7 +2595,13 @@ function TabEngagement({ menteeId }: { menteeId: string }) {
       )}
 
       {engagements.length === 0 && activities.length === 0 && (
-        <p className="text-sm text-muted-foreground">Nenhum registro.</p>
+        <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+          <TrendingUp className="h-8 w-8 mb-2 opacity-40" />
+          <p className="text-sm">Nenhum registro de engajamento</p>
+          <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => setShowForm(true)}>
+            <Plus className="h-3 w-3 mr-1" /> Registrar primeiro
+          </Button>
+        </div>
       )}
     </div>
   )

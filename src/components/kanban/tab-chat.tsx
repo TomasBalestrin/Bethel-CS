@@ -84,6 +84,9 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const [callsModalOpen, setCallsModalOpen] = useState(false)
   const [playingRecording, setPlayingRecording] = useState<string | null>(null)
 
+  // Message windowing
+  const [visibleLimit, setVisibleLimit] = useState(80)
+
   // Attendance summary
   const [latestNote, setLatestNote] = useState<AttendanceNote | null>(null)
   const [summarizing, setSummarizing] = useState(false)
@@ -631,18 +634,25 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         )}
       </div>
 
-      {/* Messages — scrollable */}
+      {/* Messages — scrollable (windowed) */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1 min-h-0">
+        {messages.length > visibleLimit && (
+          <div className="flex justify-center py-2">
+            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => setVisibleLimit((l) => l + 80)}>
+              Carregar anteriores ({messages.length - visibleLimit} mensagens)
+            </Button>
+          </div>
+        )}
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <MessageSquare className="h-8 w-8 text-muted-foreground/30 mb-2" />
             <p className="text-xs text-muted-foreground">Nenhuma mensagem ainda</p>
           </div>
         )}
-        {messages.map((msg, idx) => {
+        {messages.slice(-visibleLimit).map((msg, idx, visibleMsgs) => {
           const isOutgoing = msg.direction === 'outgoing'
-          const prevMsg = messages[idx - 1]
-          const nextMsg = messages[idx + 1]
+          const prevMsg = visibleMsgs[idx - 1]
+          const nextMsg = visibleMsgs[idx + 1]
           const showDateSeparator = !prevMsg || getDateKey(msg.sent_at) !== getDateKey(prevMsg.sent_at)
 
           // Group consecutive messages from same sender

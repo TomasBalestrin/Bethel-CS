@@ -528,7 +528,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
               {showCallMenu && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setShowCallMenu(false)} />
-                  <div className="absolute right-0 top-full mt-1 z-20 w-44 rounded-lg border border-border bg-card shadow-lg py-1">
+                  <div className="absolute right-0 top-full mt-1 z-20 w-44 max-w-[calc(100vw-1rem)] rounded-lg border border-border bg-card shadow-lg py-1">
                     <button
                       type="button"
                       className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
@@ -712,7 +712,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
       </div>
 
       {/* Input area — fixed bottom */}
-      <div className="border-t border-border px-3 py-2 shrink-0 bg-background">
+      <div className="border-t border-border px-3 py-2 shrink-0 bg-background" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0.5rem)' }}>
         {inputDisabledReason && (
           <p className="text-[10px] text-destructive mb-1.5">{inputDisabledReason}</p>
         )}
@@ -796,7 +796,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
               disabled={!canSend || uploading}
               rows={1}
               className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ minHeight: '36px', maxHeight: '120px' }}
+              style={{ minHeight: '44px', maxHeight: '120px' }}
             />
 
             {/* Send */}

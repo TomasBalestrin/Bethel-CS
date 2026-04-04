@@ -81,7 +81,7 @@ import type { MenteeRow, MenteeWithStats } from '@/types/kanban'
 
 const TabChat = dynamic(
   () => import('./tab-chat').then((mod) => ({ default: mod.TabChat })),
-  { ssr: false }
+  { ssr: false, loading: () => <div className="flex items-center justify-center h-full"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div> }
 )
 import type { Database, TestimonialCategory, EngagementType, CsActivityType, RevenueType } from '@/types/database'
 
@@ -196,7 +196,7 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+    <div className="fixed inset-0 z-50 flex flex-col bg-background" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-6 bg-card shrink-0">
         <div className="flex items-center gap-3 min-w-0">

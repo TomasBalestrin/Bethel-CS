@@ -49,7 +49,7 @@ export default function MenteeCallPage() {
   }
 
   return (
-    <div className="flex flex-col" style={{ backgroundColor: '#001321', height: '100dvh' }}>
+    <div className="flex flex-col" style={{ backgroundColor: '#001321', height: '100dvh', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {status === 'joining' || status === 'active' ? (
         callType === 'video' ? (
           <MenteeVideoCall
@@ -273,12 +273,14 @@ function MenteeVoiceCall({ roomUrl, token, specialistName, status, onStatusChang
   const callStatus = ended ? 'ended' : status === 'joining' ? 'connecting' : isActive ? 'active' : 'waiting'
 
   return (
-    <div className="flex flex-1 flex-col items-center justify-center px-6">
-      <p className="text-xs text-white/50">Ligação de voz</p>
-      <h2 className="text-xl font-semibold text-white mt-1">{specialistName}</h2>
-      <p className="text-4xl font-mono text-white mt-6 tabular">{formatTimer}</p>
+    <div className="flex flex-1 flex-col landscape:flex-row items-center justify-center px-6 gap-4">
+      <div className="flex flex-col items-center">
+        <p className="text-xs text-white/50">Ligação de voz</p>
+        <h2 className="text-xl font-semibold text-white mt-1">{specialistName}</h2>
+        <p className="text-4xl font-mono text-white mt-4 landscape:mt-2 tabular">{formatTimer}</p>
+      </div>
 
-      <div className="mt-4 flex items-center gap-2">
+      <div className="mt-2 flex items-center gap-2">
         {callStatus === 'connecting' && (
           <><Loader2 className="h-4 w-4 animate-spin text-white/50" /><span className="text-xs text-white/50">Conectando...</span></>
         )}
@@ -291,7 +293,7 @@ function MenteeVoiceCall({ roomUrl, token, specialistName, status, onStatusChang
       </div>
 
       {!ended && (
-        <div className="mt-12 flex items-center gap-6">
+        <div className="mt-8 landscape:mt-4 flex items-center gap-6">
           <button
             className={`rounded-full h-14 w-14 flex items-center justify-center transition-colors ${muted ? 'bg-red-500 hover:bg-red-600' : 'bg-white/10 hover:bg-white/20'}`}
             onClick={toggleMute}

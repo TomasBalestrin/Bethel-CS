@@ -16,5 +16,6 @@ export interface MenteeWithStats extends MenteeSummary, Partial<Omit<MenteeRow, 
   attendance_count: number
   indication_count: number
   revenue_total: number
+  days_since_contact?: number
 }
 

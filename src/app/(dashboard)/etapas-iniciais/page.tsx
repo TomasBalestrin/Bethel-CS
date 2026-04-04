@@ -49,6 +49,18 @@ export default async function EtapasIniciaisPage() {
     .from('revenue_records')
     .select('mentee_id, sale_value')
 
+  // Fetch last contact dates (latest outgoing message per mentee)
+  const { data: lastContacts } = await supabase
+    .from('wpp_messages')
+    .select('mentee_id, sent_at')
+    .eq('direction', 'outgoing')
+    .order('sent_at', { ascending: false })
+
+  const lastContactMap = new Map<string, string>()
+  lastContacts?.forEach((m) => {
+    if (!lastContactMap.has(m.mentee_id)) lastContactMap.set(m.mentee_id, m.sent_at)
+  })
+
   // Build stats maps
   const attendanceMap = new Map<string, number>()
   attendances?.forEach((a) => {
@@ -69,12 +81,18 @@ export default async function EtapasIniciaisPage() {
   })
 
   // Merge stats into mentees
-  const menteesWithStats: MenteeWithStats[] = (mentees ?? []).map((m) => ({
-    ...m,
-    attendance_count: attendanceMap.get(m.id) ?? 0,
-    indication_count: indicationMap.get(m.id) ?? 0,
-    revenue_total: revenueMap.get(m.id) ?? 0,
-  }))
+  const now = Date.now()
+  const menteesWithStats: MenteeWithStats[] = (mentees ?? []).map((m) => {
+    const lastContact = lastContactMap.get(m.id)
+    const daysSince = lastContact ? Math.floor((now - new Date(lastContact).getTime()) / 86400000) : undefined
+    return {
+      ...m,
+      attendance_count: attendanceMap.get(m.id) ?? 0,
+      indication_count: indicationMap.get(m.id) ?? 0,
+      revenue_total: revenueMap.get(m.id) ?? 0,
+      days_since_contact: daysSince,
+    }
+  })
 
   // Fetch specialists list for admin
   const { data: specialists } = await supabase

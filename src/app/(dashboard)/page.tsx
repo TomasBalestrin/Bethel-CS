@@ -50,19 +50,22 @@ export default async function DashboardPage({ searchParams }: Props) {
   let revenueQuery = supabase.from('revenue_records').select('sale_value, revenue_type')
   if (startDate) revenueQuery = revenueQuery.gte('created_at', startDate)
   if (endDate) revenueQuery = revenueQuery.lte('created_at', endDate + 'T23:59:59')
-  if (specialistId) revenueQuery = revenueQuery.eq('registered_by', specialistId)
+  if (specialistId && menteeIds.length > 0) revenueQuery = revenueQuery.in('mentee_id', menteeIds)
+  else if (specialistId && menteeIds.length === 0) revenueQuery = revenueQuery.eq('mentee_id', 'none')
 
   // ─── Testimonials (count only) ───
   let testimonialsQuery = supabase.from('testimonials').select('id', { count: 'exact', head: true })
   if (startDate) testimonialsQuery = testimonialsQuery.gte('created_at', startDate)
   if (endDate) testimonialsQuery = testimonialsQuery.lte('created_at', endDate + 'T23:59:59')
   if (specialistId && menteeIds.length > 0) testimonialsQuery = testimonialsQuery.in('mentee_id', menteeIds)
+  else if (specialistId && menteeIds.length === 0) testimonialsQuery = testimonialsQuery.eq('mentee_id', 'none')
 
   // ─── Indications (count only) ───
   let indicationsQuery = supabase.from('indications').select('id', { count: 'exact', head: true })
   if (startDate) indicationsQuery = indicationsQuery.gte('created_at', startDate)
   if (endDate) indicationsQuery = indicationsQuery.lte('created_at', endDate + 'T23:59:59')
   if (specialistId && menteeIds.length > 0) indicationsQuery = indicationsQuery.in('mentee_id', menteeIds)
+  else if (specialistId && menteeIds.length === 0) indicationsQuery = indicationsQuery.eq('mentee_id', 'none')
 
   // ─── Engagement (only needed fields) ───
   let engagementQuery = supabase.from('engagement_records').select('type, value')
@@ -81,6 +84,8 @@ export default async function DashboardPage({ searchParams }: Props) {
   let stageChangesQuery = supabase.from('stage_changes' as never).select('id' as never, { count: 'exact', head: true } as never) as any
   if (startDate) stageChangesQuery = stageChangesQuery.gte('changed_at', startDate)
   if (endDate) stageChangesQuery = stageChangesQuery.lte('changed_at', endDate + 'T23:59:59')
+  if (specialistId && menteeIds.length > 0) stageChangesQuery = stageChangesQuery.in('mentee_id', menteeIds)
+  else if (specialistId && menteeIds.length === 0) stageChangesQuery = stageChangesQuery.eq('mentee_id', 'none')
 
   // ─── Call Records (count + total duration) ───
   let callsQuery = supabase.from('call_records').select('duration_seconds')
@@ -97,6 +102,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   let wppInQuery = supabase.from('wpp_messages').select('id', { count: 'exact', head: true }).eq('direction', 'incoming')
   if (startDate) wppInQuery = wppInQuery.gte('sent_at', startDate)
   if (endDate) wppInQuery = wppInQuery.lte('sent_at', endDate + 'T23:59:59')
+  if (specialistId) wppInQuery = wppInQuery.eq('specialist_id', specialistId)
 
   const [
     { data: revenues },

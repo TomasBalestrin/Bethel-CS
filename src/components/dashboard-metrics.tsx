@@ -51,6 +51,9 @@ interface DashboardMetricsProps {
     totalTestimonials: number
     cancelados: number
     totalStageChanges: number
+    avgGrowth: number
+    growthCount: number
+    growthTotal: number
   }
   section4: {
     totalLigacoes: number
@@ -59,6 +62,8 @@ interface DashboardMetricsProps {
     totalWhatsappIn: number
     avgWhatsappDuration: number
     totalAtendimentos: number
+    totalAttendanceMinutes: number
+    avgAttendanceMinutes: number
   }
   section5: {
     crossell: number
@@ -196,15 +201,17 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
           <h2 className="text-sm font-semibold text-foreground">Sucesso do cliente</h2>
         </div>
         <div className="p-4">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            <MetricCard icon={TrendingUp} label="Crescimento faturamento" value={props.section3.avgGrowth !== 0 ? `${props.section3.avgGrowth > 0 ? '+' : ''}${props.section3.avgGrowth}%` : '—'} color={props.section3.avgGrowth > 0 ? 'text-success' : 'text-destructive'} bg={props.section3.avgGrowth > 0 ? 'bg-success/10' : 'bg-destructive/10'} source={`${props.section3.growthCount}/${props.section3.growthTotal} cresceram`} />
             <MetricCard icon={DollarSign} label="Receita nova gerada" value={formatBRL(props.section3.totalRevenue)} color="text-success" bg="bg-success/10" source="revenue_records" />
             <MetricCard icon={TrendingUp} label="Avanço nas etapas" value={`${props.section3.totalStageChanges} movimentações`} color="text-info" bg="bg-info/10" source="stage_changes" />
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5 mt-3">
             <MetricCard icon={BookOpen} label="Área de membros" value={`${props.section3.engByType.aula ?? 0} acessos`} color="text-accent" bg="bg-accent/10" source="engagement_records (aula)" />
             <MetricCard icon={Video} label="Mentorias ao vivo" value={`${props.section3.engByType.live ?? 0} presenças`} color="text-info" bg="bg-info/10" source="engagement_records (live)" />
             <MetricCard icon={CalendarCheck} label="Eventos" value={`${props.section3.engByType.evento ?? 0} participações`} color="text-warning" bg="bg-warning/10" source="engagement_records (evento)" />
             <MetricCard icon={Headphones} label="Canal do especialista" value={`${props.section3.engByType.whatsapp_contato ?? 0} contatos`} color="text-success" bg="bg-success/10" source="engagement_records (whatsapp)" />
             <MetricCard icon={MessageSquareQuote} label="Depoimentos" value={props.section3.totalTestimonials} color="text-warning" bg="bg-warning/10" source="testimonials" />
-            <MetricCard icon={XCircle} label="Cancelamentos" value={props.section3.cancelados} color="text-destructive" bg="bg-destructive/10" source="mentees (status=cancelado)" />
           </div>
         </div>
       </section>
@@ -216,13 +223,17 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
           <h2 className="text-sm font-semibold text-foreground">Trabalho do CS</h2>
         </div>
         <div className="p-4">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <MetricCard icon={Headphones} label="Atendimentos" value={props.section4.totalAtendimentos} color="text-accent" bg="bg-accent/10" source="sessões de chat (gap configurável)" />
-            <MetricCard icon={Phone} label="Ligações realizadas" value={props.section4.totalLigacoes} color="text-warning" bg="bg-warning/10" source="call_records / cs_activities" />
+            <MetricCard icon={Headphones} label="Tempo total atendimento" value={formatMinutes(props.section4.totalAttendanceMinutes)} color="text-accent" bg="bg-accent/10" source="duração das sessões de chat" />
+            <MetricCard icon={Headphones} label="Média por atendimento" value={props.section4.avgAttendanceMinutes > 0 ? `${props.section4.avgAttendanceMinutes} min` : '—'} color="text-accent" bg="bg-accent/10" source="duração média por sessão" />
+            <MetricCard icon={Phone} label="Ligações realizadas" value={props.section4.totalLigacoes} color="text-warning" bg="bg-warning/10" source="call_records" />
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 mt-3">
             <MetricCard icon={Phone} label="Tempo de ligações" value={formatMinutes(props.section4.totalLigacaoDuration)} color="text-warning" bg="bg-warning/10" source="call_records (duration)" />
             <MetricCard icon={MessageCircle} label="Mensagens enviadas" value={props.section4.totalWhatsapp} color="text-success" bg="bg-success/10" source="wpp_messages (outgoing)" />
             <MetricCard icon={MessageCircle} label="Mensagens recebidas" value={props.section4.totalWhatsappIn} color="text-info" bg="bg-info/10" source="wpp_messages (incoming)" />
-            <MetricCard icon={MessageCircle} label="Tempo médio WhatsApp" value={props.section4.avgWhatsappDuration > 0 ? `${props.section4.avgWhatsappDuration} min` : '—'} color="text-success" bg="bg-success/10" source="cs_activities (avg)" />
+            <MetricCard icon={MessageCircle} label="Tempo médio WhatsApp" value={props.section4.avgWhatsappDuration > 0 ? `${props.section4.avgWhatsappDuration} min` : '—'} color="text-success" bg="bg-success/10" source="cs_activities (manual)" />
           </div>
         </div>
       </section>

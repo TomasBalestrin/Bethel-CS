@@ -2037,6 +2037,49 @@ function TabHistorico({ menteeId }: { menteeId: string }) {
         })
       })
 
+      // Stage changes
+      const { data: stageChanges } = await supabase
+        .from('stage_changes' as never)
+        .select('id, from_stage_id, to_stage_id, changed_at' as never)
+        .eq('mentee_id' as never, menteeId as never)
+        .order('changed_at' as never, { ascending: true } as never) as { data: { id: string; from_stage_id: string | null; to_stage_id: string; changed_at: string }[] | null }
+
+      // Fetch stage names
+      const { data: allStages } = await supabase
+        .from('kanban_stages')
+        .select('id, name')
+      const stageNameMap = new Map<string, string>()
+      allStages?.forEach((s) => stageNameMap.set(s.id, s.name))
+
+      if (stageChanges && stageChanges.length > 0) {
+        for (let i = 0; i < stageChanges.length; i++) {
+          const sc = stageChanges[i]
+          const fromName = sc.from_stage_id ? stageNameMap.get(sc.from_stage_id) : null
+          const toName = stageNameMap.get(sc.to_stage_id) || 'Desconhecida'
+
+          // Calculate time spent in previous stage
+          let timeSpent = ''
+          if (i > 0) {
+            const prevDate = new Date(stageChanges[i - 1].changed_at)
+            const currDate = new Date(sc.changed_at)
+            const diffMs = currDate.getTime() - prevDate.getTime()
+            const diffDays = Math.floor(diffMs / 86400000)
+            const diffHours = Math.floor((diffMs % 86400000) / 3600000)
+            timeSpent = diffDays > 0 ? `${diffDays}d ${diffHours}h na etapa` : `${diffHours}h na etapa`
+          }
+
+          allEvents.push({
+            id: `stage-${sc.id}`,
+            type: 'stage_change',
+            title: fromName
+              ? `${fromName} → ${toName}`
+              : `Entrou em ${toName}`,
+            description: timeSpent || undefined,
+            date: sc.changed_at,
+          })
+        }
+      }
+
       // Sort by date descending
       allEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       setEvents(allEvents)

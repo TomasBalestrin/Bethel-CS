@@ -507,3 +507,62 @@ export async function addCsActivity(
   revalidatePath('/')
   return { error: null }
 }
+
+// ─── Presential Events ───
+export async function addPresentialEvent(menteeId: string, data: { event_date: string; brought_guest?: boolean; guest_name?: string; guest_phone?: string; converted?: boolean; converted_name?: string; converted_value?: number; notes?: string }) {
+  const supabase = createClient()
+  const { error } = await supabase.from('presential_events').insert({ mentee_id: menteeId, ...data })
+  if (error) return { error: error.message }
+  revalidatePath('/')
+  return { error: null }
+}
+
+export async function updatePresentialEvent(id: string, data: Record<string, unknown>) {
+  const supabase = createClient()
+  const { error } = await supabase.from('presential_events').update(data).eq('id', id)
+  if (error) return { error: error.message }
+  revalidatePath('/')
+  return { error: null }
+}
+
+export async function deletePresentialEvent(id: string) {
+  const supabase = createClient()
+  const { error } = await supabase.from('presential_events').delete().eq('id', id)
+  if (error) return { error: error.message }
+  revalidatePath('/')
+  return { error: null }
+}
+
+// ─── Individual Sessions ───
+export async function addIndividualSession(menteeId: string, data: { session_date: string; duration_minutes?: number; specialist_name?: string; notes?: string }) {
+  const supabase = createClient()
+  const { error } = await supabase.from('individual_sessions').insert({ mentee_id: menteeId, ...data })
+  if (error) return { error: error.message }
+  revalidatePath('/')
+  return { error: null }
+}
+
+export async function deleteIndividualSession(id: string) {
+  const supabase = createClient()
+  const { error } = await supabase.from('individual_sessions').delete().eq('id', id)
+  if (error) return { error: error.message }
+  revalidatePath('/')
+  return { error: null }
+}
+
+// ─── Extra Deliveries ───
+export async function addExtraDelivery(menteeId: string, data: { delivery_date: string; delivery_type?: string; description?: string }) {
+  const supabase = createClient()
+  const { error } = await supabase.from('extra_deliveries').insert({ mentee_id: menteeId, ...data })
+  if (error) return { error: error.message }
+  revalidatePath('/')
+  return { error: null }
+}
+
+export async function deleteExtraDelivery(id: string) {
+  const supabase = createClient()
+  const { error } = await supabase.from('extra_deliveries').delete().eq('id', id)
+  if (error) return { error: error.message }
+  revalidatePath('/')
+  return { error: null }
+}

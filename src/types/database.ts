@@ -336,6 +336,10 @@ export interface Database {
           indicated_name: string
           indicated_phone: string
           notes: string | null
+          converted: boolean
+          converted_name: string | null
+          converted_value: number | null
+          converted_at: string | null
           created_at: string
         }
         Insert: {
@@ -344,6 +348,10 @@ export interface Database {
           indicated_name: string
           indicated_phone: string
           notes?: string | null
+          converted?: boolean
+          converted_name?: string | null
+          converted_value?: number | null
+          converted_at?: string | null
           created_at?: string
         }
         Update: {
@@ -351,6 +359,10 @@ export interface Database {
           indicated_name?: string
           indicated_phone?: string
           notes?: string | null
+          converted?: boolean
+          converted_name?: string | null
+          converted_value?: number | null
+          converted_at?: string | null
         }
         Relationships: []
       }
@@ -362,6 +374,11 @@ export interface Database {
           participation_date: string | null
           indication_name: string | null
           indication_phone: string | null
+          guest_name: string | null
+          guest_phone: string | null
+          converted: boolean
+          converted_name: string | null
+          converted_value: number | null
           created_at: string
         }
         Insert: {
@@ -371,6 +388,11 @@ export interface Database {
           participation_date?: string | null
           indication_name?: string | null
           indication_phone?: string | null
+          guest_name?: string | null
+          guest_phone?: string | null
+          converted?: boolean
+          converted_name?: string | null
+          converted_value?: number | null
           created_at?: string
         }
         Update: {
@@ -379,6 +401,11 @@ export interface Database {
           participation_date?: string | null
           indication_name?: string | null
           indication_phone?: string | null
+          guest_name?: string | null
+          guest_phone?: string | null
+          converted?: boolean
+          converted_name?: string | null
+          converted_value?: number | null
         }
         Relationships: []
       }
@@ -391,6 +418,7 @@ export interface Database {
           entry_value: number
           revenue_type: RevenueType
           registered_by: string | null
+          indication_id: string | null
           created_at: string
         }
         Insert: {
@@ -401,6 +429,7 @@ export interface Database {
           entry_value: number
           revenue_type?: RevenueType
           registered_by?: string | null
+          indication_id?: string | null
           created_at?: string
         }
         Update: {
@@ -410,6 +439,94 @@ export interface Database {
           entry_value?: number
           revenue_type?: RevenueType
           registered_by?: string | null
+          indication_id?: string | null
+        }
+        Relationships: []
+      }
+      presential_events: {
+        Row: {
+          id: string
+          mentee_id: string
+          event_date: string
+          brought_guest: boolean
+          guest_name: string | null
+          guest_phone: string | null
+          converted: boolean
+          converted_name: string | null
+          converted_value: number | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          mentee_id: string
+          event_date: string
+          brought_guest?: boolean
+          guest_name?: string | null
+          guest_phone?: string | null
+          converted?: boolean
+          converted_name?: string | null
+          converted_value?: number | null
+          notes?: string | null
+        }
+        Update: {
+          event_date?: string
+          brought_guest?: boolean
+          guest_name?: string | null
+          guest_phone?: string | null
+          converted?: boolean
+          converted_name?: string | null
+          converted_value?: number | null
+          notes?: string | null
+        }
+        Relationships: []
+      }
+      individual_sessions: {
+        Row: {
+          id: string
+          mentee_id: string
+          session_date: string
+          duration_minutes: number | null
+          specialist_name: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          mentee_id: string
+          session_date: string
+          duration_minutes?: number | null
+          specialist_name?: string | null
+          notes?: string | null
+        }
+        Update: {
+          session_date?: string
+          duration_minutes?: number | null
+          specialist_name?: string | null
+          notes?: string | null
+        }
+        Relationships: []
+      }
+      extra_deliveries: {
+        Row: {
+          id: string
+          mentee_id: string
+          delivery_date: string
+          delivery_type: string
+          description: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          mentee_id: string
+          delivery_date: string
+          delivery_type?: string
+          description?: string | null
+        }
+        Update: {
+          delivery_date?: string
+          delivery_type?: string
+          description?: string | null
         }
         Relationships: []
       }

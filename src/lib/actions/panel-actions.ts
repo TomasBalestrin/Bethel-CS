@@ -102,7 +102,7 @@ export async function addIndication(
 
 export async function updateIndication(
   recordId: string,
-  data: { indicated_name: string; indicated_phone: string }
+  data: { indicated_name?: string; indicated_phone?: string; converted?: boolean; converted_name?: string; converted_value?: number; converted_at?: string }
 ) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -166,6 +166,11 @@ export async function updateIntensivoRecord(
     participation_date?: string
     indication_name?: string
     indication_phone?: string
+    guest_name?: string
+    guest_phone?: string
+    converted?: boolean
+    converted_name?: string
+    converted_value?: number
   }
 ) {
   const supabase = createClient()

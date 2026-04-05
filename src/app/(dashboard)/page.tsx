@@ -37,7 +37,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   const specialistId = isAdmin ? (searchParams.specialist || null) : user!.id
 
   // ─── Mentees (only fields needed for dashboard) ───
-  let menteesQuery = supabase.from('mentees').select('id, status, cliente_fit, priority_level, created_by')
+  let menteesQuery = supabase.from('mentees').select('id, status, cliente_fit, priority_level, created_by, faturamento_atual, faturamento_antes_mentoria')
   if (fitFilter === 'true') menteesQuery = menteesQuery.eq('cliente_fit', true)
   if (fitFilter === 'false') menteesQuery = menteesQuery.eq('cliente_fit', false)
   if (specialistId) menteesQuery = menteesQuery.eq('created_by', specialistId)
@@ -143,8 +143,9 @@ export default async function DashboardPage({ searchParams }: Props) {
     attendanceMsgsQuery,
   ])
 
-  // ─── Calculate attendance sessions ───
+  // ─── Calculate attendance sessions + duration ───
   let totalAttendanceSessions = 0
+  let totalAttendanceDurationMs = 0
   if (attendanceMsgs && attendanceMsgs.length > 0) {
     const byMentee: Record<string, string[]> = {}
     for (const m of attendanceMsgs) {
@@ -152,13 +153,30 @@ export default async function DashboardPage({ searchParams }: Props) {
       byMentee[m.mentee_id].push(m.sent_at)
     }
     for (const times of Object.values(byMentee)) {
+      // Split into sessions and calculate duration of each
+      let sessionStart = new Date(times[0]).getTime()
+      let sessionEnd = sessionStart
       let sessions = 1
+
       for (let i = 1; i < times.length; i++) {
-        if (new Date(times[i]).getTime() - new Date(times[i - 1]).getTime() > gapMs) sessions++
+        const t = new Date(times[i]).getTime()
+        if (t - sessionEnd > gapMs) {
+          // End previous session, start new one
+          totalAttendanceDurationMs += sessionEnd - sessionStart
+          sessions++
+          sessionStart = t
+        }
+        sessionEnd = t
       }
+      // Add last session duration
+      totalAttendanceDurationMs += sessionEnd - sessionStart
       totalAttendanceSessions += sessions
     }
   }
+  const totalAttendanceMinutes = Math.round(totalAttendanceDurationMs / 60000)
+  const avgAttendanceMinutes = totalAttendanceSessions > 0
+    ? Math.round(totalAttendanceMinutes / totalAttendanceSessions)
+    : 0
 
   // ─── SEÇÃO 2: Visão Geral ───
   const allMentees = mentees ?? []
@@ -166,6 +184,13 @@ export default async function DashboardPage({ searchParams }: Props) {
   const fitMentees = allMentees.filter((m) => m.cliente_fit && m.status === 'ativo').length
   const cancelados = allMentees.filter((m) => m.status === 'cancelado').length
   const totalIndications = indicationCount ?? 0
+
+  // ─── Revenue growth (faturamento antes vs atual) ───
+  const menteesWithFat = allMentees.filter((m) => m.faturamento_atual != null && m.faturamento_antes_mentoria != null && Number(m.faturamento_antes_mentoria) > 0)
+  const growthCount = menteesWithFat.filter((m) => Number(m.faturamento_atual) > Number(m.faturamento_antes_mentoria)).length
+  const avgGrowth = menteesWithFat.length > 0
+    ? Math.round(menteesWithFat.reduce((s, m) => s + ((Number(m.faturamento_atual) - Number(m.faturamento_antes_mentoria)) / Number(m.faturamento_antes_mentoria)) * 100, 0) / menteesWithFat.length)
+    : 0
 
   // ─── SEÇÃO 3: Sucesso ───
   const totalRevenue = revenues?.reduce((s, r) => s + Number(r.sale_value), 0) ?? 0
@@ -230,6 +255,9 @@ export default async function DashboardPage({ searchParams }: Props) {
         totalTestimonials,
         cancelados,
         totalStageChanges,
+        avgGrowth,
+        growthCount,
+        growthTotal: menteesWithFat.length,
       }}
       section4={{
         totalLigacoes,
@@ -238,6 +266,8 @@ export default async function DashboardPage({ searchParams }: Props) {
         totalWhatsappIn,
         avgWhatsappDuration,
         totalAtendimentos: totalAttendanceSessions,
+        totalAttendanceMinutes,
+        avgAttendanceMinutes,
       }}
       section5={{
         crossell: revByType.crossell,

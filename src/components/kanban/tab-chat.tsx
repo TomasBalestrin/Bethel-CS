@@ -117,6 +117,14 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         if (res.ok) {
           setMessages(await res.json())
           onUnreadRef.current?.(0)
+          // Mark all unread messages as read
+          const supabase = createClient()
+          supabase.from('wpp_messages')
+            .update({ is_read: true })
+            .eq('mentee_id', menteeId)
+            .eq('is_read', false)
+            .eq('direction', 'incoming')
+            .then(() => {})
         }
 
         const supabase = createClient()

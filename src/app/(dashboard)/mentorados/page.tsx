@@ -23,5 +23,25 @@ export default async function MentoradosPage() {
   }
   const { data: mentees } = await menteesQuery
 
-  return <MentoradosList mentees={mentees ?? []} />
+  // Fetch all mentees for referral lookup
+  const { data: allMentees } = await supabase
+    .from('mentees')
+    .select('id, full_name')
+    .order('full_name')
+
+  // Fetch specialists for admin
+  const { data: specialists } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .eq('role', 'especialista')
+    .order('full_name')
+
+  return (
+    <MentoradosList
+      mentees={mentees ?? []}
+      existingMentees={allMentees ?? []}
+      isAdmin={userRole === 'admin'}
+      specialists={specialists ?? []}
+    />
+  )
 }

@@ -1,14 +1,25 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useDebounce } from '@/hooks/use-debounce'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Phone, Mail, Calendar, Star, AtSign } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Phone, Mail, Calendar, Star, AtSign, Plus } from 'lucide-react'
 import { MenteePanel } from '@/components/kanban/mentee-panel'
+import { CreateMenteeDialog } from '@/components/kanban/create-mentee-dialog'
 import { useUnreadCounts } from '@/hooks/use-unread-counts'
 import { formatDateBR } from '@/lib/format'
 import type { MenteeSummary, MenteeWithStats } from '@/types/kanban'
+import type { KanbanType } from '@/types/database'
 
 const LEVEL_COLORS: Record<number, string> = {
   1: '#888780',
@@ -20,15 +31,21 @@ const LEVEL_COLORS: Record<number, string> = {
 
 interface MentoradosListProps {
   mentees: MenteeSummary[]
+  existingMentees: { id: string; full_name: string }[]
+  isAdmin?: boolean
+  specialists?: { id: string; full_name: string }[]
 }
 
-export function MentoradosList({ mentees: initialMentees }: MentoradosListProps) {
+export function MentoradosList({ mentees: initialMentees, existingMentees, isAdmin = false, specialists = [] }: MentoradosListProps) {
+  const router = useRouter()
   const [menteeList, setMenteeList] = useState(initialMentees)
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounce(search, 300)
   const { unreadMap } = useUnreadCounts()
   const [selectedMentee, setSelectedMentee] = useState<MenteeWithStats | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [selectedKanbanType, setSelectedKanbanType] = useState<KanbanType>('initial')
 
   const filtered = menteeList.filter((m) => {
     if (!debouncedSearch) return true
@@ -54,10 +71,28 @@ export function MentoradosList({ mentees: initialMentees }: MentoradosListProps)
 
   return (
     <div>
-      <h1 className="font-heading text-2xl font-bold text-foreground">Mentorados</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {filtered.length} mentorado{filtered.length !== 1 ? 's' : ''}
-      </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-heading text-2xl font-bold text-foreground">Mentorados</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {filtered.length} mentorado{filtered.length !== 1 ? 's' : ''}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={selectedKanbanType} onValueChange={(v) => setSelectedKanbanType(v as KanbanType)}>
+            <SelectTrigger className="w-40 h-9 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="initial">Etapas Iniciais</SelectItem>
+              <SelectItem value="mentorship">Etapas Mentoria</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button size="sm" onClick={() => setDialogOpen(true)} className="gap-1.5">
+            <Plus className="h-3.5 w-3.5" /> Novo mentorado
+          </Button>
+        </div>
+      </div>
 
       <div className="mt-4 max-w-sm">
         <Input
@@ -173,6 +208,15 @@ export function MentoradosList({ mentees: initialMentees }: MentoradosListProps)
           setMenteeList((prev) => prev.filter((m) => m.id !== id))
           setSelectedMentee(null)
         }}
+      />
+
+      <CreateMenteeDialog
+        open={dialogOpen}
+        onOpenChange={(open) => { setDialogOpen(open); if (!open) router.refresh() }}
+        existingMentees={existingMentees}
+        kanbanType={selectedKanbanType}
+        isAdmin={isAdmin}
+        specialists={specialists}
       />
     </div>
   )

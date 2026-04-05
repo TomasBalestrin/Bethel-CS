@@ -2,7 +2,7 @@
 
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { Phone, Users, DollarSign, Star, Clock } from 'lucide-react'
+import { Users, DollarSign, Star, Clock } from 'lucide-react'
 import type { MenteeWithStats } from '@/types/kanban'
 
 const LEVEL_COLORS: Record<number, string> = {

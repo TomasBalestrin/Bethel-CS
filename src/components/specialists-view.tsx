@@ -1,9 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Users, DollarSign, Phone, MessageCircle, TrendingUp, Star, XCircle, CheckCircle, UserCog, ArrowUpRight, BarChart3, X } from 'lucide-react'
+import { Users, DollarSign, Phone, MessageCircle, TrendingUp, UserCog, ArrowUpRight, BarChart3, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 
 interface SpecialistMetrics {
   id: string

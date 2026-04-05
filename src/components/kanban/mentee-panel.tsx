@@ -73,6 +73,10 @@ import {
   toggleClienteFit,
   updateMentee,
   deleteMentee,
+  addIndividualSession,
+  addExtraDelivery,
+  addPresentialEvent,
+  updatePresentialEvent,
 } from '@/lib/actions/panel-actions'
 import dynamic from 'next/dynamic'
 import { ErrorBoundary } from '@/components/error-boundary'
@@ -961,6 +965,13 @@ function ClienteFitToggle({ menteeId, initialValue }: { menteeId: string; initia
 
 const ACTION_PLAN_LABELS: Record<string, string> = {
   endereco_completo: 'Endereço completo',
+  email: 'Email',
+  instagram: 'Instagram',
+  cidade: 'Cidade',
+  estado: 'Estado',
+  nome_empresa: 'Nome da empresa',
+  nicho: 'Nicho',
+  num_colaboradores: 'Número de colaboradores',
   como_nos_conheceu: 'Por onde nos conheceu',
   motivacao_elite_premium: 'Por que decidiu entrar na Elite Premium',
   expectativas_resultados: 'Expectativas de resultado',
@@ -969,7 +980,10 @@ const ACTION_PLAN_LABELS: Record<string, string> = {
   produtos_servicos: 'Principais produtos/serviços',
   funis_venda: 'Funis de venda ativos',
   processo_venda: 'Processo de venda',
-  media_faturamento: 'Faturamento médio mensal',
+  faturamento_mes1: 'Faturamento último mês',
+  faturamento_mes2: 'Faturamento 2 meses atrás',
+  faturamento_mes3: 'Faturamento 3 meses atrás',
+  faturamento_medio: 'Faturamento médio',
   resultado_funis: 'Resultado por funil',
   erros_identificados: 'Erros identificados',
   desafios_funis: 'Principais desafios',
@@ -985,6 +999,7 @@ const ACTION_PLAN_LABELS: Record<string, string> = {
 }
 
 const PILL_KEYS = new Set(['como_nos_conheceu'])
+const CURRENCY_KEYS = new Set(['faturamento_mes1', 'faturamento_mes2', 'faturamento_mes3', 'faturamento_medio'])
 
 function ActionPlanResponseView({ data }: { data: Record<string, unknown> }) {
   const keys = Object.keys(ACTION_PLAN_LABELS)
@@ -993,9 +1008,10 @@ function ActionPlanResponseView({ data }: { data: Record<string, unknown> }) {
     <div className="space-y-0 divide-y divide-border/60">
       {keys.map((key) => {
         const value = data[key]
-        if (value === undefined || value === null || value === '') return null
+        if (value === undefined || value === null || value === '' || value === 0) return null
         const label = ACTION_PLAN_LABELS[key]
         const isPill = PILL_KEYS.has(key)
+        const isCurrency = CURRENCY_KEYS.has(key)
 
         return (
           <div key={key} className="py-4 first:pt-0">
@@ -1005,14 +1021,11 @@ function ActionPlanResponseView({ data }: { data: Record<string, unknown> }) {
             {isPill && Array.isArray(value) ? (
               <div className="flex flex-wrap gap-1.5">
                 {value.map((v: string) => (
-                  <span
-                    key={v}
-                    className="inline-flex items-center rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-medium text-accent"
-                  >
-                    {v}
-                  </span>
+                  <span key={v} className="inline-flex items-center rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-medium text-accent">{v}</span>
                 ))}
               </div>
+            ) : isCurrency ? (
+              <p className="text-sm text-foreground font-semibold tabular">R$ {(Number(value) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
             ) : (
               <p className="text-sm text-foreground whitespace-pre-wrap">{String(value)}</p>
             )}
@@ -1192,20 +1205,160 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
 function TabAcompanhamento({ menteeId }: { menteeId: string }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-fade-in">
-      {/* Card 1: Indicações */}
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
         <CardIndicacoes menteeId={menteeId} />
       </div>
-
-      {/* Card 2: Receita */}
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
         <TabRevenue menteeId={menteeId} />
       </div>
-
-      {/* Card 3: Depoimentos */}
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <CardIndividualSessions menteeId={menteeId} />
+      </div>
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <CardExtraDeliveries menteeId={menteeId} />
+      </div>
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden lg:col-span-2">
         <TabTestimonials menteeId={menteeId} />
       </div>
+    </div>
+  )
+}
+
+// ─── Card: Individual Sessions (Gap 2) ───
+function CardIndividualSessions({ menteeId }: { menteeId: string }) {
+  const [items, setItems] = useState<Database['public']['Tables']['individual_sessions']['Row'][]>([])
+  const [showForm, setShowForm] = useState(false)
+  const [sessionDate, setSessionDate] = useState('')
+  const [duration, setDuration] = useState('')
+  const [specialist, setSpecialist] = useState('')
+  const [notes, setNotes] = useState('')
+  const [loading, setLoading] = useState(false)
+  const supabase = createClient()
+
+  const fetchData = useCallback(() => {
+    supabase.from('individual_sessions').select('*').eq('mentee_id', menteeId)
+      .order('session_date', { ascending: false }).then(({ data }) => { if (data) setItems(data) })
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchData() }, [fetchData])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault(); setLoading(true)
+    await addIndividualSession(menteeId, { session_date: sessionDate, duration_minutes: duration ? parseInt(duration) : undefined, specialist_name: specialist || undefined, notes: notes || undefined })
+    setSessionDate(''); setDuration(''); setSpecialist(''); setNotes(''); setShowForm(false); setLoading(false); fetchData()
+  }
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center gap-2 -mx-4 -mt-4 px-4 py-3 border-b border-border bg-muted/30">
+        <Phone className="h-4 w-4 text-info" />
+        <h3 className="font-heading font-semibold text-sm">Mentoria Individual</h3>
+        <Badge variant="muted" className="text-[10px] ml-auto">{items.length}</Badge>
+      </div>
+      <div className="flex items-center justify-end">
+        <Button size="sm" variant="outline" onClick={() => setShowForm(!showForm)}><Plus className="mr-1 h-3 w-3" /> Registrar</Button>
+      </div>
+      {showForm && (
+        <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-border bg-muted/50 p-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>Data *</Label><Input type="date" value={sessionDate} onChange={(e) => setSessionDate(e.target.value)} required /></div>
+            <div className="space-y-1"><Label>Duração (min)</Label><Input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} /></div>
+          </div>
+          <div className="space-y-1"><Label>Especialista</Label><Input value={specialist} onChange={(e) => setSpecialist(e.target.value)} placeholder="Ex: Ericles" /></div>
+          <div className="space-y-1"><Label>Observações</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
+          <Button type="submit" size="sm" disabled={loading}>{loading ? 'Salvando...' : 'Salvar'}</Button>
+        </form>
+      )}
+      {items.length === 0 && !showForm && (
+        <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+          <Phone className="h-8 w-8 mb-2 opacity-40" />
+          <p className="text-sm">Nenhuma sessão registrada</p>
+          <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => setShowForm(true)}><Plus className="h-3 w-3 mr-1" /> Registrar primeira</Button>
+        </div>
+      )}
+      {items.map((item) => (
+        <div key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">{formatDateBR(item.session_date)}</span>
+            {item.duration_minutes && <Badge variant="info" className="text-[10px]">{item.duration_minutes}min</Badge>}
+          </div>
+          {item.specialist_name && <p className="mt-1 text-foreground">{item.specialist_name}</p>}
+          {item.notes && <p className="text-xs text-muted-foreground mt-0.5">{item.notes}</p>}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ─── Card: Extra Deliveries (Gap 3) ───
+function CardExtraDeliveries({ menteeId }: { menteeId: string }) {
+  const [items, setItems] = useState<Database['public']['Tables']['extra_deliveries']['Row'][]>([])
+  const [showForm, setShowForm] = useState(false)
+  const [deliveryDate, setDeliveryDate] = useState('')
+  const [deliveryType, setDeliveryType] = useState('outro')
+  const [description, setDescription] = useState('')
+  const [loading, setLoading] = useState(false)
+  const supabase = createClient()
+
+  const fetchData = useCallback(() => {
+    supabase.from('extra_deliveries').select('*').eq('mentee_id', menteeId)
+      .order('delivery_date', { ascending: false }).then(({ data }) => { if (data) setItems(data) })
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchData() }, [fetchData])
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault(); setLoading(true)
+    await addExtraDelivery(menteeId, { delivery_date: deliveryDate, delivery_type: deliveryType, description: description || undefined })
+    setDeliveryDate(''); setDeliveryType('outro'); setDescription(''); setShowForm(false); setLoading(false); fetchData()
+  }
+
+  const typeLabels: Record<string, string> = { call_individual: 'Call Individual', encontro_presencial: 'Encontro Presencial', outro: 'Outro' }
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center gap-2 -mx-4 -mt-4 px-4 py-3 border-b border-border bg-muted/30">
+        <Star className="h-4 w-4 text-warning" />
+        <h3 className="font-heading font-semibold text-sm">Entregas Extras</h3>
+        <Badge variant="muted" className="text-[10px] ml-auto">{items.length}</Badge>
+      </div>
+      <div className="flex items-center justify-end">
+        <Button size="sm" variant="outline" onClick={() => setShowForm(!showForm)}><Plus className="mr-1 h-3 w-3" /> Registrar</Button>
+      </div>
+      {showForm && (
+        <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-border bg-muted/50 p-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1"><Label>Data *</Label><Input type="date" value={deliveryDate} onChange={(e) => setDeliveryDate(e.target.value)} required /></div>
+            <div className="space-y-1">
+              <Label>Tipo</Label>
+              <Select value={deliveryType} onValueChange={setDeliveryType}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="call_individual">Call Individual</SelectItem>
+                  <SelectItem value="encontro_presencial">Encontro Presencial</SelectItem>
+                  <SelectItem value="outro">Outro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="space-y-1"><Label>Descrição</Label><Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="O que aconteceu" /></div>
+          <Button type="submit" size="sm" disabled={loading}>{loading ? 'Salvando...' : 'Salvar'}</Button>
+        </form>
+      )}
+      {items.length === 0 && !showForm && (
+        <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+          <Star className="h-8 w-8 mb-2 opacity-40" />
+          <p className="text-sm">Nenhuma entrega extra</p>
+          <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => setShowForm(true)}><Plus className="h-3 w-3 mr-1" /> Registrar primeira</Button>
+        </div>
+      )}
+      {items.map((item) => (
+        <div key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
+          <div className="flex items-center justify-between">
+            <Badge variant="info" className="text-[10px]">{typeLabels[item.delivery_type] || item.delivery_type}</Badge>
+            <span className="text-xs text-muted-foreground">{formatDateBR(item.delivery_date)}</span>
+          </div>
+          {item.description && <p className="mt-1 text-foreground">{item.description}</p>}
+        </div>
+      ))}
     </div>
   )
 }
@@ -1550,15 +1703,33 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
         </div>
       )}
       {indications.map((item) => (
-        <div key={item.id} className="group rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:bg-muted/30">
+        <div key={item.id} className={`group rounded-lg border p-3 text-sm transition-colors hover:bg-muted/30 ${item.converted ? 'border-success/30 bg-success/5' : 'border-border bg-card'}`}>
           <div className="flex items-start justify-between">
             <div>
-              <p className="font-medium text-foreground">{item.indicated_name}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-medium text-foreground">{item.indicated_name}</p>
+                {item.converted && <Badge variant="success" className="text-[10px]">Converteu</Badge>}
+              </div>
               <p className="text-muted-foreground">{item.indicated_phone}</p>
+              {item.converted && item.converted_name && (
+                <p className="text-xs text-success mt-1">Fechou: {item.converted_name} {item.converted_value ? `— R$ ${Number(item.converted_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}</p>
+              )}
             </div>
-            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditInd(item)} aria-label="Editar indicação"><Pencil className="h-3 w-3" /></Button>
-              <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteInd(item.id)} aria-label="Excluir indicação"><Trash2 className="h-3 w-3" /></Button>
+            <div className="flex items-center gap-1">
+              {!item.converted && (
+                <Button size="sm" variant="ghost" className="h-7 text-[10px] text-success" onClick={async () => {
+                  const name = window.prompt('Quem fechou?')
+                  if (!name) return
+                  const valueStr = window.prompt('Valor (ex: 5000)')
+                  const value = valueStr ? parseFloat(valueStr) : undefined
+                  await updateIndication(item.id, { converted: true, converted_name: name, converted_value: value, converted_at: new Date().toISOString().split('T')[0] })
+                  fetchAll()
+                }}>Converteu?</Button>
+              )}
+              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditInd(item)} aria-label="Editar"><Pencil className="h-3 w-3" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteInd(item.id)} aria-label="Excluir"><Trash2 className="h-3 w-3" /></Button>
+              </div>
             </div>
           </div>
         </div>
@@ -1697,15 +1868,33 @@ function TabIntensivo({ menteeId }: { menteeId: string }) {
           </div>
         )}
         {indicacoes.map((item) => (
-          <div key={item.id} className="group rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:bg-muted/30">
+          <div key={item.id} className={`group rounded-lg border p-3 text-sm transition-colors hover:bg-muted/30 ${item.converted ? 'border-success/30 bg-success/5' : 'border-border bg-card'}`}>
             <div className="flex items-start justify-between">
               <div>
-                <p className="font-medium text-foreground">{item.indication_name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium text-foreground">{item.indication_name}</p>
+                  {item.converted && <Badge variant="success" className="text-[10px]">Converteu</Badge>}
+                </div>
                 {item.indication_phone && <p className="text-muted-foreground">{item.indication_phone}</p>}
+                {item.converted && item.converted_name && (
+                  <p className="text-xs text-success mt-1">Fechou: {item.converted_name} {item.converted_value ? `— R$ ${Number(item.converted_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}</p>
+                )}
               </div>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditInd(item)} aria-label="Editar"><Pencil className="h-3 w-3" /></Button>
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteId(item.id)} aria-label="Excluir"><Trash2 className="h-3 w-3" /></Button>
+              <div className="flex items-center gap-1">
+                {!item.converted && (
+                  <Button size="sm" variant="ghost" className="h-7 text-[10px] text-success" onClick={async () => {
+                    const name = window.prompt('Quem fechou?')
+                    if (!name) return
+                    const valueStr = window.prompt('Valor (ex: 5000)')
+                    const value = valueStr ? parseFloat(valueStr) : undefined
+                    await updateIntensivoRecord(item.id, { converted: true, converted_name: name, converted_value: value })
+                    fetchData()
+                  }}>Converteu?</Button>
+                )}
+                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditInd(item)} aria-label="Editar"><Pencil className="h-3 w-3" /></Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteId(item.id)} aria-label="Excluir"><Trash2 className="h-3 w-3" /></Button>
+                </div>
               </div>
             </div>
           </div>
@@ -1767,6 +1956,11 @@ function TabIntensivo({ menteeId }: { menteeId: string }) {
         ))}
       </div>
 
+      <Separator className="border-border/50" />
+
+      {/* ═══ SEÇÃO 3: Encontro Presencial ═══ */}
+      <CardPresentialEvents menteeId={menteeId} />
+
       {/* Confirm delete dialog (shared) */}
       <Dialog open={!!confirmDeleteId} onOpenChange={() => setConfirmDeleteId(null)}>
         <DialogContent>
@@ -1777,6 +1971,127 @@ function TabIntensivo({ menteeId }: { menteeId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+// ─── Card: Encontro Presencial (Gap 4) ───
+function CardPresentialEvents({ menteeId }: { menteeId: string }) {
+  const [items, setItems] = useState<Database['public']['Tables']['presential_events']['Row'][]>([])
+  const [showForm, setShowForm] = useState(false)
+  const [eventDate, setEventDate] = useState('')
+  const [broughtGuest, setBroughtGuest] = useState(false)
+  const [guestName, setGuestName] = useState('')
+  const [guestPhone, setGuestPhone] = useState('')
+  const [eventNotes, setEventNotes] = useState('')
+  const [loading, setLoading] = useState(false)
+  const supabase = createClient()
+
+  const fetchData = useCallback(() => {
+    supabase.from('presential_events').select('*').eq('mentee_id', menteeId)
+      .order('event_date', { ascending: false }).then(({ data }) => { if (data) setItems(data) })
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { fetchData() }, [fetchData])
+
+  function resetForm() { setEventDate(''); setBroughtGuest(false); setGuestName(''); setGuestPhone(''); setEventNotes(''); setShowForm(false) }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault(); setLoading(true)
+    await addPresentialEvent(menteeId, {
+      event_date: eventDate,
+      brought_guest: broughtGuest,
+      guest_name: broughtGuest ? guestName || undefined : undefined,
+      guest_phone: broughtGuest ? guestPhone || undefined : undefined,
+      notes: eventNotes || undefined,
+    })
+    resetForm(); setLoading(false); fetchData()
+  }
+
+  const totalGuests = items.filter((i) => i.brought_guest).length
+  const totalConverted = items.filter((i) => i.converted).length
+  const totalValue = items.reduce((s, i) => s + Number(i.converted_value ?? 0), 0)
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="label-xs uppercase">Encontro Presencial ({items.length})</p>
+        <Button size="sm" variant="outline" onClick={() => { resetForm(); setShowForm(!showForm) }}><Plus className="mr-1 h-3 w-3" /> Registrar</Button>
+      </div>
+
+      {items.length > 0 && (
+        <div className="flex gap-3 text-xs text-muted-foreground">
+          <span>{items.length} participações</span>
+          <span>{totalGuests} convidados</span>
+          <span className="text-success">{totalConverted} converteram</span>
+          {totalValue > 0 && <span className="text-success font-medium">R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>}
+        </div>
+      )}
+
+      <Dialog open={showForm} onOpenChange={(open) => { if (!open) resetForm() }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Registrar Encontro Presencial</DialogTitle>
+            <DialogDescription>Registre a participação no encontro presencial da mentoria.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="space-y-1"><Label>Data do encontro *</Label><Input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} required /></div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="pe-guest" checked={broughtGuest} onChange={(e) => setBroughtGuest(e.target.checked)} className="h-4 w-4 rounded border-input" />
+              <Label htmlFor="pe-guest">Levou convidado</Label>
+            </div>
+            {broughtGuest && (
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1"><Label>Nome do convidado</Label><Input value={guestName} onChange={(e) => setGuestName(e.target.value)} /></div>
+                <div className="space-y-1"><Label>Telefone</Label><Input value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} /></div>
+              </div>
+            )}
+            <div className="space-y-1"><Label>Observações</Label><Input value={eventNotes} onChange={(e) => setEventNotes(e.target.value)} /></div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={resetForm}>Cancelar</Button>
+              <Button type="submit" disabled={loading}>{loading ? 'Salvando...' : 'Salvar'}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {items.length === 0 && !showForm && (
+        <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+          <Calendar className="h-8 w-8 mb-2 opacity-40" />
+          <p className="text-sm">Nenhum encontro registrado</p>
+          <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => setShowForm(true)}><Plus className="h-3 w-3 mr-1" /> Registrar primeiro</Button>
+        </div>
+      )}
+
+      {items.map((item) => (
+        <div key={item.id} className={`group rounded-lg border p-3 text-sm transition-colors hover:bg-muted/30 ${item.converted ? 'border-success/30 bg-success/5' : 'border-border bg-card'}`}>
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">{formatDateBR(item.event_date)}</span>
+                {item.brought_guest && <Badge variant="info" className="text-[10px]">Convidado</Badge>}
+                {item.converted && <Badge variant="success" className="text-[10px]">Converteu</Badge>}
+              </div>
+              {item.guest_name && <p className="mt-1 text-foreground">Convidado: {item.guest_name} {item.guest_phone ? `— ${item.guest_phone}` : ''}</p>}
+              {item.converted && item.converted_name && (
+                <p className="text-xs text-success mt-0.5">Fechou: {item.converted_name} {item.converted_value ? `— R$ ${Number(item.converted_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}</p>
+              )}
+              {item.notes && <p className="text-xs text-muted-foreground mt-0.5">{item.notes}</p>}
+            </div>
+            <div className="flex items-center gap-1">
+              {item.brought_guest && !item.converted && (
+                <Button size="sm" variant="ghost" className="h-7 text-[10px] text-success" onClick={async () => {
+                  const name = window.prompt('Quem fechou?')
+                  if (!name) return
+                  const valueStr = window.prompt('Valor (ex: 5000)')
+                  const value = valueStr ? parseFloat(valueStr) : undefined
+                  await updatePresentialEvent(item.id, { converted: true, converted_name: name, converted_value: value })
+                  fetchData()
+                }}>Converteu?</Button>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

@@ -74,12 +74,9 @@ import {
   updateMentee,
   deleteMentee,
   addIndividualSession,
-  deleteIndividualSession,
   addExtraDelivery,
-  deleteExtraDelivery,
   addPresentialEvent,
   updatePresentialEvent,
-  deletePresentialEvent,
 } from '@/lib/actions/panel-actions'
 import dynamic from 'next/dynamic'
 import { ErrorBoundary } from '@/components/error-boundary'

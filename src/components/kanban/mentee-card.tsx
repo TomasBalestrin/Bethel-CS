@@ -38,6 +38,8 @@ export function MenteeCard({ mentee, unreadCount = 0, onClick }: MenteeCardProps
     }
   }
 
+  const isInactive = mentee.days_since_contact != null && mentee.days_since_contact >= 30
+
   return (
     <div
       ref={setNodeRef}
@@ -45,7 +47,11 @@ export function MenteeCard({ mentee, unreadCount = 0, onClick }: MenteeCardProps
       {...listeners}
       {...attributes}
       onClick={handleClick}
-      className="relative cursor-pointer rounded-lg border border-border/50 bg-card shadow-card transition-all hover:border-accent/30 hover:shadow-md active:cursor-grabbing animate-fade-in"
+      className={`relative cursor-pointer rounded-lg border shadow-card transition-all hover:shadow-md active:cursor-grabbing animate-fade-in ${
+        isInactive
+          ? 'border-destructive/50 bg-destructive/5 hover:border-destructive/70'
+          : 'border-border/50 bg-card hover:border-accent/30'
+      }`}
     >
       {unreadCount > 0 && (
         <span className="absolute -top-1.5 -right-1.5 z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white shadow-sm">

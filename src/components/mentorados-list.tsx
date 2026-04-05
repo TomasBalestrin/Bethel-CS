@@ -31,13 +31,12 @@ const LEVEL_COLORS: Record<number, string> = {
 
 interface MentoradosListProps {
   mentees: MenteeSummary[]
-  stages: { id: string; name: string; type: string; position: number }[]
   existingMentees: { id: string; full_name: string }[]
   isAdmin?: boolean
   specialists?: { id: string; full_name: string }[]
 }
 
-export function MentoradosList({ mentees: initialMentees, stages, existingMentees, isAdmin = false, specialists = [] }: MentoradosListProps) {
+export function MentoradosList({ mentees: initialMentees, existingMentees, isAdmin = false, specialists = [] }: MentoradosListProps) {
   const router = useRouter()
   const [menteeList, setMenteeList] = useState(initialMentees)
   const [search, setSearch] = useState('')

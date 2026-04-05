@@ -23,12 +23,6 @@ export default async function MentoradosPage() {
   }
   const { data: mentees } = await menteesQuery
 
-  // Fetch kanban stages for the create dialog
-  const { data: stages } = await supabase
-    .from('kanban_stages')
-    .select('id, name, type, position')
-    .order('position')
-
   // Fetch all mentees for referral lookup
   const { data: allMentees } = await supabase
     .from('mentees')
@@ -45,7 +39,6 @@ export default async function MentoradosPage() {
   return (
     <MentoradosList
       mentees={mentees ?? []}
-      stages={stages ?? []}
       existingMentees={allMentees ?? []}
       isAdmin={userRole === 'admin'}
       specialists={specialists ?? []}

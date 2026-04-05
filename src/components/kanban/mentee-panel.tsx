@@ -1203,22 +1203,75 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
 
 // ─── Tab: Acompanhamento (unified grid) ───
 function TabAcompanhamento({ menteeId }: { menteeId: string }) {
+  const [stats, setStats] = useState({ indications: 0, converted: 0, convertedValue: 0, revenue: 0, testimonials: 0, sessions: 0, extras: 0 })
+  const supabase = createClient()
+
+  useEffect(() => {
+    async function fetchStats() {
+      const [{ data: ind }, { data: rev }, { data: test }, { data: sess }, { data: ext }] = await Promise.all([
+        supabase.from('indications').select('id, converted, converted_value').eq('mentee_id', menteeId),
+        supabase.from('revenue_records').select('sale_value').eq('mentee_id', menteeId),
+        supabase.from('testimonials').select('id').eq('mentee_id', menteeId),
+        supabase.from('individual_sessions').select('id').eq('mentee_id', menteeId),
+        supabase.from('extra_deliveries').select('id').eq('mentee_id', menteeId),
+      ])
+      setStats({
+        indications: ind?.length ?? 0,
+        converted: ind?.filter((i) => i.converted).length ?? 0,
+        convertedValue: ind?.filter((i) => i.converted).reduce((s, i) => s + Number(i.converted_value ?? 0), 0) ?? 0,
+        revenue: rev?.reduce((s, r) => s + Number(r.sale_value), 0) ?? 0,
+        testimonials: test?.length ?? 0,
+        sessions: sess?.length ?? 0,
+        extras: ext?.length ?? 0,
+      })
+    }
+    fetchStats()
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-fade-in">
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        <CardIndicacoes menteeId={menteeId} />
+    <div className="space-y-4 animate-fade-in">
+      {/* Summary metrics bar */}
+      <div className="grid grid-cols-3 md:grid-cols-5 gap-2">
+        <div className="rounded-lg border border-border bg-card p-2.5 text-center">
+          <p className="text-lg font-bold tabular text-foreground">{stats.indications}</p>
+          <p className="text-[10px] text-muted-foreground">Indicações</p>
+          {stats.converted > 0 && <p className="text-[10px] text-success font-medium">{stats.converted} converteram</p>}
+        </div>
+        <div className="rounded-lg border border-border bg-card p-2.5 text-center">
+          <p className="text-lg font-bold tabular text-success">R$ {stats.revenue.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+          <p className="text-[10px] text-muted-foreground">Receita</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-2.5 text-center">
+          <p className="text-lg font-bold tabular text-foreground">{stats.testimonials}</p>
+          <p className="text-[10px] text-muted-foreground">Depoimentos</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-2.5 text-center">
+          <p className="text-lg font-bold tabular text-foreground">{stats.sessions}</p>
+          <p className="text-[10px] text-muted-foreground">Sessões</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-2.5 text-center">
+          <p className="text-lg font-bold tabular text-foreground">{stats.extras}</p>
+          <p className="text-[10px] text-muted-foreground">Extras</p>
+        </div>
       </div>
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        <TabRevenue menteeId={menteeId} />
-      </div>
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        <CardIndividualSessions menteeId={menteeId} />
-      </div>
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        <CardExtraDeliveries menteeId={menteeId} />
-      </div>
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden lg:col-span-2">
-        <TabTestimonials menteeId={menteeId} />
+
+      {/* Cards grid — all same width */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+          <CardIndicacoes menteeId={menteeId} />
+        </div>
+        <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+          <TabRevenue menteeId={menteeId} />
+        </div>
+        <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+          <CardIndividualSessions menteeId={menteeId} />
+        </div>
+        <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+          <CardExtraDeliveries menteeId={menteeId} />
+        </div>
+        <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+          <TabTestimonials menteeId={menteeId} />
+        </div>
       </div>
     </div>
   )
@@ -1661,7 +1714,12 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
       <div className="flex items-center gap-2 -mx-4 -mt-4 px-4 py-3 border-b border-border bg-muted/30">
         <Users className="h-4 w-4 text-accent" />
         <h3 className="font-heading font-semibold text-sm">Indicações</h3>
-        <Badge variant="muted" className="text-[10px] ml-auto">{indications.length}</Badge>
+        <div className="flex items-center gap-1.5 ml-auto">
+          {indications.filter((i) => i.converted).length > 0 && (
+            <span className="text-[10px] text-success font-medium">{indications.filter((i) => i.converted).length} convertidas</span>
+          )}
+          <Badge variant="muted" className="text-[10px]">{indications.length}</Badge>
+        </div>
       </div>
 
       <div className="flex items-center justify-end">

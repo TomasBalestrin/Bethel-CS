@@ -71,19 +71,18 @@ import {
   deleteTestimonial,
   generateActionPlanLink,
   toggleClienteFit,
-  addEngagementRecord,
-  addCsActivity,
   updateMentee,
   deleteMentee,
 } from '@/lib/actions/panel-actions'
 import dynamic from 'next/dynamic'
+import { ErrorBoundary } from '@/components/error-boundary'
 import type { MenteeRow, MenteeWithStats } from '@/types/kanban'
 
 const TabChat = dynamic(
   () => import('./tab-chat').then((mod) => ({ default: mod.TabChat })),
-  { ssr: false }
+  { ssr: false, loading: () => <div className="flex items-center justify-center h-full"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div> }
 )
-import type { Database, TestimonialCategory, EngagementType, CsActivityType, RevenueType } from '@/types/database'
+import type { Database, TestimonialCategory, RevenueType } from '@/types/database'
 
 type Indication = Database['public']['Tables']['indications']['Row']
 type IntensivoRecord = Database['public']['Tables']['intensivo_records']['Row']
@@ -163,15 +162,27 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
     if (!open) setEditing(false)
   }, [open])
 
+  // Guard close when editing
+  function handleClose() {
+    if (editing) {
+      if (window.confirm('Você tem alterações não salvas. Deseja sair?')) {
+        setEditing(false)
+        onOpenChange(false)
+      }
+    } else {
+      onOpenChange(false)
+    }
+  }
+
   // Close on Escape key
   useEffect(() => {
     if (!open) return
     function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !deleteOpen) onOpenChange(false)
+      if (e.key === 'Escape' && !deleteOpen) handleClose()
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [open, deleteOpen, onOpenChange])
+  }, [open, deleteOpen, editing]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleDelete() {
     if (!mentee) return
@@ -192,17 +203,18 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
 
   const isAdmin = userRole === 'admin'
   const priorityLabel = `P${mentee.priority_level}`
+  const isLoading = !fullData
 
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+    <div className="fixed inset-0 z-50 flex flex-col bg-background" style={{ paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-4 py-3 sm:px-6 bg-card shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <button
             type="button"
-            onClick={() => onOpenChange(false)}
+            onClick={handleClose}
             className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0 min-h-[44px]"
           >
             <ChevronRight className="h-4 w-4 rotate-180" />
@@ -265,6 +277,24 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
 
       {/* Content */}
       <div className="flex-1 overflow-hidden">
+        {isLoading ? (
+          <div className="p-6 space-y-4 animate-pulse">
+            <div className="flex gap-2">
+              {[1,2,3,4,5,6,7].map((i) => <div key={i} className="h-8 w-20 rounded bg-muted" />)}
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+              <div className="space-y-3">
+                <div className="h-40 rounded-lg bg-muted" />
+                <div className="h-28 rounded-lg bg-muted" />
+              </div>
+              <div className="space-y-3">
+                <div className="h-24 rounded-lg bg-muted" />
+                <div className="h-20 rounded-lg bg-muted" />
+                <div className="h-20 rounded-lg bg-muted" />
+              </div>
+            </div>
+          </div>
+        ) : (
         <PanelTabs
           mentee={mentee}
           editing={editing}
@@ -273,6 +303,7 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
           isAdmin={isAdmin}
           onTransitionToMentorship={onTransitionToMentorship}
         />
+        )}
       </div>
 
       {/* Delete confirmation dialog */}
@@ -345,6 +376,8 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
               { value: 'info', label: 'Info' },
               { value: 'action-plan', label: 'Plano' },
               { value: 'acompanhamento', label: 'Acompanhamento' },
+              { value: 'engajamento', label: 'Engajamento' },
+              { value: 'historico', label: 'Histórico' },
               { value: 'intensivo', label: 'Intensivo' },
               { value: 'chat', label: 'Chat' },
             ].map((tab) => (
@@ -385,7 +418,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
         )}
       </div>
       <ScrollArea className={`flex-1 px-4 py-4 sm:px-6 lg:px-8 ${activeTab === 'chat' ? 'hidden' : ''}`}>
-        <TabsContent value="info">
+        <TabsContent value="info"><ErrorBoundary>
           <TabInfo
             mentee={mentee}
             editing={editing}
@@ -394,20 +427,22 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
             isAdmin={isAdmin}
             onTransitionToMentorship={onTransitionToMentorship}
           />
-        </TabsContent>
-        <TabsContent value="action-plan"><TabActionPlan mentee={mentee} /></TabsContent>
-        <TabsContent value="acompanhamento"><TabAcompanhamento menteeId={mentee.id} /></TabsContent>
-        <TabsContent value="intensivo"><TabIntensivo menteeId={mentee.id} /></TabsContent>
+        </ErrorBoundary></TabsContent>
+        <TabsContent value="action-plan"><ErrorBoundary><TabActionPlan mentee={mentee} /></ErrorBoundary></TabsContent>
+        <TabsContent value="acompanhamento"><ErrorBoundary><TabAcompanhamento menteeId={mentee.id} /></ErrorBoundary></TabsContent>
+        <TabsContent value="engajamento"><ErrorBoundary><TabEngajamento menteeId={mentee.id} mentee={mentee} /></ErrorBoundary></TabsContent>
+        <TabsContent value="historico"><ErrorBoundary><TabHistorico menteeId={mentee.id} /></ErrorBoundary></TabsContent>
+        <TabsContent value="intensivo"><ErrorBoundary><TabIntensivo menteeId={mentee.id} /></ErrorBoundary></TabsContent>
       </ScrollArea>
       {/* Chat tab — outside ScrollArea (manages its own scroll) */}
       <TabsContent value="chat" className={`flex-1 overflow-hidden ${activeTab !== 'chat' ? 'hidden' : ''}`}>
-        <TabChat
+        <ErrorBoundary><TabChat
           menteeId={mentee.id}
             menteePhone={mentee.phone}
             menteeName={mentee.full_name}
             specialistId={mentee.created_by}
             onUnreadCountChange={setChatUnread}
-          />
+          /></ErrorBoundary>
         </TabsContent>
     </Tabs>
   )
@@ -1003,7 +1038,7 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
       .eq('mentee_id', mentee.id)
       .maybeSingle()
       .then(({ data }) => { if (data) setPlan(data) })
-  }, [mentee.id, supabase])
+  }, [mentee.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleGenerateLink() {
     setLoading(true)
@@ -1168,13 +1203,8 @@ function TabAcompanhamento({ menteeId }: { menteeId: string }) {
       </div>
 
       {/* Card 3: Depoimentos */}
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden lg:col-span-2">
         <TabTestimonials menteeId={menteeId} />
-      </div>
-
-      {/* Card 4: Engajamento */}
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-        <TabEngagement menteeId={menteeId} />
       </div>
     </div>
   )
@@ -1202,7 +1232,7 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
       .eq('mentee_id', menteeId)
       .order('created_at', { ascending: false })
       .then(({ data }) => { if (data) setItems(data) })
-  }, [menteeId, supabase])
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchProducts = useCallback(() => {
     supabase
@@ -1244,12 +1274,27 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
   }
 
   async function handleDelete(recordId: string) {
-    const confirmed = window.confirm('Excluir este registro de receita?')
-    if (!confirmed) return
     setDeletingId(recordId)
-    await deleteRevenueRecord(recordId)
-    setDeletingId(null)
-    fetchData()
+    // Optimistically remove from UI
+    setItems((prev) => prev.filter((i) => i.id !== recordId))
+
+    const undoTimeout = setTimeout(async () => {
+      await deleteRevenueRecord(recordId)
+      setDeletingId(null)
+      fetchData()
+    }, 5000)
+
+    toast('Registro excluído', {
+      action: {
+        label: 'Desfazer',
+        onClick: () => {
+          clearTimeout(undoTimeout)
+          setDeletingId(null)
+          fetchData() // Restore from DB
+        },
+      },
+      duration: 5000,
+    })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -1429,7 +1474,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
   const fetchAll = useCallback(() => {
     supabase.from('indications').select('*').eq('mentee_id', menteeId)
       .order('created_at', { ascending: false }).then(({ data }) => { if (data) setIndications(data) })
-  }, [menteeId, supabase])
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
@@ -1451,7 +1496,10 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
     resetIndForm(); setIndLoading(false); fetchAll()
   }
   async function handleDeleteInd(id: string) {
-    await deleteIndication(id); setConfirmDeleteInd(null); fetchAll()
+    setConfirmDeleteInd(null)
+    setIndications((prev) => prev.filter((i) => i.id !== id))
+    const undoTimeout = setTimeout(async () => { await deleteIndication(id); fetchAll() }, 5000)
+    toast('Indicação excluída', { action: { label: 'Desfazer', onClick: () => { clearTimeout(undoTimeout); fetchAll() } }, duration: 5000 })
   }
 
   return (
@@ -1495,7 +1543,10 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
       {indications.length === 0 && (
         <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
           <Users className="h-8 w-8 mb-2 opacity-40" />
-          <p className="text-sm">Nenhum registro ainda</p>
+          <p className="text-sm">Nenhuma indicação registrada</p>
+          <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => { resetIndForm(); setShowIndForm(true) }}>
+            <Plus className="h-3 w-3 mr-1" /> Registrar primeira
+          </Button>
         </div>
       )}
       {indications.map((item) => (
@@ -1548,7 +1599,7 @@ function TabIntensivo({ menteeId }: { menteeId: string }) {
   const fetchData = useCallback(() => {
     supabase.from('intensivo_records').select('*').eq('mentee_id', menteeId)
       .order('created_at', { ascending: false }).then(({ data }) => { if (data) setIntensivos(data) })
-  }, [menteeId, supabase])
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -1596,7 +1647,10 @@ function TabIntensivo({ menteeId }: { menteeId: string }) {
 
   // ─── Delete handler ───
   async function handleDelete(id: string) {
-    await deleteIntensivoRecord(id); setConfirmDeleteId(null); fetchData()
+    setConfirmDeleteId(null)
+    setIntensivos((prev) => prev.filter((i) => i.id !== id))
+    const undoTimeout = setTimeout(async () => { await deleteIntensivoRecord(id); fetchData() }, 5000)
+    toast('Registro excluído', { action: { label: 'Desfazer', onClick: () => { clearTimeout(undoTimeout); fetchData() } }, duration: 5000 })
   }
 
   return (
@@ -1637,6 +1691,9 @@ function TabIntensivo({ menteeId }: { menteeId: string }) {
           <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
             <Users className="h-8 w-8 mb-2 opacity-40" />
             <p className="text-sm">Nenhuma indicação registrada</p>
+            <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => { resetIndForm(); setShowIndForm(true) }}>
+              <Plus className="h-3 w-3 mr-1" /> Registrar primeira
+            </Button>
           </div>
         )}
         {indicacoes.map((item) => (
@@ -1689,6 +1746,9 @@ function TabIntensivo({ menteeId }: { menteeId: string }) {
           <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
             <Calendar className="h-8 w-8 mb-2 opacity-40" />
             <p className="text-sm">Nenhuma participação registrada</p>
+            <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => { resetPartForm(); setShowPartForm(true) }}>
+              <Plus className="h-3 w-3 mr-1" /> Registrar primeira
+            </Button>
           </div>
         )}
         {participacoes.map((item) => (
@@ -1717,6 +1777,338 @@ function TabIntensivo({ menteeId }: { menteeId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+// ─── Tab: Engajamento (dashboard com métricas automáticas) ───
+function TabEngajamento({ menteeId, mentee }: { menteeId: string; mentee: MenteeWithStats }) {
+  const [engagements, setEngagements] = useState<EngagementRecord[]>([])
+  const [lastMsgDate, setLastMsgDate] = useState<string | null>(null)
+  const [wppStats, setWppStats] = useState({ sent: 0, received: 0 })
+  const [callStats, setCallStats] = useState({ count: 0, minutes: 0 })
+  const supabase = createClient()
+
+  useEffect(() => {
+    // Fetch engagement records
+    supabase.from('engagement_records').select('*').eq('mentee_id', menteeId)
+      .order('recorded_at', { ascending: false })
+      .then(({ data }) => { if (data) setEngagements(data) })
+
+    // Last outgoing message
+    supabase.from('wpp_messages').select('sent_at').eq('mentee_id', menteeId).eq('direction', 'outgoing')
+      .order('sent_at', { ascending: false }).limit(1)
+      .then(({ data }) => { if (data?.[0]) setLastMsgDate(data[0].sent_at) })
+
+    // WhatsApp counts
+    supabase.from('wpp_messages').select('direction').eq('mentee_id', menteeId)
+      .then(({ data }) => {
+        if (!data) return
+        const sent = data.filter((m) => m.direction === 'outgoing').length
+        const received = data.filter((m) => m.direction === 'incoming').length
+        setWppStats({ sent, received })
+      })
+
+    // Call stats
+    supabase.from('call_records').select('duration_seconds').eq('mentee_id', menteeId)
+      .then(({ data }) => {
+        if (!data) return
+        setCallStats({
+          count: data.length,
+          minutes: Math.round(data.reduce((s, c) => s + Number(c.duration_seconds ?? 0), 0) / 60),
+        })
+      })
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const daysSinceContact = lastMsgDate
+    ? Math.floor((Date.now() - new Date(lastMsgDate).getTime()) / 86400000)
+    : null
+
+  const engAulas = engagements.filter((e) => e.type === 'aula').reduce((s, e) => s + Number(e.value), 0)
+  const engLives = engagements.filter((e) => e.type === 'live').reduce((s, e) => s + Number(e.value), 0)
+  const engEventos = engagements.filter((e) => e.type === 'evento').reduce((s, e) => s + Number(e.value), 0)
+
+  const fatAtual = mentee.faturamento_atual ?? 0
+  const fatAntes = mentee.faturamento_antes_mentoria ?? 0
+  const crescimento = fatAntes > 0 ? Math.round(((fatAtual - fatAntes) / fatAntes) * 100) : 0
+
+  return (
+    <div className="space-y-4 animate-fade-in">
+      {/* Health indicators */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className={`rounded-lg border p-3 text-center ${daysSinceContact != null && daysSinceContact > 7 ? 'border-destructive/30 bg-destructive/5' : daysSinceContact != null && daysSinceContact > 3 ? 'border-warning/30 bg-warning/5' : 'border-border bg-card'}`}>
+          <p className={`text-2xl font-bold tabular ${daysSinceContact != null && daysSinceContact > 7 ? 'text-destructive' : daysSinceContact != null && daysSinceContact > 3 ? 'text-warning' : 'text-foreground'}`}>
+            {daysSinceContact != null ? `${daysSinceContact}d` : '—'}
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Último contato</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-3 text-center">
+          <p className="text-2xl font-bold tabular text-foreground">{engAulas}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Acessos área membros</p>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-3 text-center">
+          <p className="text-2xl font-bold tabular text-foreground">{engLives}</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Presenças ao vivo</p>
+        </div>
+        <div className={`rounded-lg border p-3 text-center ${crescimento > 0 ? 'border-success/30 bg-success/5' : crescimento < 0 ? 'border-destructive/30 bg-destructive/5' : 'border-border bg-card'}`}>
+          <p className={`text-2xl font-bold tabular ${crescimento > 0 ? 'text-success' : crescimento < 0 ? 'text-destructive' : 'text-foreground'}`}>
+            {crescimento !== 0 ? `${crescimento > 0 ? '+' : ''}${crescimento}%` : '—'}
+          </p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">Crescimento fat.</p>
+        </div>
+      </div>
+
+      {/* Detailed metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {/* WhatsApp */}
+        <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-success/5 to-transparent">
+            <MessageSquare className="h-3.5 w-3.5 text-success" />
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide">WhatsApp</h3>
+          </div>
+          <div className="p-3 grid grid-cols-2 gap-3 text-center">
+            <div>
+              <p className="text-lg font-bold tabular text-foreground">{wppStats.sent}</p>
+              <p className="text-[10px] text-muted-foreground">Enviadas</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold tabular text-foreground">{wppStats.received}</p>
+              <p className="text-[10px] text-muted-foreground">Recebidas</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Ligações */}
+        <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-info/5 to-transparent">
+            <Phone className="h-3.5 w-3.5 text-info" />
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide">Ligações</h3>
+          </div>
+          <div className="p-3 grid grid-cols-2 gap-3 text-center">
+            <div>
+              <p className="text-lg font-bold tabular text-foreground">{callStats.count}</p>
+              <p className="text-[10px] text-muted-foreground">Realizadas</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold tabular text-foreground">{callStats.minutes}min</p>
+              <p className="text-[10px] text-muted-foreground">Tempo total</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Participação */}
+        <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
+            <TrendingUp className="h-3.5 w-3.5 text-accent" />
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide">Participação</h3>
+          </div>
+          <div className="p-3 grid grid-cols-3 gap-2 text-center">
+            <div>
+              <p className="text-lg font-bold tabular text-foreground">{engAulas}</p>
+              <p className="text-[10px] text-muted-foreground">Área membros</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold tabular text-foreground">{engLives}</p>
+              <p className="text-[10px] text-muted-foreground">Lives</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold tabular text-foreground">{engEventos}</p>
+              <p className="text-[10px] text-muted-foreground">Eventos</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Faturamento */}
+        <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-warning/5 to-transparent">
+            <DollarSign className="h-3.5 w-3.5 text-warning" />
+            <h3 className="text-[11px] font-semibold uppercase tracking-wide">Faturamento</h3>
+          </div>
+          <div className="p-3 grid grid-cols-2 gap-3 text-center">
+            <div>
+              <p className="text-lg font-bold tabular text-foreground">
+                {fatAtual > 0 ? `R$ ${fatAtual.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}` : '—'}
+              </p>
+              <p className="text-[10px] text-muted-foreground">Atual</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold tabular text-foreground">
+                {fatAntes > 0 ? `R$ ${fatAntes.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}` : '—'}
+              </p>
+              <p className="text-[10px] text-muted-foreground">Antes mentoria</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Tab: Histórico (timeline unificada) ───
+type TimelineEvent = {
+  id: string
+  type: 'message' | 'call' | 'revenue' | 'testimonial' | 'indication' | 'stage_change' | 'engagement'
+  title: string
+  description?: string
+  date: string
+}
+
+function TabHistorico({ menteeId }: { menteeId: string }) {
+  const [events, setEvents] = useState<TimelineEvent[]>([])
+  const [loading, setLoading] = useState(true)
+  const supabase = createClient()
+
+  useEffect(() => {
+    async function fetchAll() {
+      const allEvents: TimelineEvent[] = []
+
+      // Calls
+      const { data: calls } = await supabase
+        .from('call_records')
+        .select('id, created_at, duration_seconds, recording_status')
+        .eq('mentee_id', menteeId)
+      calls?.forEach((c) => {
+        const dur = c.duration_seconds ? `${Math.round(Number(c.duration_seconds) / 60)}min` : ''
+        allEvents.push({
+          id: `call-${c.id}`,
+          type: 'call',
+          title: `Ligação realizada${dur ? ` (${dur})` : ''}`,
+          description: c.recording_status === 'ready' ? 'Gravação disponível' : undefined,
+          date: c.created_at,
+        })
+      })
+
+      // Revenue
+      const { data: revenues } = await supabase
+        .from('revenue_records')
+        .select('id, product_name, sale_value, revenue_type, created_at')
+        .eq('mentee_id', menteeId)
+      revenues?.forEach((r) => {
+        allEvents.push({
+          id: `rev-${r.id}`,
+          type: 'revenue',
+          title: `Receita: R$ ${Number(r.sale_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+          description: `${r.product_name} (${r.revenue_type})`,
+          date: r.created_at,
+        })
+      })
+
+      // Testimonials
+      const { data: testimonials } = await supabase
+        .from('testimonials')
+        .select('id, description, testimonial_date, created_at')
+        .eq('mentee_id', menteeId)
+      testimonials?.forEach((t) => {
+        allEvents.push({
+          id: `test-${t.id}`,
+          type: 'testimonial',
+          title: 'Depoimento coletado',
+          description: t.description && t.description.length > 80 ? t.description.slice(0, 80) + '...' : (t.description || ''),
+          date: t.created_at,
+        })
+      })
+
+      // Indications
+      const { data: indications } = await supabase
+        .from('indications')
+        .select('id, indicated_name, created_at')
+        .eq('mentee_id', menteeId)
+      indications?.forEach((i) => {
+        allEvents.push({
+          id: `ind-${i.id}`,
+          type: 'indication',
+          title: `Indicação: ${i.indicated_name}`,
+          date: i.created_at,
+        })
+      })
+
+      // Engagement
+      const { data: engagements } = await supabase
+        .from('engagement_records')
+        .select('id, type, value, recorded_at')
+        .eq('mentee_id', menteeId)
+      const engLabels: Record<string, string> = { aula: 'Área de Membros', live: 'Mentoria ao Vivo', evento: 'Evento', whatsapp_contato: 'Canal do Especialista' }
+      engagements?.forEach((e) => {
+        allEvents.push({
+          id: `eng-${e.id}`,
+          type: 'engagement',
+          title: `${engLabels[e.type] || e.type}: ${Number(e.value)}`,
+          date: e.recorded_at,
+        })
+      })
+
+      // Sort by date descending
+      allEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+      setEvents(allEvents)
+      setLoading(false)
+    }
+    fetchAll()
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const typeStyles: Record<string, { icon: string; color: string; bg: string }> = {
+    call: { icon: '📞', color: 'text-info', bg: 'bg-info/10' },
+    revenue: { icon: '💰', color: 'text-success', bg: 'bg-success/10' },
+    testimonial: { icon: '💬', color: 'text-accent', bg: 'bg-accent/10' },
+    indication: { icon: '👥', color: 'text-warning', bg: 'bg-warning/10' },
+    stage_change: { icon: '📋', color: 'text-info', bg: 'bg-info/10' },
+    engagement: { icon: '📊', color: 'text-muted-foreground', bg: 'bg-muted' },
+    message: { icon: '💬', color: 'text-foreground', bg: 'bg-muted' },
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (events.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+        <Clock className="h-8 w-8 mb-2 opacity-40" />
+        <p className="text-sm">Nenhum evento registrado</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-1 animate-fade-in">
+      <p className="label-xs mb-3">Histórico ({events.length} eventos)</p>
+      <div className="relative">
+        {/* Timeline line */}
+        <div className="absolute left-4 top-0 bottom-0 w-px bg-border" />
+
+        {events.map((event, idx) => {
+          const style = typeStyles[event.type] || typeStyles.message
+          const prevEvent = events[idx - 1]
+          const showDate = !prevEvent || formatDateBR(event.date) !== formatDateBR(prevEvent.date)
+
+          return (
+            <div key={event.id}>
+              {showDate && (
+                <div className="relative pl-10 py-2">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase">{formatDateBR(event.date)}</p>
+                </div>
+              )}
+              <div className="relative flex items-start gap-3 pl-2 py-1.5">
+                <div className={`relative z-10 flex h-5 w-5 items-center justify-center rounded-full ${style.bg} text-xs shrink-0 mt-0.5`}>
+                  {style.icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-foreground">{event.title}</p>
+                  {event.description && (
+                    <p className="text-[11px] text-muted-foreground truncate">{event.description}</p>
+                  )}
+                </div>
+                <span className="text-[10px] text-muted-foreground/50 tabular shrink-0">
+                  {new Date(event.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -1756,7 +2148,7 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
       .eq('mentee_id', menteeId)
       .order('created_at', { ascending: false })
       .then(({ data }) => { if (data) setItems(data) })
-  }, [menteeId, supabase])
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -1788,11 +2180,24 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
   }
 
   async function handleDelete(id: string) {
-    setLoading(true)
-    await deleteTestimonial(id)
     setConfirmDeleteId(null)
-    setLoading(false)
-    fetchData()
+    setItems((prev) => prev.filter((i) => i.id !== id))
+
+    const undoTimeout = setTimeout(async () => {
+      await deleteTestimonial(id)
+      fetchData()
+    }, 5000)
+
+    toast('Depoimento excluído', {
+      action: {
+        label: 'Desfazer',
+        onClick: () => {
+          clearTimeout(undoTimeout)
+          fetchData()
+        },
+      },
+      duration: 5000,
+    })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -2018,212 +2423,6 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
           )}
         </div>
       ))}
-    </div>
-  )
-}
-
-// ─── Tab 8: Engajamento ───
-const ENGAGEMENT_LABELS: Record<EngagementType, string> = {
-  aula: 'Área de Membros (Mentorfy)',
-  live: 'Mentoria ao Vivo',
-  evento: 'Evento',
-  whatsapp_contato: 'Canal do Especialista',
-}
-
-const CS_ACTIVITY_LABELS: Record<CsActivityType, string> = {
-  ligacao: 'Ligação',
-  whatsapp: 'WhatsApp',
-}
-
-type CsActivity = Database['public']['Tables']['cs_activities']['Row']
-
-function TabEngagement({ menteeId }: { menteeId: string }) {
-  const [engagements, setEngagements] = useState<EngagementRecord[]>([])
-  const [activities, setActivities] = useState<CsActivity[]>([])
-  const [showForm, setShowForm] = useState(false)
-  const [formMode, setFormMode] = useState<'engagement' | 'cs'>('engagement')
-  // engagement fields
-  const [engType, setEngType] = useState<EngagementType>('aula')
-  const [engValue, setEngValue] = useState('')
-  const [engNotes, setEngNotes] = useState('')
-  const [engDate, setEngDate] = useState('')
-  // cs activity fields
-  const [csType, setCsType] = useState<CsActivityType>('ligacao')
-  const [csDuration, setCsDuration] = useState('')
-  const [csNotes, setCsNotes] = useState('')
-  const [csDate, setCsDate] = useState('')
-  const [loading, setLoading] = useState(false)
-  const supabase = createClient()
-
-  const fetchData = useCallback(() => {
-    supabase
-      .from('engagement_records')
-      .select('*')
-      .eq('mentee_id', menteeId)
-      .order('recorded_at', { ascending: false })
-      .then(({ data }) => { if (data) setEngagements(data) })
-    supabase
-      .from('cs_activities')
-      .select('*')
-      .eq('mentee_id', menteeId)
-      .order('activity_date', { ascending: false })
-      .then(({ data }) => { if (data) setActivities(data) })
-  }, [menteeId, supabase])
-
-  useEffect(() => { fetchData() }, [fetchData])
-
-  async function handleSubmitEngagement(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    await addEngagementRecord(menteeId, {
-      type: engType,
-      value: parseFloat(engValue),
-      notes: engNotes || undefined,
-      recorded_at: engDate,
-    })
-    setEngValue(''); setEngNotes(''); setEngDate('')
-    setShowForm(false); setLoading(false)
-    fetchData()
-  }
-
-  async function handleSubmitCsActivity(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    await addCsActivity(menteeId, {
-      type: csType,
-      duration_minutes: parseInt(csDuration, 10),
-      notes: csNotes || undefined,
-      activity_date: csDate,
-    })
-    setCsDuration(''); setCsNotes(''); setCsDate('')
-    setShowForm(false); setLoading(false)
-    fetchData()
-  }
-
-  return (
-    <div className="p-4 space-y-4">
-      {/* Card header */}
-      <div className="flex items-center gap-2 -mx-4 -mt-4 px-4 py-3 border-b border-border bg-muted/30">
-        <TrendingUp className="h-4 w-4 text-warning" />
-        <h3 className="font-heading font-semibold text-sm">Engajamento</h3>
-        <Badge variant="muted" className="text-[10px] ml-auto">{engagements.length + activities.length}</Badge>
-      </div>
-      <div className="flex items-center justify-end">
-        <Button size="sm" variant="outline" onClick={() => setShowForm(!showForm)}>
-          <Plus className="mr-1 h-3 w-3" /> Registrar
-        </Button>
-      </div>
-
-      {showForm && (
-        <div className="rounded-lg border border-border bg-muted/50 p-4 space-y-3">
-          <div className="flex gap-2">
-            <Button type="button" size="sm" variant={formMode === 'engagement' ? 'default' : 'outline'} onClick={() => setFormMode('engagement')}>
-              Engajamento
-            </Button>
-            <Button type="button" size="sm" variant={formMode === 'cs' ? 'default' : 'outline'} onClick={() => setFormMode('cs')}>
-              Atividade CS
-            </Button>
-          </div>
-
-          {formMode === 'engagement' ? (
-            <form onSubmit={handleSubmitEngagement} className="space-y-3">
-              <div className="space-y-1">
-                <Label>Tipo *</Label>
-                <Select value={engType} onValueChange={(v) => setEngType(v as EngagementType)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="aula">Área de Membros (Mentorfy)</SelectItem>
-                    <SelectItem value="live">Mentoria ao Vivo</SelectItem>
-                    <SelectItem value="evento">Evento</SelectItem>
-                    <SelectItem value="whatsapp_contato">Canal do Especialista</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="eng-value">Quantidade *</Label>
-                  <Input id="eng-value" type="number" step="0.01" value={engValue} onChange={(e) => setEngValue(e.target.value)} required />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="eng-date">Data *</Label>
-                  <Input id="eng-date" type="date" value={engDate} onChange={(e) => setEngDate(e.target.value)} required />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="eng-notes">Observação</Label>
-                <Input id="eng-notes" value={engNotes} onChange={(e) => setEngNotes(e.target.value)} />
-              </div>
-              <Button type="submit" size="sm" disabled={loading}>{loading ? 'Salvando...' : 'Salvar'}</Button>
-            </form>
-          ) : (
-            <form onSubmit={handleSubmitCsActivity} className="space-y-3">
-              <div className="space-y-1">
-                <Label>Tipo *</Label>
-                <Select value={csType} onValueChange={(v) => setCsType(v as CsActivityType)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ligacao">Ligação</SelectItem>
-                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="cs-duration">Duração (min) *</Label>
-                  <Input id="cs-duration" type="number" value={csDuration} onChange={(e) => setCsDuration(e.target.value)} required />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="cs-date">Data *</Label>
-                  <Input id="cs-date" type="date" value={csDate} onChange={(e) => setCsDate(e.target.value)} required />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="cs-notes">Observação</Label>
-                <Input id="cs-notes" value={csNotes} onChange={(e) => setCsNotes(e.target.value)} />
-              </div>
-              <Button type="submit" size="sm" disabled={loading}>{loading ? 'Salvando...' : 'Salvar'}</Button>
-            </form>
-          )}
-        </div>
-      )}
-
-      {engagements.length > 0 && (
-        <div className="space-y-2">
-          <p className="label-xs text-muted-foreground">Engajamento</p>
-          {engagements.map((item) => (
-            <div key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
-              <div className="flex items-center justify-between">
-                <Badge variant="info" className="text-[10px]">{ENGAGEMENT_LABELS[item.type]}</Badge>
-                <span className="text-xs text-muted-foreground">{formatDateBR(item.recorded_at)}</span>
-              </div>
-              <p className="mt-1 text-foreground tabular">Quantidade: {Number(item.value)}</p>
-              {item.notes && <p className="text-xs text-muted-foreground">{item.notes}</p>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {activities.length > 0 && (
-        <div className="space-y-2">
-          <p className="label-xs text-muted-foreground">Atividades CS</p>
-          {activities.map((item) => (
-            <div key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
-              <div className="flex items-center justify-between">
-                <Badge variant={item.type === 'whatsapp' ? 'success' : 'warning'} className="text-[10px]">
-                  {CS_ACTIVITY_LABELS[item.type]}
-                </Badge>
-                <span className="text-xs text-muted-foreground">{formatDateBR(item.activity_date)}</span>
-              </div>
-              <p className="mt-1 text-foreground tabular">Duração: {Number(item.duration_minutes)} min</p>
-              {item.notes && <p className="text-xs text-muted-foreground">{item.notes}</p>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {engagements.length === 0 && activities.length === 0 && (
-        <p className="text-sm text-muted-foreground">Nenhum registro.</p>
-      )}
     </div>
   )
 }

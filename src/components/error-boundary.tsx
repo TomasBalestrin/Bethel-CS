@@ -29,24 +29,21 @@ export class ErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) return this.props.fallback
 
       return (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="rounded-full bg-destructive/10 p-3 mb-4">
-            <AlertTriangle className="h-6 w-6 text-destructive" />
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="rounded-full bg-destructive/10 p-3 mb-3">
+            <AlertTriangle className="h-5 w-5 text-destructive" />
           </div>
           <h3 className="text-sm font-semibold text-foreground mb-1">Algo deu errado</h3>
-          <p className="text-xs text-muted-foreground mb-4 max-w-sm">
-            Ocorreu um erro inesperado. Tente recarregar a página.
+          <p className="text-xs text-muted-foreground mb-3 max-w-sm">
+            Ocorreu um erro nesta seção.
           </p>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              this.setState({ hasError: false, error: null })
-              window.location.reload()
-            }}
+            onClick={() => this.setState({ hasError: false, error: null })}
           >
             <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-            Recarregar
+            Tentar novamente
           </Button>
         </div>
       )

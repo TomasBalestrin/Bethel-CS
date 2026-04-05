@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Shield, User, Plus, Pencil, Trash2, Package, MessageSquare, Wifi, WifiOff, Webhook } from 'lucide-react'
+import { Shield, User, Plus, Pencil, Trash2, Package, MessageSquare, Wifi, WifiOff, Webhook, Settings } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 const WebhooksSection = dynamic(
@@ -42,6 +42,7 @@ import type { Database, UserRole } from '@/types/database'
 type Profile = Database['public']['Tables']['profiles']['Row']
 type Product = Database['public']['Tables']['products']['Row']
 type WppInstance = Database['public']['Tables']['wpp_instances']['Row']
+type SystemSetting = Database['public']['Tables']['system_settings']['Row']
 
 interface KanbanStage {
   id: string
@@ -54,10 +55,11 @@ interface AdminUserListProps {
   products: Product[]
   wppInstances: WppInstance[]
   kanbanStages: KanbanStage[]
+  settings: SystemSetting[]
   currentUserId: string
 }
 
-export function AdminUserList({ users, products, wppInstances, kanbanStages, currentUserId }: AdminUserListProps) {
+export function AdminUserList({ users, products, wppInstances, kanbanStages, settings, currentUserId }: AdminUserListProps) {
   return (
     <div>
       <h1 className="font-heading text-2xl font-bold text-foreground">Admin</h1>
@@ -72,6 +74,7 @@ export function AdminUserList({ users, products, wppInstances, kanbanStages, cur
             <TabsTrigger value="products"><Package className="h-4 w-4 mr-1.5" />Produtos</TabsTrigger>
             <TabsTrigger value="whatsapp"><MessageSquare className="h-4 w-4 mr-1.5" />WhatsApp</TabsTrigger>
             <TabsTrigger value="webhooks"><Webhook className="h-4 w-4 mr-1.5" />Webhooks</TabsTrigger>
+            <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-1.5" />Configurações</TabsTrigger>
           </TabsList>
         </div>
 
@@ -96,7 +99,80 @@ export function AdminUserList({ users, products, wppInstances, kanbanStages, cur
             kanbanStages={kanbanStages}
           />
         </TabsContent>
+        <TabsContent value="settings">
+          <SettingsSection settings={settings} />
+        </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+// ─── Settings Section ───
+function SettingsSection({ settings }: { settings: SystemSetting[] }) {
+  const router = useRouter()
+  const [values, setValues] = useState<Record<string, string>>(
+    Object.fromEntries(settings.map((s) => [s.key, s.value]))
+  )
+  const [saving, setSaving] = useState<string | null>(null)
+
+  async function handleSave(key: string) {
+    setSaving(key)
+    const { createClient } = await import('@/lib/supabase/client')
+    const supabase = createClient()
+    await supabase.from('system_settings').update({ value: values[key] }).eq('key', key)
+    setSaving(null)
+    router.refresh()
+  }
+
+  const GAP_OPTIONS = [
+    { value: '30', label: '30 minutos' },
+    { value: '60', label: '1 hora' },
+    { value: '120', label: '2 horas (padrão)' },
+    { value: '240', label: '4 horas' },
+  ]
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-lg font-semibold">Configurações do Sistema</h2>
+        <p className="text-sm text-muted-foreground mt-0.5">Parâmetros que afetam o comportamento do sistema</p>
+      </div>
+
+      <div className="space-y-4">
+        {settings.map((setting) => (
+          <div key={setting.key} className="rounded-lg border border-border bg-card p-4 space-y-2">
+            <div>
+              <p className="text-sm font-medium">{setting.label}</p>
+              {setting.description && <p className="text-xs text-muted-foreground">{setting.description}</p>}
+            </div>
+            <div className="flex items-center gap-2">
+              {setting.key === 'attendance_gap_minutes' ? (
+                <Select value={values[setting.key]} onValueChange={(v) => setValues((prev) => ({ ...prev, [setting.key]: v }))}>
+                  <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {GAP_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  value={values[setting.key] ?? ''}
+                  onChange={(e) => setValues((prev) => ({ ...prev, [setting.key]: e.target.value }))}
+                  className="w-48"
+                />
+              )}
+              <Button
+                size="sm"
+                onClick={() => handleSave(setting.key)}
+                disabled={saving === setting.key || values[setting.key] === setting.value}
+              >
+                {saving === setting.key ? 'Salvando...' : 'Salvar'}
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

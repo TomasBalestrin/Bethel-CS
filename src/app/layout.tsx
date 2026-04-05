@@ -36,6 +36,12 @@ export const metadata: Metadata = {
     apple: '/icons/icon-192x192.png',
     shortcut: '/icons/icon-96x96.png',
   },
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    viewportFit: 'cover',
+  },
 }
 
 export default function RootLayout({

@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
   if (!forceNew) {
     const { data: existingCall } = await supabase
       .from('call_records')
-      .select('id, daily_room_name, daily_room_url, created_at')
+      .select('id, daily_room_name, daily_room_url, call_type, created_at')
       .eq('mentee_id', menteeId)
       .is('ended_at', null)
       .order('created_at', { ascending: false })
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
         token,
         menteeLink,
         reused: true,
-        callType,
+        callType: existingCall.call_type || callType,
       })
     }
   } else {
@@ -75,10 +75,16 @@ export async function POST(request: NextRequest) {
     console.error('[Calls/Create] createRoom failed:', err)
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
-  const specialistToken = await createMeetingToken(room.name, true)
+  let specialistToken: string
+  try {
+    specialistToken = await createMeetingToken(room.name, true)
+  } catch (err) {
+    console.error('[Calls/Create] createMeetingToken failed:', err)
+    return NextResponse.json({ error: 'Falha ao gerar token' }, { status: 500 })
+  }
 
   // Save call record
-  const { data: callRecord } = await supabase
+  const { data: callRecord, error: insertError } = await supabase
     .from('call_records')
     .insert({
       mentee_id: menteeId,
@@ -91,6 +97,11 @@ export async function POST(request: NextRequest) {
     })
     .select('id')
     .single()
+
+  if (insertError) {
+    console.error('[Calls/Create] Insert failed:', insertError)
+    return NextResponse.json({ error: 'Falha ao salvar ligação' }, { status: 500 })
+  }
 
   // Build mentee link
   const menteeLink = `${appUrl}/call/${mentee.call_token}?room=${room.name}`
@@ -107,11 +118,11 @@ export async function POST(request: NextRequest) {
     let phone = mentee.phone.replace(/\D/g, '')
     if (!phone.startsWith('55')) phone = '55' + phone
 
-    await sendMessage(
+    try { await sendMessage(
       instance.instance_id,
       phone,
       `🔔 *${specialistName}* está te chamando!\n\nClique para atender:\n${menteeLink}\n\nO link expira em 30 minutos.`
-    )
+    ) } catch (err) { console.error('[Calls/Create] WPP notification failed:', err) }
   }
 
   const roomUrl = room.url || getRoomUrl(room.name)

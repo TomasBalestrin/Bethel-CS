@@ -5,7 +5,7 @@ type DailyCall = ReturnType<typeof DailyIframe.createCallObject>
 let activeCall: DailyCall | null = null
 let activeRoomUrl: string | null = null
 
-export function getOrCreateCall(roomUrl?: string): DailyCall {
+export function getOrCreateCall(roomUrl?: string, enableVideo = false): DailyCall {
   // If room changed, destroy old call first
   if (activeCall && roomUrl && activeRoomUrl && roomUrl !== activeRoomUrl) {
     destroyCall()
@@ -14,7 +14,7 @@ export function getOrCreateCall(roomUrl?: string): DailyCall {
   if (!activeCall) {
     activeCall = DailyIframe.createCallObject({
       audioSource: true,
-      videoSource: false,
+      videoSource: enableVideo,
     })
     activeRoomUrl = roomUrl || null
   }

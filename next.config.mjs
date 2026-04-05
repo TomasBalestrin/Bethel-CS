@@ -6,6 +6,9 @@ const withPWA = withPWAInit({
   register: true,
   skipWaiting: true,
   importScripts: ['/sw-push-listener.js'],
+  fallbacks: {
+    document: '/offline.html',
+  },
   runtimeCaching: [
     // Static assets — CacheFirst 7 days
     {

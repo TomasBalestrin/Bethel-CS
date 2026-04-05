@@ -2,7 +2,7 @@
 
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { Phone, Users, DollarSign, Star } from 'lucide-react'
+import { Users, DollarSign, Star, Clock } from 'lucide-react'
 import type { MenteeWithStats } from '@/types/kanban'
 
 const LEVEL_COLORS: Record<number, string> = {
@@ -78,10 +78,6 @@ export function MenteeCard({ mentee, unreadCount = 0, onClick }: MenteeCardProps
           )}
           {/* Divider + metrics */}
           <div className="mt-2 pt-2 border-t border-border/50 flex items-center gap-3 text-xs text-muted-foreground tabular">
-            <span className="flex items-center gap-1" title="Atendimentos">
-              <Phone size={12} />
-              {mentee.attendance_count} atend.
-            </span>
             <span className="flex items-center gap-1" title="Indicações">
               <Users size={12} />
               {mentee.indication_count} indic.
@@ -90,6 +86,15 @@ export function MenteeCard({ mentee, unreadCount = 0, onClick }: MenteeCardProps
               <DollarSign size={12} />
               R$ {(mentee.revenue_total / 100).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </span>
+            {mentee.days_since_contact != null && (
+              <span
+                className={`flex items-center gap-1 ml-auto ${mentee.days_since_contact > 7 ? 'text-destructive' : mentee.days_since_contact > 3 ? 'text-warning' : 'text-muted-foreground'}`}
+                title="Dias sem contato"
+              >
+                <Clock size={12} />
+                {mentee.days_since_contact}d
+              </span>
+            )}
           </div>
         </div>
       </div>

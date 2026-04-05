@@ -29,7 +29,6 @@ export const CallInterface = memo(function CallInterface({
   const [copied, setCopied] = useState(false)
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const timerStarted = useRef(false)
   const endedRef = useRef(false)
   const callIdRef = useRef(callId)
   const onEndRef = useRef(onEnd)
@@ -39,11 +38,13 @@ export const CallInterface = memo(function CallInterface({
 
   const isActive = remoteCount > 0 && joined
 
-  // Start timer when active
+  // Start/stop timer based on active state
   useEffect(() => {
-    if (isActive && !timerStarted.current) {
-      timerStarted.current = true
+    if (isActive && !timerRef.current) {
       timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000)
+    } else if (!isActive && timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
     }
   }, [isActive])
 

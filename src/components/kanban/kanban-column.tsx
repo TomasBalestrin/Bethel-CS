@@ -27,7 +27,7 @@ export function KanbanColumn({ stage, mentees, unreadMap, onCardClick, showAddBu
   return (
     <div
       className={cn(
-        'flex min-w-[280px] w-72 shrink-0 flex-col rounded-lg border border-border bg-muted/50 snap-start',
+        'flex min-w-[260px] w-[calc(100vw-2rem)] sm:w-72 shrink-0 flex-col rounded-lg border border-border bg-muted/50 snap-start',
         isOver && 'ring-2 ring-accent/50'
       )}
     >

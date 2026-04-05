@@ -46,6 +46,18 @@ export default async function EtapasMentoriaPage() {
     .from('revenue_records')
     .select('mentee_id, sale_value')
 
+  // Fetch last contact dates
+  const { data: lastContacts } = await supabase
+    .from('wpp_messages')
+    .select('mentee_id, sent_at')
+    .eq('direction', 'outgoing')
+    .order('sent_at', { ascending: false })
+
+  const lastContactMap = new Map<string, string>()
+  lastContacts?.forEach((m) => {
+    if (!lastContactMap.has(m.mentee_id)) lastContactMap.set(m.mentee_id, m.sent_at)
+  })
+
   const attendanceMap = new Map<string, number>()
   attendances?.forEach((a) => {
     attendanceMap.set(a.mentee_id, (attendanceMap.get(a.mentee_id) ?? 0) + 1)
@@ -64,12 +76,18 @@ export default async function EtapasMentoriaPage() {
     )
   })
 
-  const menteesWithStats: MenteeWithStats[] = (mentees ?? []).map((m) => ({
-    ...m,
-    attendance_count: attendanceMap.get(m.id) ?? 0,
-    indication_count: indicationMap.get(m.id) ?? 0,
-    revenue_total: revenueMap.get(m.id) ?? 0,
-  }))
+  const now = Date.now()
+  const menteesWithStats: MenteeWithStats[] = (mentees ?? []).map((m) => {
+    const lastContact = lastContactMap.get(m.id)
+    const daysSince = lastContact ? Math.floor((now - new Date(lastContact).getTime()) / 86400000) : undefined
+    return {
+      ...m,
+      attendance_count: attendanceMap.get(m.id) ?? 0,
+      indication_count: indicationMap.get(m.id) ?? 0,
+      revenue_total: revenueMap.get(m.id) ?? 0,
+      days_since_contact: daysSince,
+    }
+  })
 
   // Fetch specialists list for admin
   const { data: specialists } = await supabase

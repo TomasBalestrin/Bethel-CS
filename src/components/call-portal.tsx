@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import DailyIframe from '@daily-co/daily-js'
 import { useCallStore } from '@/store/call-store'
 import { CallInterface } from '@/components/kanban/call-interface'
+import { toast } from 'sonner'
 
 export function CallPortal() {
   const isActive = useCallStore((s) => s.isActive)
@@ -101,7 +102,11 @@ function VideoCallPortal({ roomUrl, token, menteeName, menteeLink }: {
         let attempts = 0
         const recordingPoll = setInterval(async () => {
           attempts++
-          if (attempts > 20) { clearInterval(recordingPoll); return }
+          if (attempts > 20) {
+            clearInterval(recordingPoll)
+            toast.error('Gravação não encontrada. Verifique no histórico de ligações.')
+            return
+          }
           try {
             const res = await fetch('/api/calls/check-recording', {
               method: 'POST',
@@ -109,8 +114,14 @@ function VideoCallPortal({ roomUrl, token, menteeName, menteeLink }: {
               body: JSON.stringify({ callId: cid }),
             })
             const data = await res.json()
-            if (data.status === 'ready') clearInterval(recordingPoll)
-          } catch { /* */ }
+            if (data.status === 'ready') {
+              clearInterval(recordingPoll)
+              toast.success('Gravação da ligação disponível')
+            } else if (data.status === 'failed') {
+              clearInterval(recordingPoll)
+              toast.error('Falha na gravação da ligação')
+            }
+          } catch { /* network error, retry */ }
         }, 15000)
       }
       joinedRef.current = null
@@ -184,7 +195,11 @@ function VoiceCallPortal({ roomUrl, token, callId, menteeName, menteeLink }: {
     let attempts = 0
     const recordingPoll = setInterval(async () => {
       attempts++
-      if (attempts > 20) { clearInterval(recordingPoll); return }
+      if (attempts > 20) {
+        clearInterval(recordingPoll)
+        toast.error('Gravação não encontrada. Verifique no histórico de ligações.')
+        return
+      }
       try {
         const res = await fetch('/api/calls/check-recording', {
           method: 'POST',
@@ -192,8 +207,14 @@ function VoiceCallPortal({ roomUrl, token, callId, menteeName, menteeLink }: {
           body: JSON.stringify({ callId }),
         })
         const data = await res.json()
-        if (data.status === 'ready') clearInterval(recordingPoll)
-      } catch { /* */ }
+        if (data.status === 'ready') {
+          clearInterval(recordingPoll)
+          toast.success('Gravação da ligação disponível')
+        } else if (data.status === 'failed') {
+          clearInterval(recordingPoll)
+          toast.error('Falha na gravação da ligação')
+        }
+      } catch { /* network error, retry */ }
     }, 15000)
 
     endCall()

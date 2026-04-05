@@ -84,6 +84,9 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const [callsModalOpen, setCallsModalOpen] = useState(false)
   const [playingRecording, setPlayingRecording] = useState<string | null>(null)
 
+  // Message windowing
+  const [visibleLimit, setVisibleLimit] = useState(80)
+
   // Attendance summary
   const [latestNote, setLatestNote] = useState<AttendanceNote | null>(null)
   const [summarizing, setSummarizing] = useState(false)
@@ -528,7 +531,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
               {showCallMenu && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setShowCallMenu(false)} />
-                  <div className="absolute right-0 top-full mt-1 z-20 w-44 rounded-lg border border-border bg-card shadow-lg py-1">
+                  <div className="absolute right-0 top-full mt-1 z-20 w-44 max-w-[calc(100vw-1rem)] rounded-lg border border-border bg-card shadow-lg py-1">
                     <button
                       type="button"
                       className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted transition-colors"
@@ -631,18 +634,25 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         )}
       </div>
 
-      {/* Messages — scrollable */}
+      {/* Messages — scrollable (windowed) */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1 min-h-0">
+        {messages.length > visibleLimit && (
+          <div className="flex justify-center py-2">
+            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => setVisibleLimit((l) => l + 80)}>
+              Carregar anteriores ({messages.length - visibleLimit} mensagens)
+            </Button>
+          </div>
+        )}
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <MessageSquare className="h-8 w-8 text-muted-foreground/30 mb-2" />
             <p className="text-xs text-muted-foreground">Nenhuma mensagem ainda</p>
           </div>
         )}
-        {messages.map((msg, idx) => {
+        {messages.slice(-visibleLimit).map((msg, idx, visibleMsgs) => {
           const isOutgoing = msg.direction === 'outgoing'
-          const prevMsg = messages[idx - 1]
-          const nextMsg = messages[idx + 1]
+          const prevMsg = visibleMsgs[idx - 1]
+          const nextMsg = visibleMsgs[idx + 1]
           const showDateSeparator = !prevMsg || getDateKey(msg.sent_at) !== getDateKey(prevMsg.sent_at)
 
           // Group consecutive messages from same sender
@@ -712,7 +722,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
       </div>
 
       {/* Input area — fixed bottom */}
-      <div className="border-t border-border px-3 py-2 shrink-0 bg-background">
+      <div className="border-t border-border px-3 py-2 shrink-0 bg-background" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0.5rem)' }}>
         {inputDisabledReason && (
           <p className="text-[10px] text-destructive mb-1.5">{inputDisabledReason}</p>
         )}
@@ -796,7 +806,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
               disabled={!canSend || uploading}
               rows={1}
               className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ minHeight: '36px', maxHeight: '120px' }}
+              style={{ minHeight: '44px', maxHeight: '120px' }}
             />
 
             {/* Send */}

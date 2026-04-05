@@ -961,6 +961,13 @@ function ClienteFitToggle({ menteeId, initialValue }: { menteeId: string; initia
 
 const ACTION_PLAN_LABELS: Record<string, string> = {
   endereco_completo: 'Endereço completo',
+  email: 'Email',
+  instagram: 'Instagram',
+  cidade: 'Cidade',
+  estado: 'Estado',
+  nome_empresa: 'Nome da empresa',
+  nicho: 'Nicho',
+  num_colaboradores: 'Número de colaboradores',
   como_nos_conheceu: 'Por onde nos conheceu',
   motivacao_elite_premium: 'Por que decidiu entrar na Elite Premium',
   expectativas_resultados: 'Expectativas de resultado',
@@ -969,7 +976,10 @@ const ACTION_PLAN_LABELS: Record<string, string> = {
   produtos_servicos: 'Principais produtos/serviços',
   funis_venda: 'Funis de venda ativos',
   processo_venda: 'Processo de venda',
-  media_faturamento: 'Faturamento médio mensal',
+  faturamento_mes1: 'Faturamento último mês',
+  faturamento_mes2: 'Faturamento 2 meses atrás',
+  faturamento_mes3: 'Faturamento 3 meses atrás',
+  faturamento_medio: 'Faturamento médio',
   resultado_funis: 'Resultado por funil',
   erros_identificados: 'Erros identificados',
   desafios_funis: 'Principais desafios',
@@ -985,6 +995,7 @@ const ACTION_PLAN_LABELS: Record<string, string> = {
 }
 
 const PILL_KEYS = new Set(['como_nos_conheceu'])
+const CURRENCY_KEYS = new Set(['faturamento_mes1', 'faturamento_mes2', 'faturamento_mes3', 'faturamento_medio'])
 
 function ActionPlanResponseView({ data }: { data: Record<string, unknown> }) {
   const keys = Object.keys(ACTION_PLAN_LABELS)
@@ -993,9 +1004,10 @@ function ActionPlanResponseView({ data }: { data: Record<string, unknown> }) {
     <div className="space-y-0 divide-y divide-border/60">
       {keys.map((key) => {
         const value = data[key]
-        if (value === undefined || value === null || value === '') return null
+        if (value === undefined || value === null || value === '' || value === 0) return null
         const label = ACTION_PLAN_LABELS[key]
         const isPill = PILL_KEYS.has(key)
+        const isCurrency = CURRENCY_KEYS.has(key)
 
         return (
           <div key={key} className="py-4 first:pt-0">
@@ -1005,14 +1017,11 @@ function ActionPlanResponseView({ data }: { data: Record<string, unknown> }) {
             {isPill && Array.isArray(value) ? (
               <div className="flex flex-wrap gap-1.5">
                 {value.map((v: string) => (
-                  <span
-                    key={v}
-                    className="inline-flex items-center rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-medium text-accent"
-                  >
-                    {v}
-                  </span>
+                  <span key={v} className="inline-flex items-center rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-medium text-accent">{v}</span>
                 ))}
               </div>
+            ) : isCurrency ? (
+              <p className="text-sm text-foreground font-semibold tabular">R$ {(Number(value) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
             ) : (
               <p className="text-sm text-foreground whitespace-pre-wrap">{String(value)}</p>
             )}

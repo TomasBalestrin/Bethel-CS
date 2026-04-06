@@ -176,6 +176,53 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
             </Select>
           </div>
         </div>
+        {/* Period shortcuts */}
+        <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-border">
+          <Label className="text-xs text-muted-foreground mr-1 self-center">Período:</Label>
+          {[
+            { label: 'Hoje', days: 0 },
+            { label: '7 dias', days: 7 },
+            { label: '30 dias', days: 30 },
+            { label: '90 dias', days: 90 },
+            { label: 'Este mês', days: -1 },
+            { label: 'Tudo', days: -2 },
+          ].map(({ label, days }) => {
+            const isActive = (() => {
+              if (days === -2) return !startLocal && !endLocal
+              const today = new Date().toISOString().substring(0, 10)
+              if (days === 0) return startLocal === today && endLocal === today
+              if (days === -1) {
+                const first = new Date(); first.setDate(1)
+                return startLocal === first.toISOString().substring(0, 10) && endLocal === today
+              }
+              const from = new Date(); from.setDate(from.getDate() - days)
+              return startLocal === from.toISOString().substring(0, 10) && endLocal === today
+            })()
+            return (
+              <button
+                key={label}
+                onClick={() => {
+                  const today = new Date().toISOString().substring(0, 10)
+                  if (days === -2) { setStartLocal(''); setEndLocal(''); return }
+                  if (days === 0) { setStartLocal(today); setEndLocal(today); return }
+                  if (days === -1) {
+                    const first = new Date(); first.setDate(1)
+                    setStartLocal(first.toISOString().substring(0, 10)); setEndLocal(today); return
+                  }
+                  const from = new Date(); from.setDate(from.getDate() - days)
+                  setStartLocal(from.toISOString().substring(0, 10)); setEndLocal(today)
+                }}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                  isActive
+                    ? 'bg-accent text-white'
+                    : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+                }`}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
       </section>
 
       {/* ═══ VISÃO GERAL DOS MENTORADOS ═══ */}

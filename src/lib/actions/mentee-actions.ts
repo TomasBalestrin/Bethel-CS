@@ -446,3 +446,163 @@ export async function bulkAssignSpecialist(menteeIds: string[], specialistId: st
   revalidatePath('/etapas-mentoria')
   return { error: null }
 }
+
+// ─── Bulk Import: Action Plans ───────────────────────────────────────────────
+
+interface BulkActionPlanInput {
+  rows: Record<string, string | number>[]
+  matchField: 'full_name' | 'phone' | 'email'
+}
+
+export async function bulkImportActionPlans(input: BulkActionPlanInput): Promise<BulkImportResult> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { total: input.rows.length, created: 0, errors: [{ row: 0, name: '', error: 'Não autenticado' }] }
+
+  // Load all mentees for matching
+  const { data: mentees } = await supabase.from('mentees').select('id, full_name, phone, email')
+  if (!mentees) return { total: input.rows.length, created: 0, errors: [{ row: 0, name: '', error: 'Erro ao carregar mentorados' }] }
+
+  // Build lookup maps
+  const nameMap = new Map<string, string>()
+  const phoneMap = new Map<string, string>()
+  const emailMap = new Map<string, string>()
+  mentees.forEach((m) => {
+    nameMap.set(m.full_name.toLowerCase().trim(), m.id)
+    if (m.phone) phoneMap.set(m.phone.replace(/\D/g, ''), m.id)
+    if (m.email) emailMap.set(m.email.toLowerCase().trim(), m.id)
+  })
+
+  const errors: BulkImportResult['errors'] = []
+  let created = 0
+
+  for (let i = 0; i < input.rows.length; i++) {
+    const raw = input.rows[i]
+    const rowNum = i + 2
+    const matchValue = String(raw.__match_value ?? '').trim()
+    const name = String(raw.__display_name ?? matchValue).trim()
+
+    if (!matchValue) { errors.push({ row: rowNum, name: '', error: 'Campo de identificação vazio' }); continue }
+
+    // Find mentee
+    let menteeId: string | undefined
+    if (input.matchField === 'full_name') {
+      menteeId = nameMap.get(matchValue.toLowerCase())
+    } else if (input.matchField === 'phone') {
+      menteeId = phoneMap.get(matchValue.replace(/\D/g, ''))
+    } else {
+      menteeId = emailMap.get(matchValue.toLowerCase())
+    }
+
+    if (!menteeId) { errors.push({ row: rowNum, name, error: 'Mentorado não encontrado' }); continue }
+
+    // Build action plan data object
+    const planData: Record<string, string | number> = {}
+    for (const [key, val] of Object.entries(raw)) {
+      if (key.startsWith('__')) continue
+      if (val !== '' && val !== null && val !== undefined) {
+        planData[key] = val
+      }
+    }
+
+    try {
+      const { data: existing } = await supabase
+        .from('action_plans')
+        .select('id')
+        .eq('mentee_id', menteeId)
+        .limit(1)
+        .single()
+
+      if (existing) {
+        await supabase
+          .from('action_plans')
+          .update({ data: planData as unknown as Database['public']['Tables']['action_plans']['Update']['data'], submitted_at: new Date().toISOString() })
+          .eq('id', existing.id)
+      } else {
+        await supabase
+          .from('action_plans')
+          .insert({ mentee_id: menteeId, data: planData as unknown as Database['public']['Tables']['action_plans']['Insert']['data'], submitted_at: new Date().toISOString() })
+      }
+      created++
+    } catch (err) {
+      errors.push({ row: rowNum, name, error: String(err) })
+    }
+  }
+
+  revalidatePath('/mentorados')
+  return { total: input.rows.length, created, errors }
+}
+
+// ─── Bulk Import: Stage Assignments ──────────────────────────────────────────
+
+interface BulkStageInput {
+  rows: { matchValue: string; stageName: string }[]
+  matchField: 'full_name' | 'phone' | 'email'
+}
+
+export async function bulkImportStages(input: BulkStageInput): Promise<BulkImportResult> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { total: input.rows.length, created: 0, errors: [{ row: 0, name: '', error: 'Não autenticado' }] }
+
+  const { data: mentees } = await supabase.from('mentees').select('id, full_name, phone, email')
+  const { data: stages } = await supabase.from('kanban_stages').select('id, name, type')
+
+  if (!mentees || !stages) return { total: input.rows.length, created: 0, errors: [{ row: 0, name: '', error: 'Erro ao carregar dados' }] }
+
+  const nameMap = new Map<string, string>()
+  const phoneMap = new Map<string, string>()
+  const emailMap = new Map<string, string>()
+  mentees.forEach((m) => {
+    nameMap.set(m.full_name.toLowerCase().trim(), m.id)
+    if (m.phone) phoneMap.set(m.phone.replace(/\D/g, ''), m.id)
+    if (m.email) emailMap.set(m.email.toLowerCase().trim(), m.id)
+  })
+
+  const stageMap = new Map<string, { id: string; type: KanbanType }>()
+  stages.forEach((s) => {
+    stageMap.set(s.name.toLowerCase().trim(), { id: s.id, type: s.type as KanbanType })
+    const norm = s.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+    stageMap.set(norm, { id: s.id, type: s.type as KanbanType })
+  })
+
+  const errors: BulkImportResult['errors'] = []
+  let created = 0
+
+  for (let i = 0; i < input.rows.length; i++) {
+    const { matchValue, stageName } = input.rows[i]
+    const rowNum = i + 2
+
+    if (!matchValue.trim()) { errors.push({ row: rowNum, name: '', error: 'Campo de identificação vazio' }); continue }
+    if (!stageName.trim()) { errors.push({ row: rowNum, name: matchValue, error: 'Nome da etapa vazio' }); continue }
+
+    let menteeId: string | undefined
+    if (input.matchField === 'full_name') {
+      menteeId = nameMap.get(matchValue.toLowerCase().trim())
+    } else if (input.matchField === 'phone') {
+      menteeId = phoneMap.get(matchValue.replace(/\D/g, ''))
+    } else {
+      menteeId = emailMap.get(matchValue.toLowerCase().trim())
+    }
+
+    if (!menteeId) { errors.push({ row: rowNum, name: matchValue, error: 'Mentorado não encontrado' }); continue }
+
+    const stageNorm = stageName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
+    const stage = stageMap.get(stageName.toLowerCase().trim()) ?? stageMap.get(stageNorm)
+
+    if (!stage) { errors.push({ row: rowNum, name: matchValue, error: `Etapa "${stageName}" não encontrada` }); continue }
+
+    const { error } = await supabase
+      .from('mentees')
+      .update({ current_stage_id: stage.id, kanban_type: stage.type, updated_at: new Date().toISOString() })
+      .eq('id', menteeId)
+
+    if (error) { errors.push({ row: rowNum, name: matchValue, error: error.message }); continue }
+    created++
+  }
+
+  revalidatePath('/mentorados')
+  revalidatePath('/etapas-iniciais')
+  revalidatePath('/etapas-mentoria')
+  return { total: input.rows.length, created, errors }
+}

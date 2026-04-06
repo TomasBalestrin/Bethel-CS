@@ -19,10 +19,10 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Upload, FileText, CheckCircle2, XCircle, AlertCircle, ArrowRight } from 'lucide-react'
-import { bulkCreateMentees } from '@/lib/actions/mentee-actions'
+import { Upload, FileText, CheckCircle2, XCircle, AlertCircle, ArrowRight, Users, ClipboardList, GitBranch } from 'lucide-react'
+import { bulkCreateMentees, bulkImportActionPlans, bulkImportStages } from '@/lib/actions/mentee-actions'
 
-// ─── Field Definitions ──────────────────────────────────────────────────────
+// ─── Types ──────────────────────────────────────────────────────────────────
 
 interface FieldDef {
   key: string
@@ -32,13 +32,22 @@ interface FieldDef {
   aliases: string[]
 }
 
-const SYSTEM_FIELDS: FieldDef[] = [
-  // Required
+type ImportTab = 'mentees' | 'action_plan' | 'stages'
+type ImportStep = 'upload' | 'mapping' | 'preview' | 'importing' | 'done'
+
+interface ImportResult {
+  total: number
+  created: number
+  errors: { row: number; name: string; error: string }[]
+}
+
+// ─── Field Definitions: Mentorados ──────────────────────────────────────────
+
+const MENTEE_FIELDS: FieldDef[] = [
   { key: 'full_name', label: 'Nome completo', required: true, type: 'text', aliases: ['nome', 'name', 'nome completo', 'full name'] },
   { key: 'phone', label: 'Telefone', required: true, type: 'text', aliases: ['telefone', 'fone', 'celular', 'phone', 'whatsapp', 'tel'] },
   { key: 'product_name', label: 'Produto Contratado', required: true, type: 'text', aliases: ['produto', 'product', 'produto contratado', 'plano', 'mentoria', 'tipo de produto'] },
   { key: 'start_date', label: 'Data de Entrada', required: true, type: 'date', aliases: ['entrada', 'inicio', 'início', 'start', 'data entrada', 'data início', 'start date', 'data de entrada', 'data inicio'] },
-  // Optional
   { key: 'status', label: 'Situação', required: false, type: 'status', aliases: ['situação', 'situacao', 'status', 'estado do cliente', 'ativo'] },
   { key: 'closer_name', label: 'Closer (Vendedor)', required: false, type: 'text', aliases: ['closer', 'vendedor', 'seller', 'vendedor que vendeu', 'consultor', 'closer responsável'] },
   { key: 'cpf', label: 'CPF', required: false, type: 'text', aliases: ['cpf', 'documento', 'doc'] },
@@ -59,48 +68,81 @@ const SYSTEM_FIELDS: FieldDef[] = [
   { key: 'webhook_notes', label: 'Integrações (Nextrack/Unia)', required: false, type: 'text', aliases: ['nextrack', 'unia', 'integração', 'integracao', 'integracoes'] },
 ]
 
+// ─── Field Definitions: Action Plan ─────────────────────────────────────────
+
+const ACTION_PLAN_FIELDS: FieldDef[] = [
+  { key: '__match_value', label: 'Nome / Telefone (Identificação)', required: true, type: 'text', aliases: ['nome', 'nome completo', 'name', 'full name', 'telefone', 'whatsapp', 'phone'] },
+  { key: 'endereco_completo', label: 'Endereço completo', required: false, type: 'text', aliases: ['endereco', 'endereço', 'endereço completo', 'endereco completo', 'address'] },
+  { key: 'email', label: 'Email', required: false, type: 'text', aliases: ['email', 'e-mail', 'mail', 'endereco de e-mail'] },
+  { key: 'instagram', label: '@Instagram', required: false, type: 'text', aliases: ['instagram', '@instagram', '@ do instagram', 'insta'] },
+  { key: 'cidade', label: 'Cidade', required: false, type: 'text', aliases: ['cidade', 'cidade do negocio', 'city'] },
+  { key: 'estado', label: 'Estado', required: false, type: 'text', aliases: ['estado', 'estado do negocio', 'uf'] },
+  { key: 'nome_empresa', label: 'Nome da empresa', required: false, type: 'text', aliases: ['empresa', 'nome da empresa', 'nome empresa'] },
+  { key: 'nicho', label: 'Nicho', required: false, type: 'text', aliases: ['nicho', 'niche', 'segmento'] },
+  { key: 'num_colaboradores', label: 'Nº de colaboradores', required: false, type: 'text', aliases: ['colaboradores', 'numero de colaboradores', 'n colaboradores', 'funcionarios'] },
+  { key: 'como_nos_conheceu', label: 'Como nos conheceu', required: false, type: 'text', aliases: ['como nos conheceu', 'como conheceu', 'origem', 'discovery'] },
+  { key: 'motivacao_elite_premium', label: 'Por que decidiu entrar', required: false, type: 'text', aliases: ['por que decidiu', 'motivacao', 'motivação', 'por que entrou'] },
+  { key: 'expectativas_resultados', label: 'Expectativas de resultados', required: false, type: 'text', aliases: ['expectativas', 'o que espera', 'resultados esperados'] },
+  { key: 'atuacao_profissional', label: 'Atuação profissional', required: false, type: 'text', aliases: ['o que faz', 'profissao', 'profissão', 'atuacao', 'atuação'] },
+  { key: 'tempo_atuacao', label: 'Tempo de atuação', required: false, type: 'text', aliases: ['tempo atuacao', 'ha quanto tempo', 'tempo de atuação'] },
+  { key: 'produtos_servicos', label: 'Produtos/Serviços', required: false, type: 'text', aliases: ['produtos', 'servicos', 'produtos/servicos', '4 principais produtos'] },
+  { key: 'funis_venda', label: 'Funis de venda ativos', required: false, type: 'text', aliases: ['funis', 'como vende', 'funis de venda', 'funis ativos'] },
+  { key: 'processo_venda', label: 'Processo de venda', required: false, type: 'text', aliases: ['como passa o preco', 'processo de venda', 'processo venda', 'percurso do lead'] },
+  { key: 'faturamento_mes1', label: 'Faturamento último mês', required: false, type: 'text', aliases: ['faturamento mes 1', 'faturamento ultimo mes', 'fat mes 1', 'media de faturamento'] },
+  { key: 'faturamento_mes2', label: 'Faturamento 2 meses atrás', required: false, type: 'text', aliases: ['faturamento mes 2', 'fat mes 2', '2 meses atras'] },
+  { key: 'faturamento_mes3', label: 'Faturamento 3 meses atrás', required: false, type: 'text', aliases: ['faturamento mes 3', 'fat mes 3', '3 meses atras'] },
+  { key: 'resultado_funis', label: 'Resultado por funil', required: false, type: 'text', aliases: ['resultado funis', 'resultado por funil', 'quanto cada funil'] },
+  { key: 'erros_identificados', label: 'Erros identificados', required: false, type: 'text', aliases: ['erros', 'erros identificados', 'quais erros'] },
+  { key: 'desafios_funis', label: 'Desafios nos funis', required: false, type: 'text', aliases: ['desafios', 'principais desafios', 'desafios funis'] },
+  { key: 'funis_testados', label: 'Funis testados que não funcionaram', required: false, type: 'text', aliases: ['funis testados', 'nao funcionaram', 'novos funis'] },
+  { key: 'estrutura_comercial', label: 'Estrutura comercial', required: false, type: 'text', aliases: ['estrutura comercial', 'vendedores', 'canais'] },
+  { key: 'estrutura_marketing', label: 'Estrutura de marketing', required: false, type: 'text', aliases: ['estrutura marketing', 'marketing', 'criacao', 'trafego'] },
+  { key: 'entrega_produto', label: 'Entrega do produto/serviço', required: false, type: 'text', aliases: ['entrega', 'como funciona a entrega', 'entrega produto'] },
+  { key: 'estrutura_gestao', label: 'Estrutura de gestão', required: false, type: 'text', aliases: ['gestao', 'gestão', 'estrutura gestao', 'indicadores', 'crm'] },
+  { key: 'equipe', label: 'Equipe', required: false, type: 'text', aliases: ['equipe', 'quantas pessoas', 'funcao de cada'] },
+  { key: 'momento_negocio', label: 'Momento do negócio', required: false, type: 'text', aliases: ['momento', 'momento negocio', 'momento atual'] },
+  { key: 'objetivos_urgentes', label: 'Objetivos urgentes', required: false, type: 'text', aliases: ['objetivos', 'objetivos urgentes', 'mais urgentes'] },
+  { key: 'visao_futuro', label: 'Visão de futuro', required: false, type: 'text', aliases: ['visao', 'visão', '6 meses', '1 ano', '5 anos', 'onde voce ve'] },
+]
+
+// ─── Field Definitions: Stages ──────────────────────────────────────────────
+
+const STAGE_FIELDS: FieldDef[] = [
+  { key: '__match_value', label: 'Nome / Telefone (Identificação)', required: true, type: 'text', aliases: ['nome', 'nome completo', 'name', 'telefone', 'whatsapp', 'phone'] },
+  { key: '__stage_name', label: 'Nome da Etapa', required: true, type: 'text', aliases: ['etapa', 'stage', 'fase', 'funil', 'status', 'etapa atual', 'estagio'] },
+]
+
 const SKIP_VALUE = '__skip__'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function normalizeHeader(h: string): string {
-  return h
-    .toLowerCase()
-    .trim()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')  // strip accents
-    .replace(/[^\w\s./@-]/g, '')      // strip broken encoding chars
-    .replace(/\s+/g, ' ')             // collapse whitespace
-    .trim()
+  return h.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w\s./@-]/g, '').replace(/\s+/g, ' ').trim()
 }
 
-function autoDetectMapping(headers: string[]): Record<string, string> {
+function autoDetectMapping(headers: string[], fields: FieldDef[]): Record<string, string> {
   const mapping: Record<string, string> = {}
   for (const header of headers) {
     const norm = normalizeHeader(header)
-    for (const field of SYSTEM_FIELDS) {
+    for (const field of fields) {
       if (field.aliases.some((alias) => normalizeHeader(alias) === norm || norm.includes(normalizeHeader(alias)))) {
-        if (!mapping[header]) {
-          mapping[header] = field.key
-        }
+        if (!mapping[header]) mapping[header] = field.key
       }
     }
-    if (!mapping[header]) {
-      mapping[header] = SKIP_VALUE
-    }
+    if (!mapping[header]) mapping[header] = SKIP_VALUE
   }
   return mapping
 }
 
+// ─── Tab Config ─────────────────────────────────────────────────────────────
+
+const TABS: { key: ImportTab; label: string; icon: typeof Users; description: string }[] = [
+  { key: 'mentees', label: 'Mentorados', icon: Users, description: 'Criar novos mentorados a partir de CSV/Excel' },
+  { key: 'action_plan', label: 'Plano de Ação', icon: ClipboardList, description: 'Importar respostas do formulário para mentorados existentes' },
+  { key: 'stages', label: 'Etapas', icon: GitBranch, description: 'Atualizar a etapa do funil de mentorados existentes' },
+]
+
 // ─── Component ──────────────────────────────────────────────────────────────
-
-type ImportStep = 'upload' | 'mapping' | 'preview' | 'importing' | 'done'
-
-interface ImportResult {
-  total: number
-  created: number
-  errors: { row: number; name: string; error: string }[]
-}
 
 interface BulkImportDialogProps {
   open: boolean
@@ -112,14 +154,18 @@ interface BulkImportDialogProps {
 export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: BulkImportDialogProps) {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [activeTab, setActiveTab] = useState<ImportTab>('mentees')
   const [step, setStep] = useState<ImportStep>('upload')
   const [fileName, setFileName] = useState('')
   const [headers, setHeaders] = useState<string[]>([])
   const [rows, setRows] = useState<Record<string, string | number>[]>([])
   const [mapping, setMapping] = useState<Record<string, string>>({})
   const [defaultSpecialistId, setDefaultSpecialistId] = useState('')
+  const [matchField, setMatchField] = useState<'full_name' | 'phone' | 'email'>('full_name')
   const [result, setResult] = useState<ImportResult | null>(null)
   const [dragOver, setDragOver] = useState(false)
+
+  const currentFields = activeTab === 'mentees' ? MENTEE_FIELDS : activeTab === 'action_plan' ? ACTION_PLAN_FIELDS : STAGE_FIELDS
 
   function reset() {
     setStep('upload')
@@ -131,20 +177,24 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
     setResult(null)
   }
 
-  function handleClose(open: boolean) {
-    if (!open) reset()
-    onOpenChange(open)
+  function switchTab(tab: ImportTab) {
+    reset()
+    setActiveTab(tab)
+  }
+
+  function handleClose(v: boolean) {
+    if (!v) reset()
+    onOpenChange(v)
   }
 
   function processWorkbook(wb: XLSX.WorkBook) {
     const sheet = wb.Sheets[wb.SheetNames[0]]
     const data = XLSX.utils.sheet_to_json<Record<string, string | number>>(sheet, { defval: '' })
     if (data.length === 0) return
-
     const hdrs = Object.keys(data[0])
     setHeaders(hdrs)
     setRows(data)
-    setMapping(autoDetectMapping(hdrs))
+    setMapping(autoDetectMapping(hdrs, currentFields))
     setStep('mapping')
   }
 
@@ -164,9 +214,8 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
     setDragOver(false)
     const file = e.dataTransfer.files[0]
     if (file) handleFile(file)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [activeTab]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Build preview rows (first 5) using the current mapping
   function getMappedRow(raw: Record<string, string | number>): Record<string, string | number> {
     const out: Record<string, string | number> = {}
     for (const [header, fieldKey] of Object.entries(mapping)) {
@@ -177,47 +226,100 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
   }
 
   const previewRows = rows.slice(0, 5).map(getMappedRow)
-  const requiredFields = SYSTEM_FIELDS.filter((f) => f.required)
+  const requiredFields = currentFields.filter((f) => f.required)
   const mappedFieldKeys = Object.values(mapping).filter((v) => v !== SKIP_VALUE)
   const missingRequired = requiredFields.filter((f) => !mappedFieldKeys.includes(f.key))
 
   async function handleImport() {
     setStep('importing')
-    const mapped = rows.map(getMappedRow)
-    const res = await bulkCreateMentees({
-      rows: mapped,
-      defaultSpecialistId: defaultSpecialistId || undefined,
-    })
+    let res: ImportResult
+
+    if (activeTab === 'mentees') {
+      const mapped = rows.map(getMappedRow)
+      res = await bulkCreateMentees({ rows: mapped, defaultSpecialistId: defaultSpecialistId || undefined })
+    } else if (activeTab === 'action_plan') {
+      const mapped = rows.map((raw) => {
+        const out = getMappedRow(raw)
+        // Also store display name for error reporting
+        const matchVal = String(out.__match_value ?? '')
+        out.__display_name = matchVal
+        return out
+      })
+      res = await bulkImportActionPlans({ rows: mapped, matchField })
+    } else {
+      const mapped = rows.map((raw) => {
+        const out = getMappedRow(raw)
+        return {
+          matchValue: String(out.__match_value ?? ''),
+          stageName: String(out.__stage_name ?? ''),
+        }
+      })
+      res = await bulkImportStages({ rows: mapped, matchField })
+    }
+
     setResult(res)
     setStep('done')
     router.refresh()
+  }
+
+  const tabLabels: Record<ImportTab, { importing: string; button: string; success: string }> = {
+    mentees: { importing: 'Importando mentorados...', button: `Importar ${rows.length} mentorados`, success: 'importados' },
+    action_plan: { importing: 'Importando planos de ação...', button: `Importar ${rows.length} planos`, success: 'vinculados' },
+    stages: { importing: 'Atualizando etapas...', button: `Atualizar ${rows.length} etapas`, success: 'atualizados' },
   }
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden w-[95vw] sm:w-full rounded-2xl sm:rounded-lg flex flex-col">
         <DialogHeader>
-          <DialogTitle>Importar Mentorados em Massa</DialogTitle>
+          <DialogTitle>Importar Dados</DialogTitle>
           <DialogDescription>
-            Faça upload de um arquivo CSV ou Excel (.xlsx) com os dados dos mentorados.
+            Faça upload de CSV ou Excel para importar dados em massa.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-y-auto pr-1" style={{ maxHeight: '60vh' }}>
+        {/* Tab selector */}
+        {step === 'upload' && (
+          <div className="flex gap-1 p-1 rounded-lg bg-muted/50 shrink-0">
+            {TABS.map((tab) => {
+              const Icon = tab.icon
+              return (
+                <button
+                  key={tab.key}
+                  onClick={() => switchTab(tab.key)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-xs font-medium transition-colors ${
+                    activeTab === tab.key
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  {tab.label}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1" style={{ maxHeight: '55vh' }}>
           {/* ── STEP: upload ── */}
           {step === 'upload' && (
-            <div className="space-y-6 p-1">
+            <div className="space-y-4 p-1">
+              <p className="text-sm text-muted-foreground">
+                {TABS.find((t) => t.key === activeTab)?.description}
+              </p>
+
               <div
-                className={`rounded-xl border-2 border-dashed transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 py-12 ${dragOver ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50 hover:bg-muted/30'}`}
+                className={`rounded-xl border-2 border-dashed transition-colors cursor-pointer flex flex-col items-center justify-center gap-3 py-10 ${dragOver ? 'border-accent bg-accent/5' : 'border-border hover:border-accent/50 hover:bg-muted/30'}`}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
               >
-                <Upload className="h-10 w-10 text-muted-foreground" />
+                <Upload className="h-8 w-8 text-muted-foreground" />
                 <div className="text-center">
-                  <p className="font-medium text-foreground">Arraste o arquivo aqui ou clique para selecionar</p>
-                  <p className="text-sm text-muted-foreground mt-1">CSV ou Excel (.xlsx, .xls)</p>
+                  <p className="font-medium text-foreground text-sm">Arraste o arquivo ou clique para selecionar</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">CSV ou Excel (.xlsx, .xls)</p>
                 </div>
                 <input
                   ref={fileInputRef}
@@ -228,15 +330,34 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
                 />
               </div>
 
-              <div className="rounded-lg bg-muted/50 p-4 space-y-2">
-                <p className="text-sm font-medium">Campos reconhecidos automaticamente:</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {SYSTEM_FIELDS.filter((f) => f.required).map((f) => (
-                    <Badge key={f.key} variant="default" className="text-xs">{f.label} *</Badge>
+              {activeTab !== 'mentees' && (
+                <div className="rounded-lg border border-border/50 p-3 space-y-2">
+                  <p className="text-sm font-medium">Identificar mentorado por:</p>
+                  <Select value={matchField} onValueChange={(v) => setMatchField(v as typeof matchField)}>
+                    <SelectTrigger className="w-full h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="full_name">Nome completo</SelectItem>
+                      <SelectItem value="phone">Telefone</SelectItem>
+                      <SelectItem value="email">Email</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="rounded-lg bg-muted/50 p-3 space-y-1.5">
+                <p className="text-xs font-medium">Campos reconhecidos:</p>
+                <div className="flex flex-wrap gap-1">
+                  {currentFields.filter((f) => f.required).map((f) => (
+                    <Badge key={f.key} variant="default" className="text-[10px]">{f.label} *</Badge>
                   ))}
-                  {SYSTEM_FIELDS.filter((f) => !f.required).map((f) => (
-                    <Badge key={f.key} variant="secondary" className="text-xs">{f.label}</Badge>
+                  {currentFields.filter((f) => !f.required).slice(0, 12).map((f) => (
+                    <Badge key={f.key} variant="secondary" className="text-[10px]">{f.label}</Badge>
                   ))}
+                  {currentFields.filter((f) => !f.required).length > 12 && (
+                    <Badge variant="secondary" className="text-[10px]">+{currentFields.filter((f) => !f.required).length - 12} mais</Badge>
+                  )}
                 </div>
               </div>
             </div>
@@ -248,16 +369,14 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <FileText className="h-4 w-4" />
                 <span className="font-medium text-foreground">{fileName}</span>
-                <span>— {rows.length} linhas encontradas</span>
+                <span>— {rows.length} linhas</span>
               </div>
 
-              {/* Specialist default (admin) */}
-              {isAdmin && specialists.length > 0 && (
+              {activeTab === 'mentees' && isAdmin && specialists.length > 0 && (
                 <div className="rounded-lg border border-border/50 p-3 space-y-2">
                   <p className="text-sm font-medium">Especialista padrão</p>
-                  <p className="text-xs text-muted-foreground">Usado quando a planilha não tem coluna de especialista</p>
                   <Select value={defaultSpecialistId} onValueChange={setDefaultSpecialistId}>
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className="w-full h-8 text-xs">
                       <SelectValue placeholder="Selecione o especialista" />
                     </SelectTrigger>
                     <SelectContent>
@@ -269,30 +388,29 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
                 </div>
               )}
 
-              {/* Mapping table */}
               <div className="space-y-1.5">
                 <p className="text-sm font-medium">Mapeamento de colunas</p>
                 <div className="rounded-lg border border-border overflow-hidden">
-                  <div className="grid grid-cols-[1fr_auto_1fr] gap-0 bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground border-b border-border">
+                  <div className="grid grid-cols-[1fr_auto_1fr] gap-0 bg-muted/50 px-3 py-1.5 text-xs font-medium text-muted-foreground border-b border-border">
                     <span>Coluna na planilha</span>
                     <span />
                     <span>Campo no sistema</span>
                   </div>
                   <div className="divide-y divide-border">
                     {headers.map((header) => (
-                      <div key={header} className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-3 py-2">
+                      <div key={header} className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 px-3 py-1.5">
                         <span className="text-sm font-medium truncate" title={header}>{header}</span>
-                        <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <ArrowRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                         <Select
                           value={mapping[header] ?? SKIP_VALUE}
                           onValueChange={(v) => setMapping((prev) => ({ ...prev, [header]: v }))}
                         >
-                          <SelectTrigger className="h-8 text-xs">
+                          <SelectTrigger className="h-7 text-xs">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value={SKIP_VALUE}>— Ignorar —</SelectItem>
-                            {SYSTEM_FIELDS.map((f) => (
+                            {currentFields.map((f) => (
                               <SelectItem key={f.key} value={f.key}>
                                 {f.label}{f.required ? ' *' : ''}
                               </SelectItem>
@@ -324,14 +442,13 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
                 <CheckCircle2 className="h-4 w-4 text-success" />
                 <span>Prévia dos primeiros {previewRows.length} de {rows.length} registros</span>
               </div>
-
               <div className="rounded-lg border border-border overflow-hidden">
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead className="bg-muted/50">
                       <tr>
                         {mappedFieldKeys.map((key) => {
-                          const field = SYSTEM_FIELDS.find((f) => f.key === key)
+                          const field = currentFields.find((f) => f.key === key)
                           return (
                             <th key={key} className="px-2 py-2 text-left font-medium text-muted-foreground whitespace-nowrap">
                               {field?.label ?? key}
@@ -354,10 +471,8 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
                   </table>
                 </div>
               </div>
-
               <div className="rounded-lg bg-muted/50 p-3 text-sm">
-                <p className="font-medium">{rows.length} mentorados serão importados</p>
-                <p className="text-muted-foreground text-xs mt-0.5">Registros com telefone duplicado serão ignorados.</p>
+                <p className="font-medium">{rows.length} registros serão processados</p>
               </div>
             </div>
           )}
@@ -366,7 +481,7 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
           {step === 'importing' && (
             <div className="flex flex-col items-center justify-center py-16 gap-4">
               <div className="h-10 w-10 rounded-full border-4 border-accent border-t-transparent animate-spin" />
-              <p className="text-sm text-muted-foreground">Importando mentorados...</p>
+              <p className="text-sm text-muted-foreground">{tabLabels[activeTab].importing}</p>
             </div>
           )}
 
@@ -376,13 +491,12 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
               <div className="flex items-center gap-3">
                 <CheckCircle2 className="h-8 w-8 text-success shrink-0" />
                 <div>
-                  <p className="font-medium text-lg">{result.created} de {result.total} importados com sucesso</p>
+                  <p className="font-medium text-lg">{result.created} de {result.total} {tabLabels[activeTab].success} com sucesso</p>
                   {result.errors.length > 0 && (
                     <p className="text-sm text-muted-foreground">{result.errors.length} com erro</p>
                   )}
                 </div>
               </div>
-
               {result.errors.length > 0 && (
                 <div className="rounded-lg border border-destructive/20 overflow-hidden">
                   <div className="bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive flex items-center gap-2">
@@ -403,16 +517,13 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
           )}
         </div>
 
-        {/* ── Footer buttons (always visible) ── */}
+        {/* ── Footer ── */}
         {step !== 'upload' && step !== 'importing' && (
           <div className="flex justify-between pt-3 border-t border-border shrink-0">
             {step === 'mapping' && (
               <>
                 <Button variant="outline" onClick={reset}>Voltar</Button>
-                <Button
-                  onClick={() => setStep('preview')}
-                  disabled={missingRequired.length > 0}
-                >
+                <Button onClick={() => setStep('preview')} disabled={missingRequired.length > 0}>
                   Visualizar prévia
                 </Button>
               </>
@@ -420,9 +531,7 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
             {step === 'preview' && (
               <>
                 <Button variant="outline" onClick={() => setStep('mapping')}>Voltar</Button>
-                <Button onClick={handleImport}>
-                  Importar {rows.length} mentorados
-                </Button>
+                <Button onClick={handleImport}>{tabLabels[activeTab].button}</Button>
               </>
             )}
             {step === 'done' && (

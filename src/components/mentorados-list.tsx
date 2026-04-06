@@ -18,7 +18,7 @@ import { MenteePanel } from '@/components/kanban/mentee-panel'
 import { CreateMenteeDialog } from '@/components/kanban/create-mentee-dialog'
 import { useUnreadCounts } from '@/hooks/use-unread-counts'
 import { formatDateBR } from '@/lib/format'
-import type { MenteeSummary, MenteeWithStats } from '@/types/kanban'
+import type { MenteeWithStats } from '@/types/kanban'
 import type { KanbanType } from '@/types/database'
 
 const LEVEL_COLORS: Record<number, string> = {
@@ -30,7 +30,7 @@ const LEVEL_COLORS: Record<number, string> = {
 }
 
 interface MentoradosListProps {
-  mentees: MenteeSummary[]
+  mentees: MenteeWithStats[]
   existingMentees: { id: string; full_name: string }[]
   isAdmin?: boolean
   specialists?: { id: string; full_name: string }[]
@@ -38,7 +38,7 @@ interface MentoradosListProps {
 
 export function MentoradosList({ mentees: initialMentees, existingMentees, isAdmin = false, specialists = [] }: MentoradosListProps) {
   const router = useRouter()
-  const [menteeList, setMenteeList] = useState(initialMentees)
+  const [menteeList, setMenteeList] = useState<MenteeWithStats[]>(initialMentees)
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounce(search, 300)
   const { unreadMap } = useUnreadCounts()
@@ -58,14 +58,8 @@ export function MentoradosList({ mentees: initialMentees, existingMentees, isAdm
     )
   })
 
-  function handleCardClick(mentee: MenteeSummary) {
-    const menteeWithStats: MenteeWithStats = {
-      ...mentee,
-      attendance_count: 0,
-      indication_count: 0,
-      revenue_total: 0,
-    }
-    setSelectedMentee(menteeWithStats)
+  function handleCardClick(mentee: MenteeWithStats) {
+    setSelectedMentee(mentee)
     setPanelOpen(true)
   }
 
@@ -184,11 +178,9 @@ export function MentoradosList({ mentees: initialMentees, existingMentees, isAdm
 
                   {/* Metrics footer */}
                   <div className="mt-3 pt-3 border-t border-border/50 text-xs text-muted-foreground">
-                    <span>0 atend.</span>
+                    <span>{m.indication_count} indicações</span>
                     <span className="mx-1.5">·</span>
-                    <span>0 indicações</span>
-                    <span className="mx-1.5">·</span>
-                    <span>R$ 0 receita</span>
+                    <span>R$ {m.revenue_total.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })} receita</span>
                     {m.kanban_type === 'mentorship' && (
                       <Badge variant="info" className="text-[10px] ml-2">Mentoria</Badge>
                     )}

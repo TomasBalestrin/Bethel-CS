@@ -153,12 +153,24 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           .limit(1)
         if (notes && notes.length > 0) setLatestNote(notes[0])
 
-        // Find any WPP instance (connected or not)
-        const { data: instance } = await supabase
-          .from('wpp_instances').select('status').limit(1).single()
+        // Find WPP instance for the mentee's specialist
+        const menteeSpecialistId = specialistId || user.id
+        const instanceQuery = supabase
+          .from('wpp_instances').select('status')
+          .eq('specialist_id', menteeSpecialistId)
+          .limit(1)
+          .single()
+        const { data: specInstance } = await instanceQuery
 
-        if (instance) setInstanceStatus(instance.status)
-        else setNoInstance(true)
+        if (specInstance) {
+          setInstanceStatus(specInstance.status)
+        } else {
+          // Fallback: check any connected instance
+          const { data: anyInstance } = await supabase
+            .from('wpp_instances').select('status').limit(1).single()
+          if (anyInstance) setInstanceStatus(anyInstance.status)
+          else setNoInstance(true)
+        }
       } catch (err) {
         console.error('Chat load error:', err)
       } finally {

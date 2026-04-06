@@ -200,12 +200,16 @@ function UsersSection({ users, currentUserId }: { users: Profile[]; currentUserI
   // Edit form
   const [editName, setEditName] = useState('')
   const [editRole, setEditRole] = useState<UserRole>('especialista')
+  const [editEmail, setEditEmail] = useState('')
+  const [editPassword, setEditPassword] = useState('')
   const [editLoading, setEditLoading] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
 
   function openEdit(user: Profile) {
     setEditName(user.full_name)
     setEditRole(user.role)
+    setEditEmail('')
+    setEditPassword('')
     setEditError(null)
     setEditingUser(user)
   }
@@ -235,6 +239,8 @@ function UsersSection({ users, currentUserId }: { users: Profile[]; currentUserI
     const result = await updateUser(editingUser.id, {
       full_name: editName,
       role: editRole,
+      email: editEmail || undefined,
+      password: editPassword || undefined,
     })
     setEditLoading(false)
     if (result.error) { setEditError(result.error); return }
@@ -384,7 +390,7 @@ function UsersSection({ users, currentUserId }: { users: Profile[]; currentUserI
               <Input id="edit-name" value={editName} onChange={(e) => setEditName(e.target.value)} required />
             </div>
             <div className="space-y-1">
-              <Label>Role *</Label>
+              <Label>Função *</Label>
               <Select value={editRole} onValueChange={(v) => setEditRole(v as UserRole)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -392,6 +398,14 @@ function UsersSection({ users, currentUserId }: { users: Profile[]; currentUserI
                   <SelectItem value="especialista">Especialista</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-email">Novo email de login</Label>
+              <Input id="edit-email" type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="Deixe vazio para manter o atual" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="edit-password">Nova senha</Label>
+              <Input id="edit-password" type="password" value={editPassword} onChange={(e) => setEditPassword(e.target.value)} placeholder="Deixe vazio para manter a atual" />
             </div>
             {editError && <p className="text-sm text-destructive">{editError}</p>}
             <div className="flex justify-end gap-2">

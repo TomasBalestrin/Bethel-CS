@@ -270,7 +270,7 @@ export function MentoradosList({
             <Button
               size="sm"
               variant={bulkAction === 'move' ? 'default' : 'outline'}
-              disabled={selectedIds.size === 0 || bulkLoading}
+              disabled={bulkLoading}
               onClick={() => setBulkAction(bulkAction === 'move' ? 'none' : 'move')}
               className="gap-1.5"
             >
@@ -305,7 +305,7 @@ export function MentoradosList({
                     )}
                   </SelectContent>
                 </Select>
-                <Button size="sm" disabled={!targetStageId || bulkLoading} onClick={handleBulkMove}>
+                <Button size="sm" disabled={!targetStageId || selectedIds.size === 0 || bulkLoading} onClick={handleBulkMove}>
                   {bulkLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Aplicar'}
                 </Button>
               </>
@@ -318,7 +318,7 @@ export function MentoradosList({
               <Button
                 size="sm"
                 variant={bulkAction === 'assign' ? 'default' : 'outline'}
-                disabled={selectedIds.size === 0 || bulkLoading}
+                disabled={bulkLoading}
                 onClick={() => setBulkAction(bulkAction === 'assign' ? 'none' : 'assign')}
                 className="gap-1.5"
               >
@@ -336,7 +336,7 @@ export function MentoradosList({
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button size="sm" disabled={!targetSpecialistId || bulkLoading} onClick={handleBulkAssign}>
+                  <Button size="sm" disabled={!targetSpecialistId || selectedIds.size === 0 || bulkLoading} onClick={handleBulkAssign}>
                     {bulkLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Aplicar'}
                   </Button>
                 </>

@@ -357,7 +357,7 @@ function UsersSection({ users, currentUserId }: { users: Profile[]; currentUserI
               <Input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required minLength={6} />
             </div>
             <div className="space-y-1">
-              <Label>Role *</Label>
+              <Label>Função *</Label>
               <Select value={newRole} onValueChange={(v) => setNewRole(v as UserRole)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>

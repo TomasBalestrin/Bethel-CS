@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'menteeId e message/imageUrl são obrigatórios' }, { status: 400 })
     }
 
-    // 2. Find mentee
+    // 2. Find mentee + specialist owner
     const { data: mentee, error: menteeError } = await supabase
       .from('mentees')
       .select('id, phone, created_by')
@@ -30,31 +30,66 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Mentorado não encontrado' }, { status: 404 })
     }
 
-    // 3. Find connected WPP instance (for specialist_id and instance_id)
-    const { data: instance } = await supabase
+    // 3. Find the correct WPP instance:
+    //    Priority: mentee's specialist (created_by) → logged-in user → any connected
+    const specialistId = mentee.created_by || user.id
+
+    // Try specialist's instance first
+    let instance: { instance_id: string; specialist_id: string } | null = null
+
+    const { data: specialistInstance } = await supabase
       .from('wpp_instances')
       .select('instance_id, specialist_id')
+      .eq('specialist_id', specialistId)
       .eq('status', 'connected')
       .limit(1)
       .single()
 
-    if (!instance) {
-      return NextResponse.json({ error: 'Instância WhatsApp não conectada' }, { status: 404 })
+    if (specialistInstance) {
+      instance = specialistInstance
+    } else if (specialistId !== user.id) {
+      // Try logged-in user's instance (admin sending on behalf)
+      const { data: userInstance } = await supabase
+        .from('wpp_instances')
+        .select('instance_id, specialist_id')
+        .eq('specialist_id', user.id)
+        .eq('status', 'connected')
+        .limit(1)
+        .single()
+      instance = userInstance
     }
 
-    const specialistId = instance.specialist_id || user.id
+    // Fallback: any connected instance
+    if (!instance) {
+      const { data: anyInstance } = await supabase
+        .from('wpp_instances')
+        .select('instance_id, specialist_id')
+        .eq('status', 'connected')
+        .limit(1)
+        .single()
+      instance = anyInstance
+    }
 
-    // 4. Format phone: ensure 55{DDD}{NUMERO} without special chars
+    if (!instance) {
+      return NextResponse.json({ error: 'Nenhuma instância WhatsApp conectada' }, { status: 404 })
+    }
+
+    // 4. Resolve NextTrack UUID from instance_id
+    // The instance_id stored in DB is the NextTrack format: "phone_hash"
+    // We need the UUID for the API. Try to find it via the instance record.
+    const nextrackUUID = instance.instance_id
+
+    // 5. Format phone
     let phone = mentee.phone.replace(/\D/g, '')
     if (!phone.startsWith('55')) {
       phone = '55' + phone
     }
 
-    // 5. Send via NextTrack API
+    // 6. Send via NextTrack API using the correct instance
     let result: { success: boolean; error?: string }
 
     if (!type || type === 'text') {
-      result = await sendTextMessage(phone, message)
+      result = await sendTextMessage(phone, message, nextrackUUID)
     } else {
       result = await sendMediaMessage(
         phone,
@@ -62,7 +97,8 @@ export async function POST(request: NextRequest) {
         imageUrl || '',
         message || undefined,
         fileName || undefined,
-        mimeType || undefined
+        mimeType || undefined,
+        nextrackUUID
       )
     }
 
@@ -70,11 +106,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: 500 })
     }
 
-    // 6. Save to wpp_messages (the webhook will also fire for fromApi,
-    //    but we filter fromApi=true in the webhook handler to avoid duplicates)
+    // 7. Save message with correct specialist + instance
     await supabase.from('wpp_messages').insert({
       mentee_id: menteeId,
-      specialist_id: specialistId,
+      specialist_id: instance.specialist_id || user.id,
       instance_id: instance.instance_id,
       direction: 'outgoing',
       message_type: type || 'text',

@@ -189,11 +189,12 @@ export function getMediaUrl(urlField: string | null | undefined): string | null 
  */
 export async function sendTextMessage(
   phone: string,
-  message: string
+  message: string,
+  overrideInstanceUUID?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const instanceUUID = getInstanceUUID()
-    if (!instanceUUID) return { success: false, error: 'NEXTRACK_INSTANCE_UUID not configured' }
+    const instanceUUID = overrideInstanceUUID || getInstanceUUID()
+    if (!instanceUUID) return { success: false, error: 'Instância WhatsApp não configurada' }
 
     const url = `${BASE_URL}/api/chats/instances/${instanceUUID}/send-text`
     const res = await authFetch(url, {
@@ -221,11 +222,12 @@ export async function sendMediaMessage(
   mediaUrl: string,
   caption?: string,
   fileName?: string,
-  mimeType?: string
+  mimeType?: string,
+  overrideInstanceUUID?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const instanceUUID = getInstanceUUID()
-    if (!instanceUUID) return { success: false, error: 'NEXTRACK_INSTANCE_UUID not configured' }
+    const instanceUUID = overrideInstanceUUID || getInstanceUUID()
+    if (!instanceUUID) return { success: false, error: 'Instância WhatsApp não configurada' }
 
     const url = `${BASE_URL}/api/chats/instances/${instanceUUID}/send`
     const body: Record<string, unknown> = {

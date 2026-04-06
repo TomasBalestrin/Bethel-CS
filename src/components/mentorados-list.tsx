@@ -13,9 +13,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Phone, Mail, Calendar, Star, AtSign, Plus } from 'lucide-react'
+import { Phone, Mail, Calendar, Star, AtSign, Plus, Upload } from 'lucide-react'
 import { MenteePanel } from '@/components/kanban/mentee-panel'
 import { CreateMenteeDialog } from '@/components/kanban/create-mentee-dialog'
+import { BulkImportDialog } from '@/components/kanban/bulk-import-dialog'
 import { useUnreadCounts } from '@/hooks/use-unread-counts'
 import { formatDateBR } from '@/lib/format'
 import type { MenteeWithStats } from '@/types/kanban'
@@ -45,6 +46,7 @@ export function MentoradosList({ mentees: initialMentees, existingMentees, isAdm
   const [selectedMentee, setSelectedMentee] = useState<MenteeWithStats | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [selectedKanbanType, setSelectedKanbanType] = useState<KanbanType>('initial')
 
   const filtered = menteeList.filter((m) => {
@@ -82,6 +84,9 @@ export function MentoradosList({ mentees: initialMentees, existingMentees, isAdm
               <SelectItem value="mentorship">Etapas Mentoria</SelectItem>
             </SelectContent>
           </Select>
+          <Button size="sm" variant="outline" onClick={() => setImportOpen(true)} className="gap-1.5">
+            <Upload className="h-3.5 w-3.5" /> Importar
+          </Button>
           <Button size="sm" onClick={() => setDialogOpen(true)} className="gap-1.5">
             <Plus className="h-3.5 w-3.5" /> Novo mentorado
           </Button>
@@ -209,6 +214,13 @@ export function MentoradosList({ mentees: initialMentees, existingMentees, isAdm
         kanbanType={selectedKanbanType}
         isAdmin={isAdmin}
         specialists={specialists}
+      />
+
+      <BulkImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        specialists={specialists}
+        isAdmin={isAdmin}
       />
     </div>
   )

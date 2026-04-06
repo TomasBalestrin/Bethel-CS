@@ -90,7 +90,7 @@ export interface Database {
           city: string | null
           state: string | null
           product_name: string
-          start_date: string
+          start_date: string | null
           end_date: string | null
           priority_level: number
           seller_name: string | null
@@ -147,7 +147,7 @@ export interface Database {
           city?: string | null
           state?: string | null
           product_name: string
-          start_date: string
+          start_date?: string | null
           end_date?: string | null
           priority_level?: number
           seller_name?: string | null
@@ -203,7 +203,7 @@ export interface Database {
           city?: string | null
           state?: string | null
           product_name?: string
-          start_date?: string
+          start_date?: string | null
           end_date?: string | null
           priority_level?: number
           seller_name?: string | null

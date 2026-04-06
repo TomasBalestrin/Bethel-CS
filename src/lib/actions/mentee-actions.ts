@@ -312,7 +312,6 @@ export async function bulkCreateMentees(input: BulkImportInput): Promise<BulkImp
       if (!fullName) { errors.push({ row: rowNum, name: '', error: 'Nome obrigatório' }); continue }
       if (!phone) { errors.push({ row: rowNum, name: fullName, error: 'Telefone obrigatório' }); continue }
       if (!productName) { errors.push({ row: rowNum, name: fullName, error: 'Produto obrigatório' }); continue }
-      if (!startDate) { errors.push({ row: rowNum, name: fullName, error: `Data de entrada inválida: "${raw.start_date}"` }); continue }
 
       // Resolve specialist: non-admin always uses own ID
       let createdBy = user.id
@@ -331,7 +330,7 @@ export async function bulkCreateMentees(input: BulkImportInput): Promise<BulkImp
         full_name: fullName,
         phone,
         product_name: productName,
-        start_date: startDate,
+        start_date: startDate ?? null,
         end_date: parseDateServer(raw.end_date),
         cpf: raw.cpf ? String(raw.cpf).trim() : null,
         birth_date: parseDateServer(raw.birth_date),

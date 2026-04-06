@@ -307,12 +307,11 @@ export async function bulkCreateMentees(input: BulkImportInput): Promise<BulkImp
       const fullName = name
       const phone = String(raw.phone ?? '').trim().replace(/\s+/g, '')
       const productName = String(raw.product_name ?? '').trim()
-      const startDate = parseDateServer(raw.start_date)
+      const startDate = parseDateServer(raw.start_date) ?? new Date().toISOString().substring(0, 10)
 
       if (!fullName) { errors.push({ row: rowNum, name: '', error: 'Nome obrigatório' }); continue }
       if (!phone) { errors.push({ row: rowNum, name: fullName, error: 'Telefone obrigatório' }); continue }
       if (!productName) { errors.push({ row: rowNum, name: fullName, error: 'Produto obrigatório' }); continue }
-      if (!startDate) { errors.push({ row: rowNum, name: fullName, error: `Data de entrada inválida: "${raw.start_date}"` }); continue }
 
       // Resolve specialist: non-admin always uses own ID
       let createdBy = user.id

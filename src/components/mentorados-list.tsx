@@ -74,7 +74,7 @@ export function MentoradosList({ mentees: initialMentees, existingMentees, isAdm
             {filtered.length} mentorado{filtered.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Select value={selectedKanbanType} onValueChange={(v) => setSelectedKanbanType(v as KanbanType)}>
             <SelectTrigger className="w-40 h-9 text-xs">
               <SelectValue />

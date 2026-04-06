@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { UserRole } from '@/types/database'
 
 async function verifyAdmin() {
@@ -68,16 +69,35 @@ export async function createUser(data: {
 export async function updateUser(userId: string, data: {
   full_name: string
   role: UserRole
+  email?: string
+  password?: string
 }) {
   const { supabase, error: authError } = await verifyAdmin()
   if (authError) return { error: authError }
 
+  // Update profile (name + role)
   const { error } = await supabase
     .from('profiles')
     .update({ full_name: data.full_name, role: data.role })
     .eq('id', userId)
 
   if (error) return { error: error.message }
+
+  // Update auth (email/password) via admin API
+  if (data.email || data.password) {
+    try {
+      const adminClient = createAdminClient()
+      const authUpdate: { email?: string; password?: string } = {}
+      if (data.email) authUpdate.email = data.email
+      if (data.password) authUpdate.password = data.password
+
+      const { error: authUpdateError } = await adminClient.auth.admin.updateUserById(userId, authUpdate)
+      if (authUpdateError) return { error: `Perfil salvo, mas erro ao atualizar credenciais: ${authUpdateError.message}` }
+    } catch {
+      return { error: 'Perfil salvo, mas erro ao acessar API admin do Supabase' }
+    }
+  }
+
   revalidatePath('/admin')
   return { error: null }
 }

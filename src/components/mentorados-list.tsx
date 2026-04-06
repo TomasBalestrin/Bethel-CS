@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useDebounce } from '@/hooks/use-debounce'
 import { Input } from '@/components/ui/input'
@@ -81,6 +81,10 @@ export function MentoradosList({
   const [targetStageId, setTargetStageId] = useState('')
   const [targetSpecialistId, setTargetSpecialistId] = useState('')
 
+  const PAGE_SIZE = 30
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+
   const filtered = menteeList.filter((m) => {
     if (!debouncedSearch) return true
     const term = debouncedSearch.toLowerCase()
@@ -91,6 +95,32 @@ export function MentoradosList({
       (m.product_name?.toLowerCase().includes(term) ?? false)
     )
   })
+
+  const visibleMentees = filtered.slice(0, visibleCount)
+  const hasMore = visibleCount < filtered.length
+
+  // Reset visible count when search changes
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE)
+  }, [debouncedSearch])
+
+  // Infinite scroll observer
+  useEffect(() => {
+    if (!hasMore) return
+    const el = loadMoreRef.current
+    if (!el) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((prev) => prev + PAGE_SIZE)
+        }
+      },
+      { rootMargin: '200px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [hasMore, filtered.length])
 
   function handleCardClick(mentee: MenteeWithStats) {
     if (selectionMode) {
@@ -327,7 +357,7 @@ export function MentoradosList({
 
       {/* Cards grid */}
       <div className="mt-6 grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 min-h-[200px]">
-        {filtered.map((m) => {
+        {visibleMentees.map((m) => {
           const color = LEVEL_COLORS[m.priority_level] ?? LEVEL_COLORS[1]
           const location = [m.city, m.state].filter(Boolean).join(', ')
           const subtitle = [m.product_name, location].filter(Boolean).join(' · ')
@@ -438,6 +468,15 @@ export function MentoradosList({
           )
         })}
       </div>
+
+      {/* Infinite scroll sentinel + counter */}
+      {hasMore && (
+        <div ref={loadMoreRef} className="flex justify-center py-6">
+          <p className="text-sm text-muted-foreground">
+            Mostrando {visibleMentees.length} de {filtered.length} mentorados...
+          </p>
+        </div>
+      )}
 
       <MenteePanel
         mentee={selectedMentee}

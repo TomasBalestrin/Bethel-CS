@@ -51,12 +51,19 @@ export default async function MentoradosPage() {
     .eq('role', 'especialista')
     .order('full_name')
 
+  // Fetch kanban stages for bulk move
+  const { data: stages } = await supabase
+    .from('kanban_stages')
+    .select('id, name, type, position')
+    .order('position')
+
   return (
     <MentoradosList
       mentees={menteesWithStats}
       existingMentees={allMentees ?? []}
       isAdmin={userRole === 'admin'}
       specialists={specialists ?? []}
+      stages={stages ?? []}
     />
   )
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useDebounce } from '@/hooks/use-debounce'
 import { Input } from '@/components/ui/input'
@@ -13,10 +13,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Phone, Mail, Calendar, Star, AtSign, Plus, Upload } from 'lucide-react'
+import {
+  Phone, Mail, Calendar, Star, AtSign, Plus, Upload,
+  CheckSquare, Square, Trash2, UserPlus, ArrowRightLeft, X, Loader2,
+} from 'lucide-react'
 import { MenteePanel } from '@/components/kanban/mentee-panel'
 import { CreateMenteeDialog } from '@/components/kanban/create-mentee-dialog'
 import { BulkImportDialog } from '@/components/kanban/bulk-import-dialog'
+import { bulkDeleteMentees, bulkMoveMentees, bulkAssignSpecialist } from '@/lib/actions/mentee-actions'
 import { useUnreadCounts } from '@/hooks/use-unread-counts'
 import { formatDateBR } from '@/lib/format'
 import type { MenteeWithStats } from '@/types/kanban'
@@ -30,14 +34,28 @@ const LEVEL_COLORS: Record<number, string> = {
   5: '#1F3A7D',
 }
 
+interface Stage {
+  id: string
+  name: string
+  type: KanbanType
+  position: number
+}
+
 interface MentoradosListProps {
   mentees: MenteeWithStats[]
   existingMentees: { id: string; full_name: string }[]
   isAdmin?: boolean
   specialists?: { id: string; full_name: string }[]
+  stages?: Stage[]
 }
 
-export function MentoradosList({ mentees: initialMentees, existingMentees, isAdmin = false, specialists = [] }: MentoradosListProps) {
+export function MentoradosList({
+  mentees: initialMentees,
+  existingMentees,
+  isAdmin = false,
+  specialists = [],
+  stages = [],
+}: MentoradosListProps) {
   const router = useRouter()
   const [menteeList, setMenteeList] = useState<MenteeWithStats[]>(initialMentees)
   const [search, setSearch] = useState('')
@@ -48,6 +66,14 @@ export function MentoradosList({ mentees: initialMentees, existingMentees, isAdm
   const [dialogOpen, setDialogOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [selectedKanbanType, setSelectedKanbanType] = useState<KanbanType>('initial')
+
+  // Bulk selection state
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
+  const [bulkAction, setBulkAction] = useState<'none' | 'move' | 'assign'>('none')
+  const [targetStageId, setTargetStageId] = useState('')
+  const [targetSpecialistId, setTargetSpecialistId] = useState('')
 
   const filtered = menteeList.filter((m) => {
     if (!debouncedSearch) return true
@@ -61,12 +87,90 @@ export function MentoradosList({ mentees: initialMentees, existingMentees, isAdm
   })
 
   function handleCardClick(mentee: MenteeWithStats) {
+    if (selectionMode) {
+      toggleSelect(mentee.id)
+      return
+    }
     setSelectedMentee(mentee)
     setPanelOpen(true)
   }
 
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function selectAll() {
+    setSelectedIds(new Set(filtered.map((m) => m.id)))
+  }
+
+  function exitSelectionMode() {
+    setSelectionMode(false)
+    setSelectedIds(new Set())
+    setBulkAction('none')
+    setTargetStageId('')
+    setTargetSpecialistId('')
+  }
+
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedIds.size === 0) return
+    const confirmed = window.confirm(`Tem certeza que deseja excluir ${selectedIds.size} mentorado(s)? Esta ação não pode ser desfeita.`)
+    if (!confirmed) return
+
+    setBulkLoading(true)
+    const res = await bulkDeleteMentees(Array.from(selectedIds))
+    setBulkLoading(false)
+
+    if (res.error) {
+      alert(`Erro: ${res.error}`)
+      return
+    }
+
+    setMenteeList((prev) => prev.filter((m) => !selectedIds.has(m.id)))
+    exitSelectionMode()
+    router.refresh()
+  }, [selectedIds, router])
+
+  const handleBulkMove = useCallback(async () => {
+    if (selectedIds.size === 0 || !targetStageId) return
+    setBulkLoading(true)
+    const res = await bulkMoveMentees(Array.from(selectedIds), targetStageId)
+    setBulkLoading(false)
+
+    if (res.error) {
+      alert(`Erro: ${res.error}`)
+      return
+    }
+
+    exitSelectionMode()
+    router.refresh()
+  }, [selectedIds, targetStageId, router])
+
+  const handleBulkAssign = useCallback(async () => {
+    if (selectedIds.size === 0 || !targetSpecialistId) return
+    setBulkLoading(true)
+    const res = await bulkAssignSpecialist(Array.from(selectedIds), targetSpecialistId)
+    setBulkLoading(false)
+
+    if (res.error) {
+      alert(`Erro: ${res.error}`)
+      return
+    }
+
+    exitSelectionMode()
+    router.refresh()
+  }, [selectedIds, targetSpecialistId, router])
+
+  const initialStages = stages.filter((s) => s.type === 'initial')
+  const mentorshipStages = stages.filter((s) => s.type === 'mentorship')
+
   return (
     <div>
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-heading text-2xl font-bold text-foreground">Mentorados</h1>
@@ -75,6 +179,15 @@ export function MentoradosList({ mentees: initialMentees, existingMentees, isAdm
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            variant={selectionMode ? 'default' : 'outline'}
+            onClick={() => selectionMode ? exitSelectionMode() : setSelectionMode(true)}
+            className="gap-1.5"
+          >
+            {selectionMode ? <X className="h-3.5 w-3.5" /> : <CheckSquare className="h-3.5 w-3.5" />}
+            {selectionMode ? 'Cancelar' : 'Selecionar'}
+          </Button>
           <Select value={selectedKanbanType} onValueChange={(v) => setSelectedKanbanType(v as KanbanType)}>
             <SelectTrigger className="w-40 h-9 text-xs">
               <SelectValue />
@@ -93,6 +206,111 @@ export function MentoradosList({ mentees: initialMentees, existingMentees, isAdm
         </div>
       </div>
 
+      {/* Bulk action bar */}
+      {selectionMode && (
+        <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-accent/30 bg-accent/5 p-3">
+          <span className="text-sm font-medium mr-1">
+            {selectedIds.size} selecionado{selectedIds.size !== 1 ? 's' : ''}
+          </span>
+          <Button size="sm" variant="ghost" onClick={selectAll} className="text-xs">
+            Selecionar todos ({filtered.length})
+          </Button>
+          <div className="h-5 w-px bg-border mx-1" />
+
+          {/* Delete */}
+          <Button
+            size="sm"
+            variant="destructive"
+            disabled={selectedIds.size === 0 || bulkLoading}
+            onClick={handleBulkDelete}
+            className="gap-1.5"
+          >
+            {bulkLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+            Excluir
+          </Button>
+
+          {/* Move to stage */}
+          <div className="flex items-center gap-1.5">
+            <Button
+              size="sm"
+              variant={bulkAction === 'move' ? 'default' : 'outline'}
+              disabled={selectedIds.size === 0 || bulkLoading}
+              onClick={() => setBulkAction(bulkAction === 'move' ? 'none' : 'move')}
+              className="gap-1.5"
+            >
+              <ArrowRightLeft className="h-3.5 w-3.5" /> Mover etapa
+            </Button>
+            {bulkAction === 'move' && (
+              <>
+                <Select value={targetStageId} onValueChange={setTargetStageId}>
+                  <SelectTrigger className="w-48 h-8 text-xs">
+                    <SelectValue placeholder="Selecione a etapa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {initialStages.length > 0 && (
+                      <>
+                        <SelectItem value="__label_initial" disabled className="text-xs font-semibold text-muted-foreground">
+                          Etapas Iniciais
+                        </SelectItem>
+                        {initialStages.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </>
+                    )}
+                    {mentorshipStages.length > 0 && (
+                      <>
+                        <SelectItem value="__label_mentorship" disabled className="text-xs font-semibold text-muted-foreground">
+                          Etapas Mentoria
+                        </SelectItem>
+                        {mentorshipStages.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                        ))}
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+                <Button size="sm" disabled={!targetStageId || bulkLoading} onClick={handleBulkMove}>
+                  {bulkLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Aplicar'}
+                </Button>
+              </>
+            )}
+          </div>
+
+          {/* Assign specialist (admin only) */}
+          {isAdmin && specialists.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <Button
+                size="sm"
+                variant={bulkAction === 'assign' ? 'default' : 'outline'}
+                disabled={selectedIds.size === 0 || bulkLoading}
+                onClick={() => setBulkAction(bulkAction === 'assign' ? 'none' : 'assign')}
+                className="gap-1.5"
+              >
+                <UserPlus className="h-3.5 w-3.5" /> Especialista
+              </Button>
+              {bulkAction === 'assign' && (
+                <>
+                  <Select value={targetSpecialistId} onValueChange={setTargetSpecialistId}>
+                    <SelectTrigger className="w-48 h-8 text-xs">
+                      <SelectValue placeholder="Selecione especialista" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {specialists.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button size="sm" disabled={!targetSpecialistId || bulkLoading} onClick={handleBulkAssign}>
+                    {bulkLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Aplicar'}
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Search */}
       <div className="mt-4 max-w-sm">
         <Input
           placeholder="Buscar por nome, telefone, email..."
@@ -101,22 +319,38 @@ export function MentoradosList({ mentees: initialMentees, existingMentees, isAdm
         />
       </div>
 
+      {/* Cards grid */}
       <div className="mt-6 grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3 min-h-[200px]">
         {filtered.map((m) => {
           const color = LEVEL_COLORS[m.priority_level] ?? LEVEL_COLORS[1]
           const location = [m.city, m.state].filter(Boolean).join(', ')
           const subtitle = [m.product_name, location].filter(Boolean).join(' · ')
           const instHandle = m.instagram?.replace(/^@/, '') || null
-
           const unread = unreadMap[m.id] ?? 0
+          const isSelected = selectedIds.has(m.id)
 
           return (
             <div
               key={m.id}
               onClick={() => handleCardClick(m)}
-              className="relative cursor-pointer rounded-lg border border-border/50 bg-card shadow-card animate-fade-in transition-all hover:shadow-md hover:border-accent/30"
+              className={`relative cursor-pointer rounded-lg border bg-card shadow-card animate-fade-in transition-all hover:shadow-md ${
+                isSelected
+                  ? 'border-accent ring-2 ring-accent/30'
+                  : 'border-border/50 hover:border-accent/30'
+              }`}
             >
-              {unread > 0 && (
+              {/* Selection checkbox */}
+              {selectionMode && (
+                <div className="absolute top-3 right-3 z-10">
+                  {isSelected ? (
+                    <CheckSquare className="h-5 w-5 text-accent" />
+                  ) : (
+                    <Square className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </div>
+              )}
+
+              {unread > 0 && !selectionMode && (
                 <span className="absolute -top-1.5 -right-1.5 z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white shadow-sm">
                   {unread > 99 ? '99+' : unread}
                 </span>
@@ -139,12 +373,14 @@ export function MentoradosList({ mentees: initialMentees, existingMentees, isAdm
                         <p className="text-sm text-muted-foreground mt-0.5 truncate">{subtitle}</p>
                       )}
                     </div>
-                    <span
-                      className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
-                      style={{ backgroundColor: `${color}15`, color }}
-                    >
-                      P{m.priority_level}
-                    </span>
+                    {!selectionMode && (
+                      <span
+                        className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+                        style={{ backgroundColor: `${color}15`, color }}
+                      >
+                        P{m.priority_level}
+                      </span>
+                    )}
                   </div>
 
                   {/* Contact section */}

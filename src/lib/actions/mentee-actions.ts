@@ -360,3 +360,74 @@ export async function bulkCreateMentees(input: BulkImportInput): Promise<BulkImp
   revalidatePath('/etapas-iniciais')
   return { total: input.rows.length, created, errors }
 }
+
+// ─── Bulk Actions ────────────────────────────────────────────────────────────
+
+export async function bulkDeleteMentees(menteeIds: string[]) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const relatedTables = [
+    'attendances', 'action_plans', 'indications', 'intensivo_records',
+    'revenue_records', 'objectives', 'testimonials', 'engagement_records',
+    'cs_activities', 'chat_metrics', 'wpp_messages', 'cancellations',
+    'push_subscriptions', 'attendance_notes',
+  ] as const
+
+  // Clear referrals
+  await supabase.from('mentees').update({ referred_by_mentee_id: null }).in('referred_by_mentee_id', menteeIds)
+
+  // Delete related records
+  for (const table of relatedTables) {
+    await supabase.from(table).delete().in('mentee_id', menteeIds)
+  }
+
+  const { error, count } = await supabase
+    .from('mentees')
+    .delete({ count: 'exact' })
+    .in('id', menteeIds)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/mentorados')
+  revalidatePath('/etapas-iniciais')
+  revalidatePath('/etapas-mentoria')
+  return { error: null, count }
+}
+
+export async function bulkMoveMentees(menteeIds: string[], newStageId: string) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await supabase
+    .from('mentees')
+    .update({ current_stage_id: newStageId, updated_at: new Date().toISOString() })
+    .in('id', menteeIds)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/mentorados')
+  revalidatePath('/etapas-iniciais')
+  revalidatePath('/etapas-mentoria')
+  return { error: null }
+}
+
+export async function bulkAssignSpecialist(menteeIds: string[], specialistId: string) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await supabase
+    .from('mentees')
+    .update({ created_by: specialistId, updated_at: new Date().toISOString() })
+    .in('id', menteeIds)
+
+  if (error) return { error: error.message }
+
+  revalidatePath('/mentorados')
+  revalidatePath('/etapas-iniciais')
+  revalidatePath('/etapas-mentoria')
+  return { error: null }
+}

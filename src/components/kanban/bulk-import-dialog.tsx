@@ -55,6 +55,7 @@ const SYSTEM_FIELDS: FieldDef[] = [
   { key: 'contract_validity', label: 'Período do Contrato', required: false, type: 'text', aliases: ['período', 'periodo', 'contract validity', 'duração', 'duracao', 'vigencia', 'vigência'] },
   { key: 'notes', label: 'Observações', required: false, type: 'text', aliases: ['observações', 'observacoes', 'obs', 'notes', 'anotações', 'notas'] },
   { key: 'niche', label: 'Nicho', required: false, type: 'text', aliases: ['nicho', 'niche', 'segmento', 'área de atuação'] },
+  { key: 'specialist_name', label: 'Especialista Responsável', required: false, type: 'text', aliases: ['especialista', 'especialista responsável', 'especialista responsavel', 'specialist', 'cs responsável', 'cs responsavel', 'responsável', 'responsavel'] },
 ]
 
 const SKIP_VALUE = '__skip__'

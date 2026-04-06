@@ -298,12 +298,17 @@ export async function bulkCreateMentees(input: BulkImportInput): Promise<BulkImp
       if (!productName) { errors.push({ row: rowNum, name: fullName, error: 'Produto obrigatório' }); continue }
       if (!startDate) { errors.push({ row: rowNum, name: fullName, error: `Data de entrada inválida: "${raw.start_date}"` }); continue }
 
-      // Resolve specialist
-      let createdBy = input.defaultSpecialistId || user.id
-      if (profile?.role === 'admin' && raw.specialist_name) {
-        const specName = String(raw.specialist_name).toLowerCase().trim()
-        const found = specialistMap.get(specName) ?? specialistMap.get(specName.split(' ')[0])
-        if (found) createdBy = found
+      // Resolve specialist: non-admin always uses own ID
+      let createdBy = user.id
+      if (profile?.role === 'admin') {
+        if (raw.specialist_name) {
+          const specName = String(raw.specialist_name).toLowerCase().trim()
+          const found = specialistMap.get(specName) ?? specialistMap.get(specName.split(' ')[0])
+          if (found) createdBy = found
+          else createdBy = input.defaultSpecialistId || user.id
+        } else {
+          createdBy = input.defaultSpecialistId || user.id
+        }
       }
 
       const menteeData: MenteeInsert = {

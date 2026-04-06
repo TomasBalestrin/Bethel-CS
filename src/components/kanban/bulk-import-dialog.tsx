@@ -49,13 +49,15 @@ const SYSTEM_FIELDS: FieldDef[] = [
   { key: 'state', label: 'Estado (UF)', required: false, type: 'state', aliases: ['estado', 'uf', 'state', 'uf estado'] },
   { key: 'birth_date', label: 'Aniversário', required: false, type: 'date', aliases: ['aniversario', 'aniversário', 'nascimento', 'data nascimento', 'dt nascimento', 'birthday', 'birth date'] },
   { key: 'end_date', label: 'Data de Encerramento', required: false, type: 'date', aliases: ['encerramento', 'fim', 'end', 'data fim', 'validade', 'data encerramento', 'end date', 'data de encerramento'] },
-  { key: 'faturamento_antes_mentoria', label: 'Faturamento Inicial', required: false, type: 'number', aliases: ['faturamento inicial', 'fat inicial', 'faturamento antes', 'receita inicial', 'fat antes mentoria', 'faturamento antes da mentoria'] },
-  { key: 'faturamento_atual', label: 'Faturamento Atual', required: false, type: 'number', aliases: ['faturamento atual', 'fat atual', 'faturamento hoje', 'receita atual', 'fat mês 3', 'fat mes 3'] },
-  { key: 'faturamento_mes_anterior', label: 'Faturamento Mês Anterior', required: false, type: 'number', aliases: ['faturamento mês anterior', 'fat mês anterior', 'fat mes anterior', 'faturamento mes anterior', 'fat mês 2', 'fat mes 2'] },
+  { key: 'faturamento_antes_mentoria', label: 'Faturamento Mês 1', required: false, type: 'number', aliases: ['faturamento inicial', 'fat inicial', 'faturamento antes', 'receita inicial', 'fat antes mentoria', 'faturamento antes da mentoria', 'fat 1', 'fat 1 mes', 'fat 1. mes', 'fat 1 mês', 'fat. 1 mes'] },
+  { key: 'faturamento_mes_anterior', label: 'Faturamento Mês 2', required: false, type: 'number', aliases: ['faturamento mês anterior', 'fat mês anterior', 'fat mes anterior', 'faturamento mes anterior', 'fat 2', 'fat 2 mes', 'fat. 2 mes', 'fat 2 mês', 'fat. 2 mês'] },
+  { key: 'faturamento_atual', label: 'Faturamento Mês 3', required: false, type: 'number', aliases: ['faturamento atual', 'fat atual', 'faturamento hoje', 'receita atual', 'fat 3', 'fat 3 mes', 'fat 3 mês', 'fat. 3 mes'] },
   { key: 'contract_validity', label: 'Período do Contrato', required: false, type: 'text', aliases: ['período', 'periodo', 'contract validity', 'duração', 'duracao', 'vigencia', 'vigência'] },
-  { key: 'notes', label: 'Observações', required: false, type: 'text', aliases: ['observações', 'observacoes', 'obs', 'notes', 'anotações', 'notas'] },
+  { key: 'notes', label: 'Observações', required: false, type: 'text', aliases: ['observações', 'observacoes', 'obs', 'notes', 'anotações', 'notas', 'n° duvidas', 'n duvidas', 'numero duvidas', 'gestao - indicadores', 'comercial - sdr'] },
   { key: 'niche', label: 'Nicho', required: false, type: 'text', aliases: ['nicho', 'niche', 'segmento', 'área de atuação'] },
   { key: 'specialist_name', label: 'Especialista Responsável', required: false, type: 'text', aliases: ['especialista', 'especialista responsável', 'especialista responsavel', 'specialist', 'cs responsável', 'cs responsavel', 'responsável', 'responsavel'] },
+  { key: 'source', label: 'Tráfego / Origem', required: false, type: 'text', aliases: ['trafego', 'tráfego', 'trafego com movi', 'tráfego com movi', 'origem', 'source', 'movi'] },
+  { key: 'webhook_notes', label: 'Integrações (Nextrack/Unia)', required: false, type: 'text', aliases: ['nextrack', 'unia', 'integração', 'integracao', 'integracoes'] },
 ]
 
 const SKIP_VALUE = '__skip__'
@@ -63,7 +65,14 @@ const SKIP_VALUE = '__skip__'
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function normalizeHeader(h: string): string {
-  return h.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  return h
+    .toLowerCase()
+    .trim()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')  // strip accents
+    .replace(/[^\w\s./@-]/g, '')      // strip broken encoding chars
+    .replace(/\s+/g, ' ')             // collapse whitespace
+    .trim()
 }
 
 function autoDetectMapping(headers: string[]): Record<string, string> {
@@ -187,7 +196,7 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden w-[95vw] sm:w-full rounded-2xl sm:rounded-lg">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden w-[95vw] sm:w-full rounded-2xl sm:rounded-lg flex flex-col">
         <DialogHeader>
           <DialogTitle>Importar Mentorados em Massa</DialogTitle>
           <DialogDescription>
@@ -195,7 +204,7 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[70vh] pr-1">
+        <ScrollArea className="flex-1 min-h-0 max-h-[60vh] pr-1">
           {/* ── STEP: upload ── */}
           {step === 'upload' && (
             <div className="space-y-6 p-1">
@@ -306,16 +315,6 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
                   </div>
                 </div>
               )}
-
-              <div className="flex justify-between pt-2">
-                <Button variant="outline" onClick={reset}>Voltar</Button>
-                <Button
-                  onClick={() => setStep('preview')}
-                  disabled={missingRequired.length > 0}
-                >
-                  Visualizar prévia
-                </Button>
-              </div>
             </div>
           )}
 
@@ -361,13 +360,6 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
                 <p className="font-medium">{rows.length} mentorados serão importados</p>
                 <p className="text-muted-foreground text-xs mt-0.5">Registros com telefone duplicado serão ignorados.</p>
               </div>
-
-              <div className="flex justify-between pt-2">
-                <Button variant="outline" onClick={() => setStep('mapping')}>Voltar</Button>
-                <Button onClick={handleImport}>
-                  Importar {rows.length} mentorados
-                </Button>
-              </div>
             </div>
           )}
 
@@ -408,13 +400,40 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
                   </div>
                 </div>
               )}
-
-              <div className="flex justify-end pt-2">
-                <Button onClick={() => handleClose(false)}>Fechar</Button>
-              </div>
             </div>
           )}
         </ScrollArea>
+
+        {/* ── Footer buttons (always visible) ── */}
+        {step !== 'upload' && step !== 'importing' && (
+          <div className="flex justify-between pt-3 border-t border-border shrink-0">
+            {step === 'mapping' && (
+              <>
+                <Button variant="outline" onClick={reset}>Voltar</Button>
+                <Button
+                  onClick={() => setStep('preview')}
+                  disabled={missingRequired.length > 0}
+                >
+                  Visualizar prévia
+                </Button>
+              </>
+            )}
+            {step === 'preview' && (
+              <>
+                <Button variant="outline" onClick={() => setStep('mapping')}>Voltar</Button>
+                <Button onClick={handleImport}>
+                  Importar {rows.length} mentorados
+                </Button>
+              </>
+            )}
+            {step === 'done' && (
+              <>
+                <div />
+                <Button onClick={() => handleClose(false)}>Fechar</Button>
+              </>
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

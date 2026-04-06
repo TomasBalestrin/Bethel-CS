@@ -332,6 +332,8 @@ export async function bulkCreateMentees(input: BulkImportInput): Promise<BulkImp
         contract_validity: raw.contract_validity ? String(raw.contract_validity).trim() : null,
         niche: raw.niche ? String(raw.niche).trim() : null,
         notes: raw.notes ? String(raw.notes).trim() : null,
+        source: raw.source ? String(raw.source).trim() : null,
+        webhook_notes: raw.webhook_notes ? String(raw.webhook_notes).trim() : null,
         current_stage_id: firstStage.id,
         kanban_type: 'initial',
         created_by: createdBy,

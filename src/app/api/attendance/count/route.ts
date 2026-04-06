@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
   // Fetch messages
   let query = supabase
     .from('wpp_messages')
-    .select('mentee_id, sent_at')
+    .select('mentee_id, direction, sent_at')
     .order('sent_at', { ascending: true })
 
   if (menteeId) query = query.eq('mentee_id', menteeId)
@@ -50,8 +50,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ total: 0, byMentee: {} })
   }
 
-  // Group by mentee and count sessions
-  const byMentee: Record<string, { mentee_id: string; sent_at: string }[]> = {}
+  // Group by mentee and count sessions (only sessions with CS participation)
+  const byMentee: Record<string, { mentee_id: string; direction: string; sent_at: string }[]> = {}
   for (const m of messages) {
     if (!byMentee[m.mentee_id]) byMentee[m.mentee_id] = []
     byMentee[m.mentee_id].push(m)
@@ -61,13 +61,17 @@ export async function GET(request: NextRequest) {
   let total = 0
 
   for (const [mId, msgs] of Object.entries(byMentee)) {
-    let sessions = 1
+    // Split into sessions
+    const sessions: typeof msgs[] = [[msgs[0]]]
     for (let i = 1; i < msgs.length; i++) {
       const gap = new Date(msgs[i].sent_at).getTime() - new Date(msgs[i - 1].sent_at).getTime()
-      if (gap > gapMs) sessions++
+      if (gap > gapMs) sessions.push([msgs[i]])
+      else sessions[sessions.length - 1].push(msgs[i])
     }
-    sessionCounts[mId] = sessions
-    total += sessions
+    // Only count sessions where CS sent at least 1 msg
+    const validSessions = sessions.filter((s) => s.some((m) => m.direction === 'outgoing')).length
+    sessionCounts[mId] = validSessions
+    total += validSessions
   }
 
   return NextResponse.json({ total, byMentee: sessionCounts })

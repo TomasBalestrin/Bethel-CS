@@ -103,7 +103,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   const gapMs = (parseInt(gapSetting?.value ?? '120', 10)) * 60 * 1000
 
   // ─── Attendance sessions (from wpp_messages timestamps) ───
-  let attendanceMsgsQuery = supabase.from('wpp_messages').select('mentee_id, sent_at').order('sent_at', { ascending: true })
+  let attendanceMsgsQuery = supabase.from('wpp_messages').select('mentee_id, direction, sent_at').order('sent_at', { ascending: true })
   if (startDate) attendanceMsgsQuery = attendanceMsgsQuery.gte('sent_at', startDate)
   if (endDate) attendanceMsgsQuery = attendanceMsgsQuery.lte('sent_at', endDate + 'T23:59:59')
   if (specialistId) attendanceMsgsQuery = attendanceMsgsQuery.eq('specialist_id', specialistId)
@@ -143,34 +143,45 @@ export default async function DashboardPage({ searchParams }: Props) {
     attendanceMsgsQuery,
   ])
 
-  // ─── Calculate attendance sessions + duration ───
+  // ─── Calculate attendance sessions + active duration ───
+  // Session = group of msgs with gap < threshold, ONLY counted if CS sent at least 1 msg
+  // Duration = sum of gaps <5min between consecutive msgs (ignores wait time)
+  const ACTIVE_GAP_MS = 5 * 60 * 1000 // 5 min — gaps larger than this are "waiting", not "working"
   let totalAttendanceSessions = 0
   let totalAttendanceDurationMs = 0
   if (attendanceMsgs && attendanceMsgs.length > 0) {
-    const byMentee: Record<string, string[]> = {}
+    const byMentee: Record<string, { sent_at: string; direction: string }[]> = {}
     for (const m of attendanceMsgs) {
       if (!byMentee[m.mentee_id]) byMentee[m.mentee_id] = []
-      byMentee[m.mentee_id].push(m.sent_at)
+      byMentee[m.mentee_id].push({ sent_at: m.sent_at, direction: m.direction })
     }
-    for (const times of Object.values(byMentee)) {
-      // Split into sessions and calculate duration of each
-      let sessionStart = new Date(times[0]).getTime()
-      let sessionEnd = sessionStart
-      let sessions = 1
-
-      for (let i = 1; i < times.length; i++) {
-        const t = new Date(times[i]).getTime()
-        if (t - sessionEnd > gapMs) {
-          // End previous session, start new one
-          totalAttendanceDurationMs += sessionEnd - sessionStart
-          sessions++
-          sessionStart = t
+    for (const msgs of Object.values(byMentee)) {
+      // Split into sessions
+      const sessions: typeof msgs[] = [[msgs[0]]]
+      for (let i = 1; i < msgs.length; i++) {
+        const gap = new Date(msgs[i].sent_at).getTime() - new Date(msgs[i - 1].sent_at).getTime()
+        if (gap > gapMs) {
+          sessions.push([msgs[i]])
+        } else {
+          sessions[sessions.length - 1].push(msgs[i])
         }
-        sessionEnd = t
       }
-      // Add last session duration
-      totalAttendanceDurationMs += sessionEnd - sessionStart
-      totalAttendanceSessions += sessions
+
+      for (const session of sessions) {
+        // Only count session if CS participated (at least 1 outgoing msg)
+        const hasOutgoing = session.some((m) => m.direction === 'outgoing')
+        if (!hasOutgoing) continue
+
+        totalAttendanceSessions++
+
+        // Calculate active duration: sum gaps <5min between consecutive msgs
+        for (let i = 1; i < session.length; i++) {
+          const gap = new Date(session[i].sent_at).getTime() - new Date(session[i - 1].sent_at).getTime()
+          if (gap <= ACTIVE_GAP_MS) {
+            totalAttendanceDurationMs += gap
+          }
+        }
+      }
     }
   }
   const totalAttendanceMinutes = Math.round(totalAttendanceDurationMs / 60000)
@@ -210,8 +221,8 @@ export default async function DashboardPage({ searchParams }: Props) {
   const ligacoesManuais = allCs.filter((c) => c.type === 'ligacao')
   const whatsappsManuais = allCs.filter((c) => c.type === 'whatsapp')
 
-  // Automático: call_records + wpp_messages
-  const allCalls = callRecords ?? []
+  // Automático: call_records (only answered calls with duration > 0)
+  const allCalls = (callRecords ?? []).filter((c) => Number(c.duration_seconds ?? 0) > 0)
   const totalCalls = allCalls.length
   const totalCallDuration = allCalls.reduce((s, c) => s + Number(c.duration_seconds ?? 0), 0)
   const totalCallMinutes = Math.round(totalCallDuration / 60)

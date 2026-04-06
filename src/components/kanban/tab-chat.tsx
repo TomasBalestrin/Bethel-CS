@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
-import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown, Sparkles, ChevronUp } from 'lucide-react'
+import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown, Sparkles, ChevronUp, BellOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -570,6 +570,34 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           >
             <PhoneCall className="h-3 w-3" />
             Ligações {callRecords.length > 0 && `(${callRecords.length})`}
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            onClick={async (e) => {
+              e.stopPropagation()
+              const supabase = createClient()
+              // Get latest incoming messages to mark as unread
+              const { data: incoming } = await supabase
+                .from('wpp_messages')
+                .select('id')
+                .eq('mentee_id', menteeId)
+                .eq('direction', 'incoming')
+                .order('created_at', { ascending: false })
+                .limit(1)
+              if (incoming && incoming.length > 0) {
+                await supabase
+                  .from('wpp_messages')
+                  .update({ is_read: false })
+                  .eq('id', incoming[0].id)
+                onUnreadRef.current?.(1)
+                toast.success('Marcado como não lida')
+              }
+            }}
+            title="Marcar como não lida"
+          >
+            <BellOff className="h-3.5 w-3.5" />
           </Button>
           <span className={`h-2 w-2 rounded-full shrink-0 ${instanceStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'}`} />
           <span className="text-[10px] text-muted-foreground hidden sm:inline">

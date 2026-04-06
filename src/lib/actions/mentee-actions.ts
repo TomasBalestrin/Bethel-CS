@@ -227,6 +227,22 @@ interface BulkImportResult {
 
 function parseDateServer(val: string | number | undefined): string | null {
   if (val === undefined || val === null || val === '') return null
+  // Excel serial number (e.g. 45781.99967592592 = a date)
+  if (typeof val === 'number' || (typeof val === 'string' && /^\d{4,5}(\.\d+)?$/.test(val.trim()))) {
+    const serial = typeof val === 'number' ? val : parseFloat(val)
+    if (serial > 1000 && serial < 100000) {
+      // Excel epoch: Jan 0, 1900 (with the Lotus 123 leap year bug)
+      // Round to nearest day to avoid fractional time issues
+      const excelEpoch = new Date(1899, 11, 30) // Dec 30, 1899
+      const date = new Date(excelEpoch.getTime() + Math.round(serial) * 86400000)
+      if (!isNaN(date.getTime())) {
+        const y = date.getFullYear()
+        const m = String(date.getMonth() + 1).padStart(2, '0')
+        const d = String(date.getDate()).padStart(2, '0')
+        return `${y}-${m}-${d}`
+      }
+    }
+  }
   const str = String(val).trim()
   // DD/MM/YYYY
   const brMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)

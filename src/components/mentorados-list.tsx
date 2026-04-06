@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useDebounce } from '@/hooks/use-debounce'
 import { Input } from '@/components/ui/input'
@@ -58,6 +58,12 @@ export function MentoradosList({
 }: MentoradosListProps) {
   const router = useRouter()
   const [menteeList, setMenteeList] = useState<MenteeWithStats[]>(initialMentees)
+
+  // Sync with server data when props change (after router.refresh)
+  useEffect(() => {
+    setMenteeList(initialMentees)
+  }, [initialMentees])
+
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebounce(search, 300)
   const { unreadMap } = useUnreadCounts()

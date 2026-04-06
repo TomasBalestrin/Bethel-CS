@@ -11,7 +11,6 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   Select,
   SelectContent,
@@ -204,7 +203,7 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 max-h-[60vh] pr-1">
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1" style={{ maxHeight: '60vh' }}>
           {/* ── STEP: upload ── */}
           {step === 'upload' && (
             <div className="space-y-6 p-1">
@@ -402,7 +401,7 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
               )}
             </div>
           )}
-        </ScrollArea>
+        </div>
 
         {/* ── Footer buttons (always visible) ── */}
         {step !== 'upload' && step !== 'importing' && (

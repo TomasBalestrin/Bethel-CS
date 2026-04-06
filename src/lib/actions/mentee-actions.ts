@@ -211,3 +211,145 @@ export async function transitionToMentorship(menteeId: string) {
   revalidatePath('/mentorados')
   return { error: null }
 }
+
+// ─── Bulk Import ─────────────────────────────────────────────────────────────
+
+interface BulkImportInput {
+  rows: Record<string, string | number>[]
+  defaultSpecialistId?: string
+}
+
+interface BulkImportResult {
+  total: number
+  created: number
+  errors: { row: number; name: string; error: string }[]
+}
+
+function parseDateServer(val: string | number | undefined): string | null {
+  if (val === undefined || val === null || val === '') return null
+  const str = String(val).trim()
+  // DD/MM/YYYY
+  const brMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+  if (brMatch) return `${brMatch[3]}-${brMatch[2].padStart(2, '0')}-${brMatch[1].padStart(2, '0')}`
+  if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.substring(0, 10)
+  const d = new Date(str)
+  if (!isNaN(d.getTime())) return d.toISOString().substring(0, 10)
+  return null
+}
+
+function parseNumberServer(val: string | number | undefined): number | null {
+  if (val === undefined || val === null || val === '') return null
+  const num = parseFloat(String(val).replace(/[R$\s.]/g, '').replace(',', '.'))
+  return isNaN(num) ? null : num
+}
+
+function parseStatusServer(val: string | undefined): 'ativo' | 'cancelado' | 'concluido' {
+  if (!val) return 'ativo'
+  const v = String(val).toLowerCase().trim()
+  if (v.includes('cancel') || v.includes('churn') || v.includes('inativ') || v.includes('pausad')) return 'cancelado'
+  if (v.includes('concluid') || v.includes('finish') || v.includes('encerr')) return 'concluido'
+  return 'ativo'
+}
+
+export async function bulkCreateMentees(input: BulkImportInput): Promise<BulkImportResult> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { total: input.rows.length, created: 0, errors: [{ row: 0, name: '', error: 'Não autenticado' }] }
+
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+
+  // Get default stage (initial kanban, first position)
+  const { data: firstStage } = await supabase
+    .from('kanban_stages')
+    .select('id')
+    .eq('type', 'initial')
+    .order('position')
+    .limit(1)
+    .single()
+
+  if (!firstStage) return { total: input.rows.length, created: 0, errors: [{ row: 0, name: '', error: 'Etapas não encontradas' }] }
+
+  // Build specialist name→id map for admin imports
+  const { data: specialistsData } = await supabase.from('profiles').select('id, full_name').eq('role', 'especialista')
+  const specialistMap = new Map<string, string>()
+  specialistsData?.forEach((s) => {
+    specialistMap.set(s.full_name.toLowerCase().trim(), s.id)
+    // Also index by first name for fuzzy matching
+    const firstName = s.full_name.split(' ')[0].toLowerCase()
+    if (!specialistMap.has(firstName)) specialistMap.set(firstName, s.id)
+  })
+
+  const errors: BulkImportResult['errors'] = []
+  let created = 0
+
+  for (let i = 0; i < input.rows.length; i++) {
+    const raw = input.rows[i]
+    const rowNum = i + 2 // spreadsheet row (1-indexed header + 1)
+    const name = String(raw.full_name ?? '').trim()
+
+    try {
+      const fullName = name
+      const phone = String(raw.phone ?? '').trim().replace(/\s+/g, '')
+      const productName = String(raw.product_name ?? '').trim()
+      const startDate = parseDateServer(raw.start_date)
+
+      if (!fullName) { errors.push({ row: rowNum, name: '', error: 'Nome obrigatório' }); continue }
+      if (!phone) { errors.push({ row: rowNum, name: fullName, error: 'Telefone obrigatório' }); continue }
+      if (!productName) { errors.push({ row: rowNum, name: fullName, error: 'Produto obrigatório' }); continue }
+      if (!startDate) { errors.push({ row: rowNum, name: fullName, error: `Data de entrada inválida: "${raw.start_date}"` }); continue }
+
+      // Resolve specialist
+      let createdBy = input.defaultSpecialistId || user.id
+      if (profile?.role === 'admin' && raw.specialist_name) {
+        const specName = String(raw.specialist_name).toLowerCase().trim()
+        const found = specialistMap.get(specName) ?? specialistMap.get(specName.split(' ')[0])
+        if (found) createdBy = found
+      }
+
+      const menteeData: MenteeInsert = {
+        full_name: fullName,
+        phone,
+        product_name: productName,
+        start_date: startDate,
+        end_date: parseDateServer(raw.end_date),
+        cpf: raw.cpf ? String(raw.cpf).trim() : null,
+        birth_date: parseDateServer(raw.birth_date),
+        email: raw.email ? String(raw.email).trim() : null,
+        instagram: raw.instagram ? String(raw.instagram).trim() : null,
+        city: raw.city ? String(raw.city).trim() : null,
+        state: raw.state ? String(raw.state).trim().toUpperCase().slice(0, 2) : null,
+        closer_name: raw.closer_name ? String(raw.closer_name).trim() : null,
+        seller_name: raw.seller_name ? String(raw.seller_name).trim() : null,
+        status: parseStatusServer(raw.status as string | undefined),
+        faturamento_antes_mentoria: parseNumberServer(raw.faturamento_antes_mentoria),
+        faturamento_atual: parseNumberServer(raw.faturamento_atual),
+        faturamento_mes_anterior: parseNumberServer(raw.faturamento_mes_anterior),
+        contract_validity: raw.contract_validity ? String(raw.contract_validity).trim() : null,
+        niche: raw.niche ? String(raw.niche).trim() : null,
+        notes: raw.notes ? String(raw.notes).trim() : null,
+        current_stage_id: firstStage.id,
+        kanban_type: 'initial',
+        created_by: createdBy,
+        priority_level: 1,
+      }
+
+      const { error: insertError } = await supabase.from('mentees').insert(menteeData)
+      if (insertError) {
+        if (insertError.code === '23505') {
+          errors.push({ row: rowNum, name: fullName, error: 'Telefone já cadastrado' })
+        } else {
+          errors.push({ row: rowNum, name: fullName, error: insertError.message })
+        }
+        continue
+      }
+
+      created++
+    } catch (err) {
+      errors.push({ row: rowNum, name, error: String(err) })
+    }
+  }
+
+  revalidatePath('/mentorados')
+  revalidatePath('/etapas-iniciais')
+  return { total: input.rows.length, created, errors }
+}

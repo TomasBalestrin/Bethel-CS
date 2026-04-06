@@ -307,7 +307,7 @@ export async function bulkCreateMentees(input: BulkImportInput): Promise<BulkImp
       const fullName = name
       const phone = String(raw.phone ?? '').trim().replace(/\s+/g, '')
       const productName = String(raw.product_name ?? '').trim()
-      const startDate = parseDateServer(raw.start_date) ?? new Date().toISOString().substring(0, 10)
+      const startDate = parseDateServer(raw.start_date)
 
       if (!fullName) { errors.push({ row: rowNum, name: '', error: 'Nome obrigatório' }); continue }
       if (!phone) { errors.push({ row: rowNum, name: fullName, error: 'Telefone obrigatório' }); continue }
@@ -330,7 +330,7 @@ export async function bulkCreateMentees(input: BulkImportInput): Promise<BulkImp
         full_name: fullName,
         phone,
         product_name: productName,
-        start_date: startDate,
+        start_date: startDate ?? null,
         end_date: parseDateServer(raw.end_date),
         cpf: raw.cpf ? String(raw.cpf).trim() : null,
         birth_date: parseDateServer(raw.birth_date),

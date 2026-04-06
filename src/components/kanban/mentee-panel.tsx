@@ -554,7 +554,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
       state: form.state || null,
       birth_date: form.birth_date || null,
       product_name: form.product_name,
-      start_date: form.start_date,
+      start_date: form.start_date || null,
       end_date: form.end_date || null,
       priority_level: form.priority_level,
       cpf: form.cpf || null,
@@ -592,7 +592,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
           <EditField label="CPF" value={form.cpf} onChange={(v) => setForm({ ...form, cpf: v })} />
           <EditField label="Produto" value={form.product_name} onChange={(v) => setForm({ ...form, product_name: v })} />
           <EditField label="Nascimento" value={form.birth_date} onChange={(v) => setForm({ ...form, birth_date: v })} type="date" />
-          <EditField label="Início" value={form.start_date} onChange={(v) => setForm({ ...form, start_date: v })} type="date" />
+          <EditField label="Início" value={form.start_date ?? ''} onChange={(v) => setForm({ ...form, start_date: v })} type="date" />
           <EditField label="Término" value={form.end_date} onChange={(v) => setForm({ ...form, end_date: v })} type="date" />
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Nível de prioridade</Label>

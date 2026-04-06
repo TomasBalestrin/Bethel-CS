@@ -185,7 +185,9 @@ function UsersSection({ users, currentUserId }: { users: Profile[]; currentUserI
   const router = useRouter()
   const [createOpen, setCreateOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<Profile | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deletingUser, setDeletingUser] = useState<Profile | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   // Create form
   const [newEmail, setNewEmail] = useState('')
@@ -240,12 +242,14 @@ function UsersSection({ users, currentUserId }: { users: Profile[]; currentUserI
     router.refresh()
   }
 
-  async function handleDelete(userId: string, userName: string) {
-    const confirmed = window.confirm(`Excluir o usuário "${userName}"?`)
-    if (!confirmed) return
-    setDeletingId(userId)
-    await deleteUser(userId)
-    setDeletingId(null)
+  async function handleDelete() {
+    if (!deletingUser) return
+    setDeleteLoading(true)
+    setDeleteError(null)
+    const result = await deleteUser(deletingUser.id)
+    setDeleteLoading(false)
+    if (result.error) { setDeleteError(result.error); return }
+    setDeletingUser(null)
     router.refresh()
   }
 
@@ -312,9 +316,8 @@ function UsersSection({ users, currentUserId }: { users: Profile[]; currentUserI
                     </button>
                     <button
                       type="button"
-                      onClick={() => handleDelete(user.id, user.full_name)}
-                      disabled={deletingId === user.id}
-                      className="rounded p-1.5 text-muted-foreground transition-colors hover:text-destructive disabled:opacity-50"
+                      onClick={() => { setDeleteError(null); setDeletingUser(user) }}
+                      className="rounded p-1.5 text-muted-foreground transition-colors hover:text-destructive"
                       title="Excluir"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -398,6 +401,27 @@ function UsersSection({ users, currentUserId }: { users: Profile[]; currentUserI
               </Button>
             </div>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete User Confirmation Dialog */}
+      <Dialog open={!!deletingUser} onOpenChange={(open) => { if (!open) setDeletingUser(null) }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Excluir Usuário</DialogTitle>
+            <DialogDescription>
+              Tem certeza que deseja excluir <strong>{deletingUser?.full_name}</strong>? Esta ação não pode ser desfeita.
+            </DialogDescription>
+          </DialogHeader>
+          {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => setDeletingUser(null)} disabled={deleteLoading}>
+              Cancelar
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleDelete} disabled={deleteLoading}>
+              {deleteLoading ? 'Excluindo...' : 'Excluir'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

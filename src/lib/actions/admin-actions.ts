@@ -87,13 +87,17 @@ export async function deleteUser(userId: string) {
   if (authError) return { error: authError }
   if (user?.id === userId) return { error: 'Não é possível excluir a si mesmo' }
 
-  // Delete profile (auth user remains but has no profile)
+  // Delete profile first
   const { error } = await supabase
     .from('profiles')
     .delete()
     .eq('id', userId)
 
   if (error) return { error: error.message }
+
+  // Also delete the auth user so they can't log in anymore
+  await supabase.auth.admin.deleteUser(userId)
+
   revalidatePath('/admin')
   return { error: null }
 }

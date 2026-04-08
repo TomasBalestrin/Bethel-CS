@@ -505,8 +505,15 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
   const [cancelReason, setCancelReason] = useState('')
   const [cancelling, setCancelling] = useState(false)
 
-  // Fetch action plan data for Empresa block (nome_empresa, num_colaboradores)
-  const [empresaData, setEmpresaData] = useState<{ nome_empresa?: string; num_colaboradores?: string }>({})
+  // Fetch action plan data for Empresa block
+  const [empresaData, setEmpresaData] = useState<{
+    nome_empresa?: string
+    num_colaboradores?: string
+    nicho?: string
+    faturamento_medio?: number
+    motivacao_elite_premium?: string
+    expectativas_resultados?: string
+  }>({})
   useEffect(() => {
     const supabase = createClient()
     supabase
@@ -521,6 +528,10 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
           setEmpresaData({
             nome_empresa: d.nome_empresa ? String(d.nome_empresa) : undefined,
             num_colaboradores: d.num_colaboradores ? String(d.num_colaboradores) : undefined,
+            nicho: d.nicho ? String(d.nicho) : undefined,
+            faturamento_medio: d.faturamento_medio ? Number(d.faturamento_medio) : undefined,
+            motivacao_elite_premium: d.motivacao_elite_premium ? String(d.motivacao_elite_premium) : undefined,
+            expectativas_resultados: d.expectativas_resultados ? String(d.expectativas_resultados) : undefined,
           })
         }
       })
@@ -725,8 +736,8 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
             </div>
           </div>
 
-          {/* Empresa — nome, nicho, colaboradores, faturamento */}
-          {(empresaData.nome_empresa || mentee.niche || empresaData.num_colaboradores || mentee.faturamento_atual != null || mentee.faturamento_antes_mentoria != null) && (
+          {/* Empresa — nome, nicho, colaboradores, faturamento, motivação, expectativas */}
+          {(empresaData.nome_empresa || mentee.niche || empresaData.nicho || empresaData.num_colaboradores || mentee.faturamento_atual != null || mentee.faturamento_antes_mentoria != null || empresaData.faturamento_medio || empresaData.motivacao_elite_premium || empresaData.expectativas_resultados) && (
             <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
               <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-success/5 to-transparent">
                 <Building2 className="h-3.5 w-3.5 text-success" />
@@ -734,11 +745,28 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
               </div>
               <div className="px-3 py-2 space-y-0">
                 {empresaData.nome_empresa && <ContactRow icon={Building2} label="Nome" value={empresaData.nome_empresa} color="text-success" bg="bg-success/10" />}
-                {mentee.niche && <ContactRow icon={Target} label="Nicho" value={mentee.niche} color="text-accent" bg="bg-accent/10" />}
+                {(mentee.niche || empresaData.nicho) && <ContactRow icon={Target} label="Nicho" value={(mentee.niche || empresaData.nicho)!} color="text-accent" bg="bg-accent/10" />}
                 {empresaData.num_colaboradores && <ContactRow icon={Users} label="Colaboradores" value={empresaData.num_colaboradores} color="text-info" bg="bg-info/10" />}
                 {mentee.faturamento_atual != null && <ContactRow icon={DollarSign} label="Faturamento atual" value={formatBRL(mentee.faturamento_atual)} color="text-success" bg="bg-success/10" />}
                 {mentee.faturamento_antes_mentoria != null && <ContactRow icon={DollarSign} label="Fat. antes da mentoria" value={formatBRL(mentee.faturamento_antes_mentoria)} color="text-warning" bg="bg-warning/10" />}
+                {empresaData.faturamento_medio != null && empresaData.faturamento_medio > 0 && <ContactRow icon={DollarSign} label="Fat. médio (formulário)" value={formatBRL(empresaData.faturamento_medio)} color="text-info" bg="bg-info/10" />}
               </div>
+              {(empresaData.motivacao_elite_premium || empresaData.expectativas_resultados) && (
+                <div className="px-3 pb-2 space-y-2 border-t border-border/50 pt-2">
+                  {empresaData.motivacao_elite_premium && (
+                    <div>
+                      <p className="text-[9px] text-muted-foreground/70 leading-none mb-0.5">Por que decidiu fazer parte da Elite Premium?</p>
+                      <p className="text-[12px] text-foreground leading-snug whitespace-pre-line">{empresaData.motivacao_elite_premium}</p>
+                    </div>
+                  )}
+                  {empresaData.expectativas_resultados && (
+                    <div>
+                      <p className="text-[9px] text-muted-foreground/70 leading-none mb-0.5">O que espera de resultados ao final da mentoria?</p>
+                      <p className="text-[12px] text-foreground leading-snug whitespace-pre-line">{empresaData.expectativas_resultados}</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

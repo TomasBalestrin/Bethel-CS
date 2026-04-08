@@ -19,7 +19,6 @@ import {
   Phone,
   MessageCircle,
   TrendingUp,
-  XCircle,
   Star,
   BookOpen,
   Video,

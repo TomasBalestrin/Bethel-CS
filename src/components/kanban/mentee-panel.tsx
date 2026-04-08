@@ -65,7 +65,6 @@ import {
   updateIndication,
   deleteIndication,
   addIntensivoRecord,
-  updateIntensivoRecord,
   deleteIntensivoRecord,
   addRevenueRecord,
   updateRevenueRecord,
@@ -79,8 +78,6 @@ import {
   deleteMentee,
   addIndividualSession,
   addExtraDelivery,
-  addPresentialEvent,
-  updatePresentialEvent,
 } from '@/lib/actions/panel-actions'
 import dynamic from 'next/dynamic'
 import { ErrorBoundary } from '@/components/error-boundary'
@@ -2465,127 +2462,6 @@ function TabIntensivo({ menteeId }: { menteeId: string }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  )
-}
-
-// ─── Card: Encontro Presencial (Gap 4) ───
-function CardPresentialEvents({ menteeId }: { menteeId: string }) {
-  const [items, setItems] = useState<Database['public']['Tables']['presential_events']['Row'][]>([])
-  const [showForm, setShowForm] = useState(false)
-  const [eventDate, setEventDate] = useState('')
-  const [broughtGuest, setBroughtGuest] = useState(false)
-  const [guestName, setGuestName] = useState('')
-  const [guestPhone, setGuestPhone] = useState('')
-  const [eventNotes, setEventNotes] = useState('')
-  const [loading, setLoading] = useState(false)
-  const supabase = createClient()
-
-  const fetchData = useCallback(() => {
-    supabase.from('presential_events').select('*').eq('mentee_id', menteeId)
-      .order('event_date', { ascending: false }).then(({ data }) => { if (data) setItems(data) })
-  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchData() }, [fetchData])
-
-  function resetForm() { setEventDate(''); setBroughtGuest(false); setGuestName(''); setGuestPhone(''); setEventNotes(''); setShowForm(false) }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault(); setLoading(true)
-    await addPresentialEvent(menteeId, {
-      event_date: eventDate,
-      brought_guest: broughtGuest,
-      guest_name: broughtGuest ? guestName || undefined : undefined,
-      guest_phone: broughtGuest ? guestPhone || undefined : undefined,
-      notes: eventNotes || undefined,
-    })
-    resetForm(); setLoading(false); fetchData()
-  }
-
-  const totalGuests = items.filter((i) => i.brought_guest).length
-  const totalConverted = items.filter((i) => i.converted).length
-  const totalValue = items.reduce((s, i) => s + Number(i.converted_value ?? 0), 0)
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="label-xs uppercase">Encontro Presencial ({items.length})</p>
-        <Button size="sm" variant="outline" onClick={() => { resetForm(); setShowForm(!showForm) }}><Plus className="mr-1 h-3 w-3" /> Registrar</Button>
-      </div>
-
-      {items.length > 0 && (
-        <div className="flex gap-3 text-xs text-muted-foreground">
-          <span>{items.length} participações</span>
-          <span>{totalGuests} convidados</span>
-          <span className="text-success">{totalConverted} converteram</span>
-          {totalValue > 0 && <span className="text-success font-medium">R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>}
-        </div>
-      )}
-
-      <Dialog open={showForm} onOpenChange={(open) => { if (!open) resetForm() }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Registrar Encontro Presencial</DialogTitle>
-            <DialogDescription>Registre a participação no encontro presencial da mentoria.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="space-y-1"><Label>Data do encontro *</Label><Input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} required /></div>
-            <div className="flex items-center gap-2">
-              <input type="checkbox" id="pe-guest" checked={broughtGuest} onChange={(e) => setBroughtGuest(e.target.checked)} className="h-4 w-4 rounded border-input" />
-              <Label htmlFor="pe-guest">Levou convidado</Label>
-            </div>
-            {broughtGuest && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><Label>Nome do convidado</Label><Input value={guestName} onChange={(e) => setGuestName(e.target.value)} /></div>
-                <div className="space-y-1"><Label>Telefone</Label><Input value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} /></div>
-              </div>
-            )}
-            <div className="space-y-1"><Label>Observações</Label><Input value={eventNotes} onChange={(e) => setEventNotes(e.target.value)} /></div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={resetForm}>Cancelar</Button>
-              <Button type="submit" disabled={loading}>{loading ? 'Salvando...' : 'Salvar'}</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {items.length === 0 && !showForm && (
-        <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-          <Calendar className="h-8 w-8 mb-2 opacity-40" />
-          <p className="text-sm">Nenhum encontro registrado</p>
-          <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => setShowForm(true)}><Plus className="h-3 w-3 mr-1" /> Registrar primeiro</Button>
-        </div>
-      )}
-
-      {items.map((item) => (
-        <div key={item.id} className={`group rounded-lg border p-3 text-sm transition-colors hover:bg-muted/30 ${item.converted ? 'border-success/30 bg-success/5' : 'border-border bg-card'}`}>
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">{formatDateBR(item.event_date)}</span>
-                {item.brought_guest && <Badge variant="info" className="text-[10px]">Convidado</Badge>}
-                {item.converted && <Badge variant="success" className="text-[10px]">Converteu</Badge>}
-              </div>
-              {item.guest_name && <p className="mt-1 text-foreground">Convidado: {item.guest_name} {item.guest_phone ? `— ${item.guest_phone}` : ''}</p>}
-              {item.converted && item.converted_name && (
-                <p className="text-xs text-success mt-0.5">Fechou: {item.converted_name} {item.converted_value ? `— R$ ${Number(item.converted_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}</p>
-              )}
-              {item.notes && <p className="text-xs text-muted-foreground mt-0.5">{item.notes}</p>}
-            </div>
-            <div className="flex items-center gap-1">
-              {item.brought_guest && !item.converted && (
-                <Button size="sm" variant="ghost" className="h-7 text-[10px] text-success" onClick={async () => {
-                  const name = window.prompt('Quem fechou?')
-                  if (!name) return
-                  const valueStr = window.prompt('Valor (ex: 5000)')
-                  const value = valueStr ? parseFloat(valueStr) : undefined
-                  await updatePresentialEvent(item.id, { converted: true, converted_name: name, converted_value: value })
-                  fetchData()
-                }}>Converteu?</Button>
-              )}
-            </div>
-          </div>
-        </div>
-      ))}
     </div>
   )
 }

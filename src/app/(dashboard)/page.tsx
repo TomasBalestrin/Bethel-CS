@@ -7,6 +7,16 @@ interface Props {
     start?: string
     end?: string
     fit?: string
+    fatInicialMin?: string
+    fatInicialMax?: string
+    fatAtualMin?: string
+    fatAtualMax?: string
+    funilOrigem?: string
+    closer?: string
+    mesAniversario?: string
+    numColaboradores?: string
+    estado?: string
+    nicho?: string
   }
 }
 
@@ -36,15 +46,112 @@ export default async function DashboardPage({ searchParams }: Props) {
   // Specialist: admin can pick from URL, specialist always uses own ID
   const specialistId = isAdmin ? (searchParams.specialist || null) : user!.id
 
+  // Advanced filters
+  const fatInicialMin = searchParams.fatInicialMin || null
+  const fatInicialMax = searchParams.fatInicialMax || null
+  const fatAtualMin = searchParams.fatAtualMin || null
+  const fatAtualMax = searchParams.fatAtualMax || null
+  const funilOrigem = searchParams.funilOrigem || null
+  const closer = searchParams.closer || null
+  const mesAniversario = searchParams.mesAniversario || null
+  const numColaboradores = searchParams.numColaboradores || null
+  const estado = searchParams.estado || null
+  const nicho = searchParams.nicho || null
+
   // ─── Mentees (only fields needed for dashboard) ───
-  let menteesQuery = supabase.from('mentees').select('id, status, cliente_fit, priority_level, created_by, faturamento_atual, faturamento_antes_mentoria')
+  let menteesQuery = supabase.from('mentees').select('id, status, cliente_fit, priority_level, created_by, faturamento_atual, faturamento_antes_mentoria, funnel_origin, closer_name, birth_date, state, niche')
   if (fitFilter === 'true') menteesQuery = menteesQuery.eq('cliente_fit', true)
   if (fitFilter === 'false') menteesQuery = menteesQuery.eq('cliente_fit', false)
   if (specialistId) menteesQuery = menteesQuery.eq('created_by', specialistId)
 
+  // Apply direct DB filters
+  if (funilOrigem) menteesQuery = menteesQuery.eq('funnel_origin', funilOrigem)
+  if (closer) menteesQuery = menteesQuery.eq('closer_name', closer)
+  if (estado) menteesQuery = menteesQuery.eq('state', estado)
+  if (nicho) menteesQuery = menteesQuery.eq('niche', nicho)
+
   // Get mentee IDs for filtering related tables
   const { data: mentees } = await menteesQuery
-  const menteeIds = (mentees ?? []).map((m) => m.id)
+  let filteredMentees = mentees ?? []
+
+  // Apply in-memory filters that can't be done in Supabase query
+  if (fatInicialMin) {
+    const min = Number(fatInicialMin) / 100
+    filteredMentees = filteredMentees.filter((m) => m.faturamento_antes_mentoria != null && Number(m.faturamento_antes_mentoria) >= min)
+  }
+  if (fatInicialMax) {
+    const max = Number(fatInicialMax) / 100
+    filteredMentees = filteredMentees.filter((m) => m.faturamento_antes_mentoria != null && Number(m.faturamento_antes_mentoria) <= max)
+  }
+  if (fatAtualMin) {
+    const min = Number(fatAtualMin) / 100
+    filteredMentees = filteredMentees.filter((m) => m.faturamento_atual != null && Number(m.faturamento_atual) >= min)
+  }
+  if (fatAtualMax) {
+    const max = Number(fatAtualMax) / 100
+    filteredMentees = filteredMentees.filter((m) => m.faturamento_atual != null && Number(m.faturamento_atual) <= max)
+  }
+  if (mesAniversario) {
+    filteredMentees = filteredMentees.filter((m) => {
+      if (!m.birth_date) return false
+      const month = new Date(m.birth_date).getMonth() + 1
+      return String(month) === mesAniversario
+    })
+  }
+
+  // Num colaboradores filter (from action_plans)
+  if (numColaboradores) {
+    const menteeIdsForColab = filteredMentees.map((m) => m.id)
+    if (menteeIdsForColab.length > 0) {
+      const { data: actionPlans } = await supabase
+        .from('action_plans')
+        .select('mentee_id, data')
+        .in('mentee_id', menteeIdsForColab)
+        .not('data', 'is', null)
+      const validIds = new Set<string>()
+      actionPlans?.forEach((ap) => {
+        const data = ap.data as Record<string, unknown> | null
+        if (data?.num_colaboradores && String(data.num_colaboradores) === numColaboradores) {
+          validIds.add(ap.mentee_id)
+        }
+      })
+      filteredMentees = filteredMentees.filter((m) => validIds.has(m.id))
+    }
+  }
+
+  const menteeIds = filteredMentees.map((m) => m.id)
+
+  // Fetch distinct values for filter dropdowns
+  const allMenteesForOptions = mentees ?? []
+  const funisOrigemOptions = Array.from(new Set(allMenteesForOptions.map((m) => m.funnel_origin).filter(Boolean))) as string[]
+  const closerOptions = Array.from(new Set(allMenteesForOptions.map((m) => m.closer_name).filter(Boolean))) as string[]
+  const nichoOptions = Array.from(new Set(allMenteesForOptions.map((m) => m.niche).filter(Boolean))) as string[]
+
+  // Birthday mentees (today + next 3 days)
+  let birthdayQuery = supabase
+    .from('mentees')
+    .select('id, full_name, birth_date')
+    .eq('status', 'ativo')
+    .not('birth_date', 'is', null)
+  if (specialistId) birthdayQuery = birthdayQuery.eq('created_by', specialistId)
+  const { data: birthdayMentees } = await birthdayQuery
+
+  const today = new Date()
+  const birthdayList: { id: string; full_name: string; daysUntil: number }[] = []
+  birthdayMentees?.forEach((m) => {
+    if (!m.birth_date) return
+    const bd = new Date(m.birth_date)
+    const thisYear = new Date(today.getFullYear(), bd.getMonth(), bd.getDate())
+    // If birthday already passed this year, check next year
+    if (thisYear < new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
+      thisYear.setFullYear(today.getFullYear() + 1)
+    }
+    const diff = Math.floor((thisYear.getTime() - new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) / (1000 * 60 * 60 * 24))
+    if (diff <= 3) {
+      birthdayList.push({ id: m.id, full_name: m.full_name, daysUntil: diff })
+    }
+  })
+  birthdayList.sort((a, b) => a.daysUntil - b.daysUntil)
 
   // ─── Revenue (only needed fields) ───
   let revenueQuery = supabase.from('revenue_records').select('sale_value, revenue_type')
@@ -53,8 +160,8 @@ export default async function DashboardPage({ searchParams }: Props) {
   if (specialistId && menteeIds.length > 0) revenueQuery = revenueQuery.in('mentee_id', menteeIds)
   else if (specialistId && menteeIds.length === 0) revenueQuery = revenueQuery.eq('mentee_id', 'none')
 
-  // ─── Testimonials (count only) ───
-  let testimonialsQuery = supabase.from('testimonials').select('id', { count: 'exact', head: true })
+  // ─── Testimonials (need mentee_id for distinct count) ───
+  let testimonialsQuery = supabase.from('testimonials').select('id, mentee_id')
   if (startDate) testimonialsQuery = testimonialsQuery.gte('created_at', startDate)
   if (endDate) testimonialsQuery = testimonialsQuery.lte('created_at', endDate + 'T23:59:59')
   if (specialistId && menteeIds.length > 0) testimonialsQuery = testimonialsQuery.in('mentee_id', menteeIds)
@@ -80,13 +187,22 @@ export default async function DashboardPage({ searchParams }: Props) {
   if (endDate) csQuery = csQuery.lte('activity_date', endDate)
   if (specialistId) csQuery = csQuery.eq('specialist_id', specialistId)
 
-  // ─── Stage Changes (count for dashboard) ───
+  // ─── Stage Changes (need mentee_id for distinct count) ───
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let stageChangesQuery = supabase.from('stage_changes' as never).select('id' as never, { count: 'exact', head: true } as never) as any
+  let stageChangesQuery = supabase.from('stage_changes' as never).select('mentee_id' as never) as any
   if (startDate) stageChangesQuery = stageChangesQuery.gte('changed_at', startDate)
   if (endDate) stageChangesQuery = stageChangesQuery.lte('changed_at', endDate + 'T23:59:59')
   if (specialistId && menteeIds.length > 0) stageChangesQuery = stageChangesQuery.in('mentee_id', menteeIds)
   else if (specialistId && menteeIds.length === 0) stageChangesQuery = stageChangesQuery.eq('mentee_id', 'none')
+
+  // ─── Delivery events + participations (for Engajamento section) ───
+  let deliveryEventsQuery = supabase.from('delivery_events').select('id, delivery_type, delivery_date')
+  if (startDate) deliveryEventsQuery = deliveryEventsQuery.gte('delivery_date', startDate)
+  if (endDate) deliveryEventsQuery = deliveryEventsQuery.lte('delivery_date', endDate)
+
+  let deliveryPartQuery = supabase.from('delivery_participations').select('delivery_event_id, mentee_id')
+  if (specialistId && menteeIds.length > 0) deliveryPartQuery = deliveryPartQuery.in('mentee_id', menteeIds)
+  else if (specialistId && menteeIds.length === 0) deliveryPartQuery = deliveryPartQuery.eq('mentee_id', 'none')
 
   // ─── Call Records (count + total duration) ───
   let callsQuery = supabase.from('call_records').select('duration_seconds')
@@ -121,15 +237,17 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   const [
     { data: revenues },
-    { count: testimonialCount },
+    { data: testimonials },
     { count: indicationCount },
     { data: engagements },
     { data: csActivities },
-    { count: stageChangeCount },
+    { data: stageChanges },
     { data: callRecords },
     { count: wppOutCount },
     { count: wppInCount },
     { data: attendanceMsgs },
+    { data: deliveryEvents },
+    { data: deliveryParts },
   ] = await Promise.all([
     revenueQuery,
     testimonialsQuery,
@@ -141,6 +259,8 @@ export default async function DashboardPage({ searchParams }: Props) {
     wppOutQuery,
     wppInQuery,
     attendanceMsgsQuery,
+    deliveryEventsQuery,
+    deliveryPartQuery,
   ])
 
   // ─── Calculate attendance sessions + active duration ───
@@ -189,19 +309,90 @@ export default async function DashboardPage({ searchParams }: Props) {
     ? Math.round(totalAttendanceMinutes / totalAttendanceSessions)
     : 0
 
+  // ─── Attendance by initiator ───
+  let sessionsInitiatedByMentee = 0
+  let sessionsInitiatedByCS = 0
+  if (attendanceMsgs && attendanceMsgs.length > 0) {
+    const byMentee2: Record<string, { sent_at: string; direction: string }[]> = {}
+    for (const m of attendanceMsgs) {
+      if (!byMentee2[m.mentee_id]) byMentee2[m.mentee_id] = []
+      byMentee2[m.mentee_id].push({ sent_at: m.sent_at, direction: m.direction })
+    }
+    for (const msgs of Object.values(byMentee2)) {
+      const sessions2: typeof msgs[] = [[msgs[0]]]
+      for (let i = 1; i < msgs.length; i++) {
+        const gap = new Date(msgs[i].sent_at).getTime() - new Date(msgs[i - 1].sent_at).getTime()
+        if (gap > gapMs) sessions2.push([msgs[i]])
+        else sessions2[sessions2.length - 1].push(msgs[i])
+      }
+      for (const session of sessions2) {
+        const hasOutgoing = session.some((m) => m.direction === 'outgoing')
+        if (!hasOutgoing) continue
+        if (session[0].direction === 'incoming') sessionsInitiatedByMentee++
+        else sessionsInitiatedByCS++
+      }
+    }
+  }
+
+  // ─── Wait time (time from mentee msg until CS replies) ───
+  let totalWaitMs = 0
+  let waitCount = 0
+  if (attendanceMsgs && attendanceMsgs.length > 0) {
+    const byMentee3: Record<string, { sent_at: string; direction: string }[]> = {}
+    for (const m of attendanceMsgs) {
+      if (!byMentee3[m.mentee_id]) byMentee3[m.mentee_id] = []
+      byMentee3[m.mentee_id].push({ sent_at: m.sent_at, direction: m.direction })
+    }
+    for (const msgs of Object.values(byMentee3)) {
+      for (let i = 0; i < msgs.length; i++) {
+        if (msgs[i].direction === 'incoming') {
+          // Find next outgoing message
+          for (let j = i + 1; j < msgs.length; j++) {
+            if (msgs[j].direction === 'outgoing') {
+              const wait = new Date(msgs[j].sent_at).getTime() - new Date(msgs[i].sent_at).getTime()
+              totalWaitMs += wait
+              waitCount++
+              break
+            }
+          }
+        }
+      }
+    }
+  }
+  const avgWaitMinutes = waitCount > 0 ? Math.round(totalWaitMs / waitCount / 60000) : 0
+
+  // ─── Manual attendance sessions (start/stop buttons) ───
+  let manualAttendanceQuery = supabase.from('attendance_sessions').select('started_at, ended_at').not('ended_at', 'is', null)
+  if (startDate) manualAttendanceQuery = manualAttendanceQuery.gte('started_at', startDate)
+  if (endDate) manualAttendanceQuery = manualAttendanceQuery.lte('started_at', endDate + 'T23:59:59')
+  if (specialistId) manualAttendanceQuery = manualAttendanceQuery.eq('specialist_id', specialistId)
+  const { data: manualSessions } = await manualAttendanceQuery
+
+  let totalManualMinutes = 0
+  const manualCount = manualSessions?.length ?? 0
+  manualSessions?.forEach((s) => {
+    if (s.started_at && s.ended_at) {
+      totalManualMinutes += (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 60000
+    }
+  })
+  const avgManualAttendanceMinutes = manualCount > 0 ? Math.round(totalManualMinutes / manualCount) : 0
+
   // ─── SEÇÃO 2: Visão Geral ───
-  const allMentees = mentees ?? []
-  const totalMentees = allMentees.filter((m) => m.status === 'ativo').length
-  const fitMentees = allMentees.filter((m) => m.cliente_fit && m.status === 'ativo').length
-  const cancelados = allMentees.filter((m) => m.status === 'cancelado').length
+  const allMentees = filteredMentees
+  const activeMentees = allMentees.filter((m) => m.status === 'ativo')
+  const totalMentees = activeMentees.length
+  const fitMentees = activeMentees.filter((m) => m.cliente_fit).length
   const totalIndications = indicationCount ?? 0
 
-  // ─── Revenue growth (faturamento antes vs atual) ───
-  const menteesWithFat = allMentees.filter((m) => m.faturamento_atual != null && m.faturamento_antes_mentoria != null && Number(m.faturamento_antes_mentoria) > 0)
+  // ─── Revenue growth (sum faturamento_atual / sum faturamento_antes) ───
+  const menteesWithFat = activeMentees.filter((m) => m.faturamento_atual != null && m.faturamento_antes_mentoria != null && Number(m.faturamento_antes_mentoria) > 0)
+  const sumFatAtual = menteesWithFat.reduce((s, m) => s + Number(m.faturamento_atual), 0)
+  const sumFatAntes = menteesWithFat.reduce((s, m) => s + Number(m.faturamento_antes_mentoria), 0)
+  const growthPct = sumFatAntes > 0 ? Math.round(((sumFatAtual - sumFatAntes) / sumFatAntes) * 100) : 0
   const growthCount = menteesWithFat.filter((m) => Number(m.faturamento_atual) > Number(m.faturamento_antes_mentoria)).length
-  const avgGrowth = menteesWithFat.length > 0
-    ? Math.round(menteesWithFat.reduce((s, m) => s + ((Number(m.faturamento_atual) - Number(m.faturamento_antes_mentoria)) / Number(m.faturamento_antes_mentoria)) * 100, 0) / menteesWithFat.length)
-    : 0
+
+  // ─── Sum faturamento_atual (Bethel Metrics) ───
+  const totalFaturamentoAtual = activeMentees.reduce((s, m) => s + (m.faturamento_atual != null ? Number(m.faturamento_atual) : 0), 0)
 
   // ─── SEÇÃO 3: Sucesso ───
   const totalRevenue = revenues?.reduce((s, r) => s + Number(r.sale_value), 0) ?? 0
@@ -210,10 +401,25 @@ export default async function DashboardPage({ searchParams }: Props) {
   const engByType: Record<string, number> = { aula: 0, live: 0, evento: 0, whatsapp_contato: 0 }
   engagements?.forEach((e) => { engByType[e.type] = (engByType[e.type] ?? 0) + Number(e.value) })
 
-  const totalTestimonials = testimonialCount ?? 0
+  // Testimonials: total + distinct mentees
+  const totalTestimonials = testimonials?.length ?? 0
+  const menteesWithTestimonial = new Set(testimonials?.map((t) => t.mentee_id) ?? []).size
 
-  // ─── SEÇÃO 3b: Stage changes ───
-  const totalStageChanges = (stageChangeCount as number) ?? 0
+  // Stage changes: distinct mentees who advanced
+  const menteesAdvanced = new Set(((stageChanges as { mentee_id: string }[] | null) ?? []).map((s) => s.mentee_id)).size
+
+  // ─── SEÇÃO Engajamento: delivery stats ───
+  const deliveryTypeKeys = ['hotseat', 'comercial', 'gestao', 'mkt', 'extras', 'mentoria_individual']
+  const deliveryEventIds = new Set((deliveryEvents ?? []).map((e) => e.id))
+  const filteredParts = (deliveryParts ?? []).filter((p) => deliveryEventIds.has(p.delivery_event_id))
+
+  const deliveryStats: Record<string, { delivered: number; participated: number }> = {}
+  for (const key of deliveryTypeKeys) {
+    const eventsOfType = (deliveryEvents ?? []).filter((e) => e.delivery_type === key)
+    const eventIdsOfType = new Set(eventsOfType.map((e) => e.id))
+    const partsOfType = filteredParts.filter((p) => eventIdsOfType.has(p.delivery_event_id))
+    deliveryStats[key] = { delivered: eventsOfType.length, participated: partsOfType.length }
+  }
 
   // ─── SEÇÃO 4: Trabalho CS (automático + manual) ───
   // Manual CS activities
@@ -235,9 +441,6 @@ export default async function DashboardPage({ searchParams }: Props) {
   const totalLigacaoDuration = totalCalls > 0 ? totalCallMinutes : ligacoesManuais.reduce((s, c) => s + Number(c.duration_minutes), 0)
   const totalWhatsapp = totalWppOut > 0 ? totalWppOut : whatsappsManuais.length
   const totalWhatsappIn = totalWppIn
-  const avgWhatsappDuration = whatsappsManuais.length > 0
-    ? Math.round(whatsappsManuais.reduce((s, c) => s + Number(c.duration_minutes), 0) / whatsappsManuais.length)
-    : 0
 
   // ─── SEÇÃO 5: Receita ───
   const revByType: Record<string, number> = {
@@ -254,29 +457,54 @@ export default async function DashboardPage({ searchParams }: Props) {
       specialists={specialists ?? []}
       isAdmin={isAdmin}
       filters={{ specialistId, startDate, endDate, fitFilter }}
+      advancedFilters={{
+        fatInicialMin: searchParams.fatInicialMin ?? '',
+        fatInicialMax: searchParams.fatInicialMax ?? '',
+        fatAtualMin: searchParams.fatAtualMin ?? '',
+        fatAtualMax: searchParams.fatAtualMax ?? '',
+        funilOrigem: searchParams.funilOrigem ?? '',
+        closer: searchParams.closer ?? '',
+        mesAniversario: searchParams.mesAniversario ?? '',
+        numColaboradores: searchParams.numColaboradores ?? '',
+        estado: searchParams.estado ?? '',
+        nicho: searchParams.nicho ?? '',
+      }}
+      filterOptions={{
+        funisOrigem: funisOrigemOptions.sort(),
+        closers: closerOptions.sort(),
+        nichos: nichoOptions.sort(),
+      }}
       section2={{
         totalMentees,
         fitMentees,
         totalIndications,
-        cancelados,
       }}
       section3={{
-        totalRevenue,
-        engByType,
+        totalFaturamentoAtual,
         totalTestimonials,
-        cancelados,
-        totalStageChanges,
-        avgGrowth,
+        menteesWithTestimonial,
+        menteesAdvanced,
+        growthPct,
         growthCount,
         growthTotal: menteesWithFat.length,
+        totalMentees,
+      }}
+      engajamento={{
+        deliveryStats,
+        eventos: engByType.evento ?? 0,
+        intensivo: engByType.live ?? 0,
+        encontro: engByType.whatsapp_contato ?? 0,
       }}
       section4={{
         totalLigacoes,
         totalLigacaoDuration,
         totalWhatsapp,
         totalWhatsappIn,
-        avgWhatsappDuration,
         totalAtendimentos: totalAttendanceSessions,
+        atendimentosMentee: sessionsInitiatedByMentee,
+        atendimentosCS: sessionsInitiatedByCS,
+        avgWaitMinutes,
+        avgManualAttendanceMinutes,
         totalAttendanceMinutes,
         avgAttendanceMinutes,
       }}
@@ -285,9 +513,9 @@ export default async function DashboardPage({ searchParams }: Props) {
         upsell: revByType.upsell,
         indicacao_perpetuo: revByType.indicacao_perpetuo,
         indicacao_intensivo: revByType.indicacao_intensivo,
-        indicacao_encontro: revByType.indicacao_encontro,
         total: totalRevenue,
       }}
+      birthdayMentees={birthdayList}
     />
   )
 }

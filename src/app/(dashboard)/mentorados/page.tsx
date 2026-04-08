@@ -57,6 +57,26 @@ export default async function MentoradosPage() {
     .select('id, name, type, position')
     .order('position')
 
+  // Fetch distinct filter options from mentees
+  const allMenteesData = mentees ?? []
+  const funisOrigem = Array.from(new Set(allMenteesData.map((m) => m.funnel_origin).filter(Boolean))) as string[]
+  const closers = Array.from(new Set(allMenteesData.map((m) => m.closer_name).filter(Boolean))) as string[]
+  const nichos = Array.from(new Set(allMenteesData.map((m) => m.niche).filter(Boolean))) as string[]
+
+  // Fetch action plans for num_colaboradores mapping
+  const menteeIds = allMenteesData.map((m) => m.id)
+  const { data: actionPlans } = menteeIds.length > 0
+    ? await supabase.from('action_plans').select('mentee_id, data').in('mentee_id', menteeIds).not('data', 'is', null)
+    : { data: [] }
+
+  const colaboradoresMap: Record<string, string> = {}
+  actionPlans?.forEach((ap) => {
+    const data = ap.data as Record<string, unknown> | null
+    if (data?.num_colaboradores) {
+      colaboradoresMap[ap.mentee_id] = String(data.num_colaboradores)
+    }
+  })
+
   return (
     <MentoradosList
       mentees={menteesWithStats}
@@ -64,6 +84,8 @@ export default async function MentoradosPage() {
       isAdmin={userRole === 'admin'}
       specialists={specialists ?? []}
       stages={stages ?? []}
+      filterOptions={{ funisOrigem: funisOrigem.sort(), closers: closers.sort(), nichos: nichos.sort() }}
+      colaboradoresMap={colaboradoresMap}
     />
   )
 }

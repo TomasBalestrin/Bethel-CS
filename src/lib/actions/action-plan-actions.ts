@@ -45,12 +45,13 @@ export async function submitActionPlan(token: string, data: Record<string, Json>
 
   // Sync contact + business data back to mentee
   const updates: Record<string, unknown> = {}
+  if (data.cpf) updates.cpf = data.cpf
+  if (data.data_aniversario) updates.birth_date = data.data_aniversario
   if (data.email) updates.email = data.email
   if (data.instagram) updates.instagram = data.instagram
   if (data.cidade) updates.city = data.cidade
   if (data.estado) updates.state = data.estado
   if (data.nicho) updates.niche = data.nicho
-  if (data.nome_empresa) updates.niche = data.nicho // niche field used for business context
   if (Object.keys(updates).length > 0) {
     await supabase.from('mentees').update(updates).eq('id', mentee.id)
   }

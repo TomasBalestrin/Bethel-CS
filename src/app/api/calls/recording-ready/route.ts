@@ -1,8 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+const DAILY_WEBHOOK_SECRET = process.env.DAILY_WEBHOOK_SECRET || ''
+
 export async function POST(request: NextRequest) {
   try {
+    // Verify webhook authenticity via shared secret header
+    if (DAILY_WEBHOOK_SECRET) {
+      const authHeader = request.headers.get('authorization') || ''
+      if (authHeader !== `Bearer ${DAILY_WEBHOOK_SECRET}`) {
+        console.warn('[Daily Webhook] Invalid authorization header')
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+    }
+
     const body = await request.json()
     console.log('[Daily Webhook] Received:', JSON.stringify(body).slice(0, 500))
 
@@ -26,10 +37,9 @@ export async function POST(request: NextRequest) {
         recording_url: recording.download_url,
         recording_status: 'ready',
         duration_seconds: recording.duration || null,
-        ended_at: new Date().toISOString(),
       })
       .eq('daily_room_name', roomName)
-      .eq('recording_status', 'pending')
+      .in('recording_status', ['pending', 'processing'])
 
     return NextResponse.json({ ok: true })
   } catch (err) {

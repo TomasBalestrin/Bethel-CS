@@ -23,11 +23,6 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { createMentee } from '@/lib/actions/mentee-actions'
 import type { KanbanType } from '@/types/database'
 
-const BR_STATES = [
-  'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
-  'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
-  'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
-]
 
 interface CreateMenteeDialogProps {
   open: boolean
@@ -57,12 +52,6 @@ export function CreateMenteeDialog({
   const [productName, setProductName] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
-  const [cpf, setCpf] = useState('')
-  const [birthDate, setBirthDate] = useState('')
-  const [email, setEmail] = useState('')
-  const [instagram, setInstagram] = useState('')
-  const [city, setCity] = useState('')
-  const [state, setState] = useState('')
   const [hasPartner, setHasPartner] = useState(false)
   const [partnerName, setPartnerName] = useState('')
   const [sellerName, setSellerName] = useState('')
@@ -77,12 +66,6 @@ export function CreateMenteeDialog({
     setProductName('')
     setStartDate('')
     setEndDate('')
-    setCpf('')
-    setBirthDate('')
-    setEmail('')
-    setInstagram('')
-    setCity('')
-    setState('')
     setHasPartner(false)
     setPartnerName('')
     setSellerName('')
@@ -103,12 +86,6 @@ export function CreateMenteeDialog({
       product_name: productName,
       start_date: startDate,
       end_date: endDate || undefined,
-      cpf: cpf || undefined,
-      birth_date: birthDate || undefined,
-      email: email || undefined,
-      instagram: instagram || undefined,
-      city: city || undefined,
-      state: state || undefined,
       has_partner: hasPartner,
       partner_name: hasPartner ? partnerName : undefined,
       seller_name: sellerName || undefined,
@@ -212,23 +189,6 @@ export function CreateMenteeDialog({
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label htmlFor="cpf">CPF</Label>
-                  <Input
-                    id="cpf"
-                    value={cpf}
-                    onChange={(e) => setCpf(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="birth_date">Data de aniversário</Label>
-                  <Input
-                    id="birth_date"
-                    type="date"
-                    value={birthDate}
-                    onChange={(e) => setBirthDate(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
                   <Label htmlFor="phone">Telefone *</Label>
                   <Input
                     id="phone"
@@ -236,47 +196,6 @@ export function CreateMenteeDialog({
                     onChange={(e) => setPhone(e.target.value)}
                     required
                   />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="instagram">@Instagram</Label>
-                  <Input
-                    id="instagram"
-                    value={instagram}
-                    onChange={(e) => setInstagram(e.target.value)}
-                    placeholder="@"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="city">Cidade</Label>
-                  <Input
-                    id="city"
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="state">Estado</Label>
-                  <Select value={state} onValueChange={setState}>
-                    <SelectTrigger id="state">
-                      <SelectValue placeholder="Selecione" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {BR_STATES.map((uf) => (
-                        <SelectItem key={uf} value={uf}>
-                          {uf}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
             </div>

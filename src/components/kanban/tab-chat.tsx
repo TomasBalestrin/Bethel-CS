@@ -3,8 +3,11 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
-import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown, Sparkles, ChevronUp, BellOff } from 'lucide-react'
+import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown, Sparkles, ChevronUp, BellOff, Pencil, Check, ClipboardCheck, Timer, TimerOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
@@ -15,10 +18,11 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { useCallStore } from '@/store/call-store'
 import { toast } from 'sonner'
+import { createTask } from '@/lib/actions/task-actions'
 import type { Database } from '@/types/database'
 
 type WppMessage = Database['public']['Tables']['wpp_messages']['Row']
-type CallRecord = Pick<Database['public']['Tables']['call_records']['Row'], 'id' | 'mentee_id' | 'duration_seconds' | 'recording_status' | 'recording_url' | 'created_at'>
+type CallRecord = Pick<Database['public']['Tables']['call_records']['Row'], 'id' | 'mentee_id' | 'duration_seconds' | 'recording_status' | 'recording_url' | 'notes' | 'created_at'>
 type AttendanceNote = Database['public']['Tables']['attendance_notes']['Row']
 
 interface TabChatProps {
@@ -83,6 +87,21 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const [callRecords, setCallRecords] = useState<CallRecord[]>([])
   const [callsModalOpen, setCallsModalOpen] = useState(false)
   const [playingRecording, setPlayingRecording] = useState<string | null>(null)
+  const [editingCallNote, setEditingCallNote] = useState<string | null>(null)
+  const [callNoteText, setCallNoteText] = useState('')
+  const [savingCallNote, setSavingCallNote] = useState(false)
+
+  // Attendance session (start/stop)
+  const [activeSession, setActiveSession] = useState<string | null>(null)
+  const [sessionStart, setSessionStart] = useState<Date | null>(null)
+
+  // Create task from chat
+  const [taskFormOpen, setTaskFormOpen] = useState(false)
+  const [taskTitle, setTaskTitle] = useState('')
+  const [taskDesc, setTaskDesc] = useState('')
+  const [taskDueDate, setTaskDueDate] = useState('')
+  const [taskNotes, setTaskNotes] = useState('')
+  const [taskLoading, setTaskLoading] = useState(false)
 
   // Message windowing
   const [visibleLimit, setVisibleLimit] = useState(80)
@@ -138,11 +157,24 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         // Fetch call history
         const { data: calls } = await supabase
           .from('call_records')
-          .select('id, mentee_id, duration_seconds, recording_status, recording_url, created_at')
+          .select('id, mentee_id, duration_seconds, recording_status, recording_url, notes, created_at')
           .eq('mentee_id', menteeId)
           .order('created_at', { ascending: false })
           .limit(20)
         if (calls) setCallRecords(calls)
+
+        // Check for active attendance session
+        const { data: activeSess } = await supabase
+          .from('attendance_sessions')
+          .select('id, started_at')
+          .eq('mentee_id', menteeId)
+          .is('ended_at', null)
+          .order('started_at', { ascending: false })
+          .limit(1)
+        if (activeSess && activeSess.length > 0) {
+          setActiveSession(activeSess[0].id)
+          setSessionStart(new Date(activeSess[0].started_at))
+        }
 
         // Fetch latest attendance note
         const { data: notes } = await supabase
@@ -583,6 +615,56 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
             <PhoneCall className="h-3 w-3" />
             Ligações {callRecords.length > 0 && `(${callRecords.length})`}
           </Button>
+          {activeSession ? (
+            <Button
+              size="sm"
+              variant="destructive"
+              className="h-8 gap-1.5 text-xs"
+              onClick={async () => {
+                const sb = createClient()
+                await sb.from('attendance_sessions').update({ ended_at: new Date().toISOString() }).eq('id', activeSession)
+                const dur = sessionStart ? Math.round((Date.now() - sessionStart.getTime()) / 60000) : 0
+                setActiveSession(null)
+                setSessionStart(null)
+                toast.success(`Atendimento finalizado (${dur} min)`)
+              }}
+            >
+              <TimerOff className="h-3 w-3" />
+              <span className="hidden sm:inline">Finalizar</span>
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 text-xs border-success/50 text-success hover:bg-success/10"
+              onClick={async () => {
+                const sb = createClient()
+                const { data: { user } } = await sb.auth.getUser()
+                if (!user) return
+                const { data: sess } = await sb.from('attendance_sessions').insert({
+                  mentee_id: menteeId,
+                  specialist_id: user.id,
+                }).select('id, started_at').single()
+                if (sess) {
+                  setActiveSession(sess.id)
+                  setSessionStart(new Date(sess.started_at))
+                  toast.success('Atendimento iniciado')
+                }
+              }}
+            >
+              <Timer className="h-3 w-3" />
+              <span className="hidden sm:inline">Iniciar</span>
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 gap-1.5 text-xs"
+            onClick={() => setTaskFormOpen(true)}
+          >
+            <ClipboardCheck className="h-3 w-3" />
+            <span className="hidden sm:inline">Tarefa</span>
+          </Button>
           <Button
             size="sm"
             variant="ghost"
@@ -610,6 +692,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
             title="Marcar como não lida"
           >
             <BellOff className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Marcar como não lida</span>
           </Button>
           <span className={`h-2 w-2 rounded-full shrink-0 ${instanceStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'}`} />
           <span className="text-[10px] text-muted-foreground hidden sm:inline">
@@ -941,6 +1024,77 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                     {/* Transcription placeholder */}
                     <p className="text-xs text-muted-foreground mt-1">Transcrição:</p>
                     <p className="text-xs text-muted-foreground/60 italic">Em breve — disponível após upgrade do plano</p>
+
+                    {/* Call notes */}
+                    <div className="mt-2 pt-2 border-t border-border/50">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs text-muted-foreground font-medium">Anotações da ligação:</p>
+                        {editingCallNote !== call.id && (
+                          <button
+                            onClick={() => {
+                              setEditingCallNote(call.id)
+                              setCallNoteText(call.notes ?? '')
+                            }}
+                            className="flex items-center gap-1 text-[10px] text-accent hover:underline"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            {call.notes ? 'Editar' : 'Adicionar'}
+                          </button>
+                        )}
+                      </div>
+                      {editingCallNote === call.id ? (
+                        <div className="space-y-2">
+                          <Textarea
+                            value={callNoteText}
+                            onChange={(e) => setCallNoteText(e.target.value)}
+                            placeholder="Registre o que foi conversado nesta ligação..."
+                            className="min-h-[80px] text-xs resize-y"
+                            autoFocus
+                          />
+                          <div className="flex justify-end gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-xs"
+                              onClick={() => { setEditingCallNote(null); setCallNoteText('') }}
+                            >
+                              Cancelar
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="h-7 text-xs gap-1"
+                              disabled={savingCallNote}
+                              onClick={async () => {
+                                setSavingCallNote(true)
+                                const sb = createClient()
+                                const { error } = await sb
+                                  .from('call_records')
+                                  .update({ notes: callNoteText || null })
+                                  .eq('id', call.id)
+                                setSavingCallNote(false)
+                                if (error) {
+                                  toast.error('Erro ao salvar anotação')
+                                  return
+                                }
+                                setCallRecords((prev) =>
+                                  prev.map((c) => c.id === call.id ? { ...c, notes: callNoteText || null } : c)
+                                )
+                                setEditingCallNote(null)
+                                setCallNoteText('')
+                                toast.success('Anotação salva')
+                              }}
+                            >
+                              <Check className="h-3 w-3" />
+                              {savingCallNote ? 'Salvando...' : 'Salvar'}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : call.notes ? (
+                        <p className="text-xs text-foreground whitespace-pre-wrap bg-muted/30 rounded-md px-2.5 py-2 leading-relaxed">{call.notes}</p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground/50 italic">Nenhuma anotação registrada</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -953,6 +1107,53 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
               Fechar
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create task dialog */}
+      <Dialog open={taskFormOpen} onOpenChange={(open) => { if (!open) { setTaskFormOpen(false); setTaskTitle(''); setTaskDesc(''); setTaskDueDate(''); setTaskNotes('') } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nova tarefa para {menteeName}</DialogTitle>
+            <DialogDescription>A tarefa será vinculada a este mentorado.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={async (e) => {
+            e.preventDefault()
+            setTaskLoading(true)
+            const res = await createTask({
+              title: taskTitle,
+              description: taskDesc || undefined,
+              notes: taskNotes || undefined,
+              due_date: taskDueDate || undefined,
+              mentee_id: menteeId,
+            })
+            setTaskLoading(false)
+            if (res.error) { toast.error(res.error); return }
+            toast.success('Tarefa criada')
+            setTaskFormOpen(false)
+            setTaskTitle(''); setTaskDesc(''); setTaskDueDate(''); setTaskNotes('')
+          }} className="space-y-3">
+            <div className="space-y-1">
+              <Label>Título *</Label>
+              <Input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} required placeholder="O que precisa ser feito?" />
+            </div>
+            <div className="space-y-1">
+              <Label>Descrição</Label>
+              <Textarea value={taskDesc} onChange={(e) => setTaskDesc(e.target.value)} className="min-h-[80px] resize-y" placeholder="Descreva a tarefa..." />
+            </div>
+            <div className="space-y-1">
+              <Label>Data de entrega</Label>
+              <Input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Observações</Label>
+              <Textarea value={taskNotes} onChange={(e) => setTaskNotes(e.target.value)} className="min-h-[60px] resize-y" placeholder="Anotações..." />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setTaskFormOpen(false)}>Cancelar</Button>
+              <Button type="submit" size="sm" disabled={taskLoading}>{taskLoading ? 'Criando...' : 'Criar tarefa'}</Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

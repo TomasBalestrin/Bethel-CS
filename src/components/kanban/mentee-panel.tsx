@@ -44,6 +44,10 @@ import {
   Briefcase,
   Mic,
   Loader2,
+  Building2,
+  XCircle,
+  CalendarCheck,
+  ClipboardCheck,
 } from 'lucide-react'
 import { formatDateBR } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
@@ -61,7 +65,6 @@ import {
   updateIndication,
   deleteIndication,
   addIntensivoRecord,
-  updateIntensivoRecord,
   deleteIntensivoRecord,
   addRevenueRecord,
   updateRevenueRecord,
@@ -75,8 +78,6 @@ import {
   deleteMentee,
   addIndividualSession,
   addExtraDelivery,
-  addPresentialEvent,
-  updatePresentialEvent,
 } from '@/lib/actions/panel-actions'
 import dynamic from 'next/dynamic'
 import { ErrorBoundary } from '@/components/error-boundary'
@@ -206,7 +207,7 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
   if (!mentee) return null
 
   const isAdmin = userRole === 'admin'
-  const priorityLabel = `P${mentee.priority_level}`
+  const priorityLabel = `Prioridade ${mentee.priority_level}`
   const isLoading = !fullData
 
   if (!open) return null
@@ -382,7 +383,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
               { value: 'acompanhamento', label: 'Acompanhamento' },
               { value: 'engajamento', label: 'Engajamento' },
               { value: 'historico', label: 'Histórico' },
-              { value: 'intensivo', label: 'Intensivo' },
+              { value: 'intensivo', label: 'Eventos' },
               { value: 'chat', label: 'Chat' },
             ].map((tab) => (
               <TabsTrigger
@@ -433,7 +434,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
           />
         </ErrorBoundary></TabsContent>
         <TabsContent value="action-plan"><ErrorBoundary><TabActionPlan mentee={mentee} /></ErrorBoundary></TabsContent>
-        <TabsContent value="acompanhamento"><ErrorBoundary><TabAcompanhamento menteeId={mentee.id} /></ErrorBoundary></TabsContent>
+        <TabsContent value="acompanhamento"><ErrorBoundary><TabAcompanhamento menteeId={mentee.id} mentee={mentee} /></ErrorBoundary></TabsContent>
         <TabsContent value="engajamento"><ErrorBoundary><TabEngajamento menteeId={mentee.id} mentee={mentee} /></ErrorBoundary></TabsContent>
         <TabsContent value="historico"><ErrorBoundary><TabHistorico menteeId={mentee.id} /></ErrorBoundary></TabsContent>
         <TabsContent value="intensivo"><ErrorBoundary><TabIntensivo menteeId={mentee.id} /></ErrorBoundary></TabsContent>
@@ -500,6 +501,30 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
   onTransitionToMentorship?: (mentee: MenteeWithStats) => void
 }) {
   const [saving, setSaving] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelling, setCancelling] = useState(false)
+
+  // Fetch action plan data for Empresa block (nome_empresa, num_colaboradores)
+  const [empresaData, setEmpresaData] = useState<{ nome_empresa?: string; num_colaboradores?: string }>({})
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('action_plans')
+      .select('data')
+      .eq('mentee_id', mentee.id)
+      .not('data', 'is', null)
+      .maybeSingle()
+      .then(({ data: ap }) => {
+        if (ap?.data) {
+          const d = ap.data as Record<string, unknown>
+          setEmpresaData({
+            nome_empresa: d.nome_empresa ? String(d.nome_empresa) : undefined,
+            num_colaboradores: d.num_colaboradores ? String(d.num_colaboradores) : undefined,
+          })
+        }
+      })
+  }, [mentee.id])
 
   const [form, setForm] = useState({
     full_name: mentee.full_name,
@@ -700,6 +725,23 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
             </div>
           </div>
 
+          {/* Empresa — nome, nicho, colaboradores, faturamento */}
+          {(empresaData.nome_empresa || mentee.niche || empresaData.num_colaboradores || mentee.faturamento_atual != null || mentee.faturamento_antes_mentoria != null) && (
+            <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-success/5 to-transparent">
+                <Building2 className="h-3.5 w-3.5 text-success" />
+                <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Empresa</h3>
+              </div>
+              <div className="px-3 py-2 space-y-0">
+                {empresaData.nome_empresa && <ContactRow icon={Building2} label="Nome" value={empresaData.nome_empresa} color="text-success" bg="bg-success/10" />}
+                {mentee.niche && <ContactRow icon={Target} label="Nicho" value={mentee.niche} color="text-accent" bg="bg-accent/10" />}
+                {empresaData.num_colaboradores && <ContactRow icon={Users} label="Colaboradores" value={empresaData.num_colaboradores} color="text-info" bg="bg-info/10" />}
+                {mentee.faturamento_atual != null && <ContactRow icon={DollarSign} label="Faturamento atual" value={formatBRL(mentee.faturamento_atual)} color="text-success" bg="bg-success/10" />}
+                {mentee.faturamento_antes_mentoria != null && <ContactRow icon={DollarSign} label="Fat. antes da mentoria" value={formatBRL(mentee.faturamento_antes_mentoria)} color="text-warning" bg="bg-warning/10" />}
+              </div>
+            </div>
+          )}
+
           {/* Performance (Bethel Metrics) — fills the space below contact */}
           {hasMetrics ? (
             <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
@@ -801,6 +843,83 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
         </div>
       )}
 
+      {/* ── Solicitar Cancelamento ── */}
+      {mentee.status !== 'cancelado' && (
+        <div className="flex justify-start pt-2">
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setCancelOpen(true)}
+            className="text-xs gap-1.5"
+          >
+            <XCircle className="h-3.5 w-3.5" />
+            Solicitar Cancelamento
+          </Button>
+        </div>
+      )}
+
+      <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Solicitação de Cancelamento</DialogTitle>
+            <DialogDescription>
+              Registre o motivo completo da solicitação de cancelamento de {mentee.full_name}. O status do mentorado não será alterado.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={async (e) => {
+            e.preventDefault()
+            if (cancelReason.trim().length < 10) {
+              toast.error('Descreva o motivo com mais detalhes (mínimo 10 caracteres)')
+              return
+            }
+            setCancelling(true)
+            const timestamp = new Date().toLocaleDateString('pt-BR')
+            const cancelNote = `[SOLICITAÇÃO DE CANCELAMENTO ${timestamp}] ${cancelReason.trim()}`
+            const existingNotes = mentee.notes?.trim() || ''
+            const newNotes = existingNotes ? `${cancelNote}\n\n${existingNotes}` : cancelNote
+
+            const result = await updateMentee(mentee.id, {
+              notes: newNotes,
+            })
+            setCancelling(false)
+
+            if (result.error) {
+              toast.error(result.error)
+              return
+            }
+
+            toast.success('Solicitação de cancelamento registrada')
+            setCancelOpen(false)
+            setCancelReason('')
+            if (onMenteeUpdated) {
+              onMenteeUpdated({ ...mentee, notes: newNotes })
+            }
+          }} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cancel-reason">Motivo da solicitação *</Label>
+              <Textarea
+                id="cancel-reason"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                required
+                minLength={10}
+                className="min-h-[120px] resize-y"
+                placeholder="Descreva detalhadamente o motivo da solicitação de cancelamento..."
+              />
+              <p className="text-[10px] text-muted-foreground">Mínimo 10 caracteres. Será registrado nas observações do mentorado.</p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => { setCancelOpen(false); setCancelReason('') }}>
+                Voltar
+              </Button>
+              <Button type="submit" variant="destructive" size="sm" disabled={cancelling || cancelReason.trim().length < 10}>
+                {cancelling ? 'Registrando...' : 'Registrar Solicitação'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
     </div>
   )
 }
@@ -885,38 +1004,82 @@ function PersonalTagsCard({ menteeId, initialTags }: { menteeId: string; initial
   )
 }
 
-// ─── Notes Card ───
+// ─── Notes Card (tag-based, same layout as PersonalTagsCard) ───
 function NotesCard({ menteeId, initialNotes }: { menteeId: string; initialNotes: string }) {
-  const [notes, setNotes] = useState(initialNotes)
+  const parseNotes = (raw: string) => raw.split('\n').map((n) => n.trim()).filter(Boolean)
+  const [items, setItems] = useState<string[]>(parseNotes(initialNotes))
+  const [input, setInput] = useState('')
   const [saving, setSaving] = useState(false)
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const supabase = createClient()
 
-  function handleChange(value: string) {
-    setNotes(value)
-    // Auto-save with debounce
-    if (timeoutRef.current) clearTimeout(timeoutRef.current)
-    timeoutRef.current = setTimeout(async () => {
-      setSaving(true)
-      await supabase.from('mentees').update({ notes: value }).eq('id', menteeId)
-      setSaving(false)
-    }, 800)
+  async function saveNotes(newItems: string[]) {
+    setSaving(true)
+    await supabase.from('mentees').update({ notes: newItems.join('\n') }).eq('id', menteeId)
+    setSaving(false)
+  }
+
+  function handleAdd() {
+    const note = input.trim()
+    if (!note) return
+    const newItems = [...items, note]
+    setItems(newItems)
+    setInput('')
+    saveNotes(newItems)
+  }
+
+  function handleRemove(idx: number) {
+    const newItems = items.filter((_, i) => i !== idx)
+    setItems(newItems)
+    saveNotes(newItems)
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleAdd()
+    }
   }
 
   return (
     <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-warning/5 to-transparent">
-        <Pencil className="h-3.5 w-3.5 text-warning" />
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
+        <Pencil className="h-3.5 w-3.5 text-accent" />
         <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Observações</h3>
-        <span className="text-[9px] text-muted-foreground/40 ml-auto">{saving ? 'Salvando...' : 'Auto-save'}</span>
+        {saving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-auto" />}
       </div>
-      <div className="p-3">
-        <Textarea
-          value={notes}
-          onChange={(e) => handleChange(e.target.value)}
-          placeholder="Anotações sobre o mentorado..."
-          className="min-h-[80px] text-xs resize-none border-0 bg-transparent p-0 focus-visible:ring-0 shadow-none"
-        />
+      <div className="p-3 space-y-2.5">
+        <div className="flex flex-wrap gap-1.5 min-h-[32px]">
+          {items.map((note, idx) => (
+            <span
+              key={idx}
+              className="inline-flex items-center gap-1 rounded-full bg-accent/10 border border-accent/20 px-2.5 py-0.5 text-[11px] font-medium text-foreground"
+            >
+              {note}
+              <button
+                type="button"
+                onClick={() => handleRemove(idx)}
+                className="text-muted-foreground hover:text-destructive transition-colors ml-0.5"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          {items.length === 0 && (
+            <p className="text-[11px] text-muted-foreground/40 italic">Adicione observações abaixo</p>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ex: Gosta de viajar, Meta: 100k/mês..."
+            className="h-7 text-xs"
+          />
+          <Button size="sm" variant="outline" className="h-7 px-2 shrink-0" onClick={handleAdd} disabled={!input.trim()}>
+            <Plus className="h-3 w-3" />
+          </Button>
+        </div>
       </div>
     </div>
   )
@@ -965,6 +1128,8 @@ function ClienteFitToggle({ menteeId, initialValue }: { menteeId: string; initia
 
 const ACTION_PLAN_LABELS: Record<string, string> = {
   endereco_completo: 'Endereço completo',
+  cpf: 'CPF',
+  data_aniversario: 'Data de aniversário',
   email: 'Email',
   instagram: 'Instagram',
   cidade: 'Cidade',
@@ -1042,6 +1207,10 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null)
+  const [attachmentName, setAttachmentName] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [viewerOpen, setViewerOpen] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -1051,7 +1220,68 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
       .eq('mentee_id', mentee.id)
       .maybeSingle()
       .then(({ data }) => { if (data) setPlan(data) })
+
+    // Check for existing attachment
+    supabase.storage
+      .from('action-plans')
+      .list(mentee.id)
+      .then(({ data: files }) => {
+        if (files && files.length > 0) {
+          const file = files[0]
+          const { data: urlData } = supabase.storage
+            .from('action-plans')
+            .getPublicUrl(`${mentee.id}/${file.name}`)
+          setAttachmentUrl(urlData.publicUrl)
+          setAttachmentName(file.name)
+        }
+      })
   }, [mentee.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function handleUploadAttachment(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const ext = file.name.split('.').pop() || 'pdf'
+      const filePath = `${mentee.id}/${Date.now()}_plano-de-acao.${ext}`
+
+      // Remove existing files first
+      if (attachmentName) {
+        await supabase.storage.from('action-plans').remove([`${mentee.id}/${attachmentName}`])
+      }
+
+      const { error } = await supabase.storage
+        .from('action-plans')
+        .upload(filePath, file, { contentType: file.type })
+
+      if (error) {
+        toast.error('Erro ao enviar arquivo')
+        return
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('action-plans')
+        .getPublicUrl(filePath)
+
+      const newName = filePath.split('/').pop()!
+      setAttachmentUrl(urlData.publicUrl)
+      setAttachmentName(newName)
+      toast.success('Plano de ação anexado com sucesso')
+    } finally {
+      setUploading(false)
+      e.target.value = ''
+    }
+  }
+
+  async function handleRemoveAttachment() {
+    if (!attachmentName) return
+    const confirmed = window.confirm('Remover o plano de ação anexado?')
+    if (!confirmed) return
+    await supabase.storage.from('action-plans').remove([`${mentee.id}/${attachmentName}`])
+    setAttachmentUrl(null)
+    setAttachmentName(null)
+    toast.success('Arquivo removido')
+  }
 
   async function handleGenerateLink() {
     setLoading(true)
@@ -1134,8 +1364,92 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
 
   const planData = plan?.data as Record<string, unknown> | null
 
+  const isPdf = attachmentName?.toLowerCase().endsWith('.pdf')
+  const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(attachmentName ?? '')
+
   return (
     <div className="space-y-4 animate-fade-in">
+      {/* ── Plano de ação anexado ── */}
+      <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
+          <FileDown className="h-3.5 w-3.5 text-accent" />
+          <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Plano de ação anexado</h3>
+        </div>
+        <div className="p-3">
+          {attachmentUrl ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2.5">
+                <FileDown className="h-4 w-4 text-accent shrink-0" />
+                <span className="text-sm text-foreground font-medium truncate flex-1">{attachmentName}</span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Button size="sm" variant="outline" onClick={() => setViewerOpen(true)} className="text-xs gap-1.5 h-7">
+                    <FileDown className="h-3 w-3" /> Visualizar
+                  </Button>
+                  <a href={attachmentUrl} download={attachmentName ?? 'plano-de-acao'} target="_blank" rel="noopener noreferrer">
+                    <Button size="sm" variant="outline" className="text-xs gap-1.5 h-7">
+                      <FileDown className="h-3 w-3" /> Baixar
+                    </Button>
+                  </a>
+                  <Button size="sm" variant="ghost" onClick={handleRemoveAttachment} className="text-xs text-destructive h-7">
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-4">
+              <p className="text-sm text-muted-foreground mb-3">Nenhum plano de ação anexado</p>
+              <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted/50 transition-colors">
+                <Plus className="h-3.5 w-3.5" />
+                {uploading ? 'Enviando...' : 'Anexar plano de ação'}
+                <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp" onChange={handleUploadAttachment} disabled={uploading} />
+              </label>
+            </div>
+          )}
+          {attachmentUrl && (
+            <label className="cursor-pointer inline-flex items-center gap-1.5 mt-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+              <Plus className="h-3 w-3" />
+              {uploading ? 'Enviando...' : 'Substituir arquivo'}
+              <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp" onChange={handleUploadAttachment} disabled={uploading} />
+            </label>
+          )}
+        </div>
+      </div>
+
+      {/* ── Viewer dialog ── */}
+      {viewerOpen && attachmentUrl && (
+        <div className="fixed inset-0 z-[100] flex flex-col bg-black/80" onClick={() => setViewerOpen(false)}>
+          <div className="flex items-center justify-between px-4 py-3 bg-card border-b border-border shrink-0" onClick={(e) => e.stopPropagation()}>
+            <span className="text-sm font-medium text-foreground truncate">{attachmentName}</span>
+            <div className="flex items-center gap-2">
+              <a href={attachmentUrl} download={attachmentName ?? 'plano-de-acao'} target="_blank" rel="noopener noreferrer">
+                <Button size="sm" variant="outline" className="text-xs gap-1.5">
+                  <FileDown className="h-3.5 w-3.5" /> Baixar
+                </Button>
+              </a>
+              <Button size="sm" variant="ghost" onClick={() => setViewerOpen(false)} className="text-xs">
+                Fechar
+              </Button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-auto p-4" onClick={(e) => e.stopPropagation()}>
+            {isPdf ? (
+              <iframe src={attachmentUrl} className="w-full h-full min-h-[80vh] rounded-lg bg-white" title="Plano de ação" />
+            ) : isImage ? (
+              <div className="flex items-center justify-center h-full">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={attachmentUrl} alt="Plano de ação" className="max-w-full max-h-[85vh] rounded-lg shadow-lg" />
+              </div>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-white text-sm">Pré-visualização não disponível para este tipo de arquivo. Use o botão &quot;Baixar&quot;.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Respostas do formulário ── */}
       {plan?.submitted_at ? (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -1202,7 +1516,155 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
 }
 
 // ─── Tab: Acompanhamento (unified grid) ───
-function TabAcompanhamento({ menteeId }: { menteeId: string }) {
+// ─── Card: Tarefas do Mentorado ───
+function CardMenteeTasks({ menteeId }: { menteeId: string }) {
+  const [tasks, setTasks] = useState<Database['public']['Tables']['tasks']['Row'][]>([])
+  const [columns, setColumns] = useState<Database['public']['Tables']['task_columns']['Row'][]>([])
+  const supabase = createClient()
+
+  useEffect(() => {
+    supabase.from('tasks').select('*').eq('mentee_id', menteeId).order('created_at', { ascending: false })
+      .then(({ data }) => { if (data) setTasks(data) })
+    supabase.from('task_columns').select('*').order('position')
+      .then(({ data }) => { if (data) setColumns(data) })
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const getColName = (colId: string | null) => columns.find((c) => c.id === colId)?.name ?? '—'
+  const isOverdue = (t: typeof tasks[0]) => t.due_date && !t.completed_at && new Date(t.due_date) < new Date(new Date().toISOString().split('T')[0])
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center gap-2 -mx-4 -mt-4 px-4 py-3 border-b border-border bg-muted/30">
+        <ClipboardCheck className="h-4 w-4 text-accent" />
+        <h3 className="font-heading font-semibold text-sm">Tarefas</h3>
+        <Badge variant="muted" className="text-[10px] ml-auto">{tasks.length}</Badge>
+      </div>
+      {tasks.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-4">Nenhuma tarefa vinculada</p>
+      ) : (
+        <div className="space-y-2">
+          {tasks.map((task) => (
+            <div key={task.id} className={`rounded-lg border p-3 text-sm ${isOverdue(task) ? 'border-destructive/30 bg-destructive/5' : task.completed_at ? 'border-success/30 bg-success/5' : 'border-border bg-card'}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className={`font-medium leading-tight ${task.completed_at ? 'line-through text-muted-foreground' : ''}`}>{task.title}</p>
+                  {task.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{task.description}</p>}
+                </div>
+                <Badge variant={isOverdue(task) ? 'destructive' : task.completed_at ? 'success' : 'muted'} className="text-[10px] shrink-0">
+                  {isOverdue(task) ? 'Atrasada' : task.completed_at ? 'Concluída' : getColName(task.column_id)}
+                </Badge>
+              </div>
+              {task.due_date && (
+                <p className={`text-[10px] mt-1 ${isOverdue(task) ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  Prazo: {new Date(task.due_date).toLocaleDateString('pt-BR')}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Card: Entregas Mentoria ───
+const DELIVERY_TYPES = [
+  { key: 'hotseat', label: 'Hotseat' },
+  { key: 'comercial', label: 'Comercial' },
+  { key: 'gestao', label: 'Gestão' },
+  { key: 'mkt', label: 'Mkt' },
+  { key: 'extras', label: 'Entregas Extras' },
+  { key: 'mentoria_individual', label: 'Mentoria Individual' },
+]
+
+function CardEntregasMentoria({ menteeId, startDate }: { menteeId: string; startDate: string | null }) {
+  const [deliveryStats, setDeliveryStats] = useState<Record<string, { delivered: number; participated: number }>>({})
+  const supabase = createClient()
+
+  useEffect(() => {
+    async function fetchDeliveries() {
+      // Fetch all delivery events since mentee start date
+      let eventsQuery = supabase.from('delivery_events').select('id, delivery_type, delivery_date')
+      if (startDate) {
+        eventsQuery = eventsQuery.gte('delivery_date', startDate)
+      }
+      const { data: events } = await eventsQuery
+
+      // Fetch participations for this mentee
+      const { data: participations } = await supabase
+        .from('delivery_participations')
+        .select('delivery_event_id')
+        .eq('mentee_id', menteeId)
+
+      const participatedSet = new Set(participations?.map((p) => p.delivery_event_id) ?? [])
+
+      // Calculate stats per type
+      const stats: Record<string, { delivered: number; participated: number }> = {}
+      for (const dt of DELIVERY_TYPES) {
+        stats[dt.key] = { delivered: 0, participated: 0 }
+      }
+
+      events?.forEach((ev) => {
+        const type = ev.delivery_type
+        if (!stats[type]) stats[type] = { delivered: 0, participated: 0 }
+        stats[type].delivered++
+        if (participatedSet.has(ev.id)) {
+          stats[type].participated++
+        }
+      })
+
+      setDeliveryStats(stats)
+    }
+    fetchDeliveries()
+  }, [menteeId, startDate]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const totalDelivered = Object.values(deliveryStats).reduce((s, d) => s + d.delivered, 0)
+  const totalParticipated = Object.values(deliveryStats).reduce((s, d) => s + d.participated, 0)
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center gap-2 -mx-4 -mt-4 px-4 py-3 border-b border-border bg-muted/30">
+        <CalendarCheck className="h-4 w-4 text-accent" />
+        <h3 className="font-heading font-semibold text-sm">Entregas Mentoria</h3>
+        <span className="text-[10px] text-muted-foreground ml-auto">
+          {totalParticipated}/{totalDelivered} participações
+        </span>
+      </div>
+
+      <div className="space-y-2">
+        {DELIVERY_TYPES.map((dt) => {
+          const stat = deliveryStats[dt.key] ?? { delivered: 0, participated: 0 }
+          const pct = stat.delivered > 0 ? Math.round((stat.participated / stat.delivered) * 100) : 0
+          return (
+            <div key={dt.key} className="rounded-lg border border-border bg-card p-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-sm font-medium text-foreground">{dt.label}</p>
+                <span className="text-[10px] text-muted-foreground">{pct}%</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className="text-muted-foreground">Entregues: </span>
+                  <span className="font-semibold tabular">{stat.delivered}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Participou: </span>
+                  <span className="font-semibold tabular text-success">{stat.participated}</span>
+                </div>
+              </div>
+              {stat.delivered > 0 && (
+                <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${pct}%` }} />
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function TabAcompanhamento({ menteeId, mentee }: { menteeId: string; mentee: MenteeWithStats }) {
   const [stats, setStats] = useState({ indications: 0, converted: 0, convertedValue: 0, revenue: 0, testimonials: 0, sessions: 0, extras: 0 })
   const supabase = createClient()
 
@@ -1257,6 +1719,12 @@ function TabAcompanhamento({ menteeId }: { menteeId: string }) {
 
       {/* Cards grid — all same width */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden lg:col-span-2">
+          <CardMenteeTasks menteeId={menteeId} />
+        </div>
+        <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden lg:col-span-2">
+          <CardEntregasMentoria menteeId={menteeId} startDate={mentee.start_date} />
+        </div>
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
           <CardIndicacoes menteeId={menteeId} />
         </div>
@@ -1270,7 +1738,7 @@ function TabAcompanhamento({ menteeId }: { menteeId: string }) {
           <CardExtraDeliveries menteeId={menteeId} />
         </div>
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-          <TabTestimonials menteeId={menteeId} />
+          <TabTestimonials menteeId={menteeId} mentee={mentee} />
         </div>
       </div>
     </div>
@@ -1416,7 +1884,7 @@ function CardExtraDeliveries({ menteeId }: { menteeId: string }) {
   )
 }
 
-// ─── Tab: Receita Nova ───
+// ─── Tab: LTV do Mentorado ───
 function TabRevenue({ menteeId }: { menteeId: string }) {
   const [items, setItems] = useState<RevenueRecord[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -1534,7 +2002,7 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
       {/* Card header */}
       <div className="flex items-center gap-2 -mx-4 -mt-4 px-4 py-3 border-b border-border bg-muted/30">
         <DollarSign className="h-4 w-4 text-success" />
-        <h3 className="font-heading font-semibold text-sm">Receita</h3>
+        <h3 className="font-heading font-semibold text-sm">LTV do Mentorado</h3>
         <span className="text-xs font-medium text-success tabular ml-auto">
           R$ {totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
         </span>
@@ -1665,13 +2133,21 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
 }
 
 // ─── Card: Indicações CS ───
+function parseCurrencyInd(raw: string): number {
+  return parseInt(raw.replace(/\D/g, '') || '0', 10)
+}
+function fmtCurrencyInd(cents: number): string {
+  return (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 function CardIndicacoes({ menteeId }: { menteeId: string }) {
-  // Indications state
   const [indications, setIndications] = useState<Indication[]>([])
-  const [showIndForm, setShowIndForm] = useState(false)
-  const [editingIndId, setEditingIndId] = useState<string | null>(null)
-  const [indName, setIndName] = useState('')
-  const [indPhone, setIndPhone] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [indDate, setIndDate] = useState('')
+  const [qtyIndicated, setQtyIndicated] = useState('')
+  const [qtyConfirmed, setQtyConfirmed] = useState('')
+  const [revenueCents, setRevenueCents] = useState(0)
   const [indLoading, setIndLoading] = useState(false)
   const [confirmDeleteInd, setConfirmDeleteInd] = useState<string | null>(null)
 
@@ -1684,29 +2160,52 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
-  // ─── Indications handlers ───
-  function openEditInd(ind: Indication) {
-    setEditingIndId(ind.id); setIndName(ind.indicated_name); setIndPhone(ind.indicated_phone)
-    setShowIndForm(true)
+  function resetForm() {
+    setEditingId(null); setIndDate(''); setQtyIndicated(''); setQtyConfirmed(''); setRevenueCents(0)
   }
-  function resetIndForm() {
-    setEditingIndId(null); setIndName(''); setIndPhone(''); setShowIndForm(false)
+
+  function openEdit(ind: Indication) {
+    setEditingId(ind.id)
+    setIndDate(ind.indication_date ?? '')
+    setQtyIndicated(String(ind.quantity_indicated ?? 0))
+    setQtyConfirmed(String(ind.quantity_confirmed ?? 0))
+    setRevenueCents(Math.round((ind.revenue_generated ?? 0) * 100))
+    setShowForm(true)
   }
-  async function handleSubmitInd(e: React.FormEvent) {
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setIndLoading(true)
-    if (editingIndId) {
-      await updateIndication(editingIndId, { indicated_name: indName, indicated_phone: indPhone })
-    } else {
-      await addIndication(menteeId, indName, indPhone)
+    const data = {
+      indication_date: indDate,
+      quantity_indicated: parseInt(qtyIndicated || '0', 10),
+      quantity_confirmed: parseInt(qtyConfirmed || '0', 10),
+      revenue_generated: revenueCents / 100,
     }
-    resetIndForm(); setIndLoading(false); fetchAll()
+    if (editingId) {
+      await updateIndication(editingId, data)
+    } else {
+      await addIndication(menteeId, data)
+    }
+    setIndLoading(false); fetchAll()
+    // Keep form open for adding in series (reset fields but don't close)
+    if (!editingId) {
+      resetForm()
+      // Keep showForm true for "+" series flow
+    } else {
+      resetForm(); setShowForm(false)
+    }
   }
-  async function handleDeleteInd(id: string) {
+
+  async function handleDelete(id: string) {
     setConfirmDeleteInd(null)
     setIndications((prev) => prev.filter((i) => i.id !== id))
     const undoTimeout = setTimeout(async () => { await deleteIndication(id); fetchAll() }, 5000)
     toast('Indicação excluída', { action: { label: 'Desfazer', onClick: () => { clearTimeout(undoTimeout); fetchAll() } }, duration: 5000 })
   }
+
+  const totalIndicated = indications.reduce((s, i) => s + (i.quantity_indicated ?? 0), 0)
+  const totalConfirmed = indications.reduce((s, i) => s + (i.quantity_confirmed ?? 0), 0)
+  const totalRevenue = indications.reduce((s, i) => s + Number(i.revenue_generated ?? 0), 0)
 
   return (
     <div className="p-4 space-y-4">
@@ -1715,89 +2214,117 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
         <Users className="h-4 w-4 text-accent" />
         <h3 className="font-heading font-semibold text-sm">Indicações</h3>
         <div className="flex items-center gap-1.5 ml-auto">
-          {indications.filter((i) => i.converted).length > 0 && (
-            <span className="text-[10px] text-success font-medium">{indications.filter((i) => i.converted).length} convertidas</span>
+          {totalConfirmed > 0 && (
+            <span className="text-[10px] text-success font-medium">{totalConfirmed} confirmadas</span>
           )}
-          <Badge variant="muted" className="text-[10px]">{indications.length}</Badge>
+          <Badge variant="muted" className="text-[10px]">{totalIndicated} indicados</Badge>
         </div>
       </div>
 
+      {/* Summary */}
+      {indications.length > 0 && (
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-md border border-border bg-card p-2">
+            <p className="text-[10px] text-muted-foreground">Indicados</p>
+            <p className="font-bold text-sm tabular">{totalIndicated}</p>
+          </div>
+          <div className="rounded-md border border-border bg-card p-2">
+            <p className="text-[10px] text-muted-foreground">Confirmados</p>
+            <p className="font-bold text-sm tabular text-success">{totalConfirmed}</p>
+          </div>
+          <div className="rounded-md border border-border bg-card p-2">
+            <p className="text-[10px] text-muted-foreground">Receita</p>
+            <p className="font-bold text-sm tabular text-success">R$ {totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-end">
-        <Button size="sm" variant="outline" onClick={() => { resetIndForm(); setShowIndForm(!showIndForm) }}>
-          <Plus className="mr-1 h-3 w-3" /> Registrar indicação
+        <Button size="sm" variant="outline" onClick={() => { resetForm(); setShowForm(!showForm) }}>
+          <Plus className="mr-1 h-3 w-3" /> Registrar
         </Button>
       </div>
 
-      <Dialog open={showIndForm} onOpenChange={(open) => { if (!open) resetIndForm() }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingIndId ? 'Editar indicação' : 'Nova indicação'}</DialogTitle>
-            <DialogDescription>Registre uma indicação feita pelo mentorado.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmitInd} className="space-y-3">
+      {showForm && (
+        <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-border bg-muted/50 p-4">
+          <div className="flex items-center justify-between">
+            <p className="label-xs">{editingId ? 'Editar registro' : 'Nova indicação'}</p>
+            {!editingId && (
+              <p className="text-[10px] text-muted-foreground">O formulário fica aberto para adicionar em série</p>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="ind-name">Nome do indicado *</Label>
-              <Input id="ind-name" value={indName} onChange={(e) => setIndName(e.target.value)} required />
+              <Label htmlFor="ind-date">Data *</Label>
+              <Input id="ind-date" type="date" value={indDate} onChange={(e) => setIndDate(e.target.value)} required />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="ind-phone">Telefone *</Label>
-              <Input id="ind-phone" value={indPhone} onChange={(e) => setIndPhone(e.target.value)} required />
+              <Label htmlFor="ind-qty">Qtd. indicados *</Label>
+              <Input id="ind-qty" type="number" min="0" value={qtyIndicated} onChange={(e) => setQtyIndicated(e.target.value)} required />
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={resetIndForm}>Cancelar</Button>
-              <Button type="submit" disabled={indLoading}>{indLoading ? 'Salvando...' : 'Salvar'}</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+            <div className="space-y-1">
+              <Label htmlFor="ind-confirmed">Qtd. confirmados</Label>
+              <Input id="ind-confirmed" type="number" min="0" value={qtyConfirmed} onChange={(e) => setQtyConfirmed(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="ind-revenue">Receita gerada</Label>
+              <Input
+                id="ind-revenue"
+                inputMode="numeric"
+                value={revenueCents > 0 ? `R$ ${fmtCurrencyInd(revenueCents)}` : ''}
+                placeholder="R$ 0,00"
+                onChange={(e) => setRevenueCents(parseCurrencyInd(e.target.value))}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => { resetForm(); setShowForm(false) }}>Fechar</Button>
+            <Button type="submit" size="sm" disabled={indLoading}>
+              {indLoading ? 'Salvando...' : editingId ? 'Salvar' : <><Plus className="h-3 w-3 mr-1" /> Adicionar</>}
+            </Button>
+          </div>
+        </form>
+      )}
 
-      {indications.length === 0 && (
+      {indications.length === 0 && !showForm && (
         <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
           <Users className="h-8 w-8 mb-2 opacity-40" />
           <p className="text-sm">Nenhuma indicação registrada</p>
-          <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => { resetIndForm(); setShowIndForm(true) }}>
+          <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => { resetForm(); setShowForm(true) }}>
             <Plus className="h-3 w-3 mr-1" /> Registrar primeira
           </Button>
         </div>
       )}
+
       {indications.map((item) => (
-        <div key={item.id} className={`group rounded-lg border p-3 text-sm transition-colors hover:bg-muted/30 ${item.converted ? 'border-success/30 bg-success/5' : 'border-border bg-card'}`}>
+        <div key={item.id} className="group rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:bg-muted/30">
           <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="font-medium text-foreground">{item.indicated_name}</p>
-                {item.converted && <Badge variant="success" className="text-[10px]">Converteu</Badge>}
+            <div className="space-y-1">
+              <p className="font-medium text-foreground">
+                {item.indication_date ? new Date(item.indication_date).toLocaleDateString('pt-BR') : 'Sem data'}
+              </p>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span>{item.quantity_indicated ?? 0} indicados</span>
+                <span className="text-success">{item.quantity_confirmed ?? 0} confirmados</span>
+                {Number(item.revenue_generated) > 0 && (
+                  <span className="text-success font-medium">R$ {Number(item.revenue_generated).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                )}
               </div>
-              <p className="text-muted-foreground">{item.indicated_phone}</p>
-              {item.converted && item.converted_name && (
-                <p className="text-xs text-success mt-1">Fechou: {item.converted_name} {item.converted_value ? `— R$ ${Number(item.converted_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}</p>
-              )}
             </div>
-            <div className="flex items-center gap-1">
-              {!item.converted && (
-                <Button size="sm" variant="ghost" className="h-7 text-[10px] text-success" onClick={async () => {
-                  const name = window.prompt('Quem fechou?')
-                  if (!name) return
-                  const valueStr = window.prompt('Valor (ex: 5000)')
-                  const value = valueStr ? parseFloat(valueStr) : undefined
-                  await updateIndication(item.id, { converted: true, converted_name: name, converted_value: value, converted_at: new Date().toISOString().split('T')[0] })
-                  fetchAll()
-                }}>Converteu?</Button>
-              )}
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditInd(item)} aria-label="Editar"><Pencil className="h-3 w-3" /></Button>
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteInd(item.id)} aria-label="Excluir"><Trash2 className="h-3 w-3" /></Button>
-              </div>
+            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(item)} aria-label="Editar"><Pencil className="h-3 w-3" /></Button>
+              <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteInd(item.id)} aria-label="Excluir"><Trash2 className="h-3 w-3" /></Button>
             </div>
           </div>
         </div>
       ))}
+
       <Dialog open={!!confirmDeleteInd} onOpenChange={() => setConfirmDeleteInd(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>Excluir indicação?</DialogTitle><DialogDescription>Esta ação não pode ser desfeita.</DialogDescription></DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmDeleteInd(null)}>Cancelar</Button>
-            <Button variant="destructive" onClick={() => confirmDeleteInd && handleDeleteInd(confirmDeleteInd)}>Excluir</Button>
+            <Button variant="destructive" onClick={() => confirmDeleteInd && handleDelete(confirmDeleteInd)}>Excluir</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1805,351 +2332,136 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
   )
 }
 
-// ─── Tab: Intensivo ───
+// ─── Tab: Eventos ───
 function TabIntensivo({ menteeId }: { menteeId: string }) {
   const [intensivos, setIntensivos] = useState<IntensivoRecord[]>([])
+  const [encontros, setEncontros] = useState<Database['public']['Tables']['presential_events']['Row'][]>([])
 
-  // Indicação form state
-  const [showIndForm, setShowIndForm] = useState(false)
-  const [editingIndId, setEditingIndId] = useState<string | null>(null)
-  const [indName, setIndName] = useState('')
-  const [indPhone, setIndPhone] = useState('')
-  const [indLoading, setIndLoading] = useState(false)
+  const [showIntForm, setShowIntForm] = useState(false)
+  const [intDate, setIntDate] = useState('')
+  const [intLoading, setIntLoading] = useState(false)
 
-  // Participação form state
-  const [showPartForm, setShowPartForm] = useState(false)
-  const [editingPartId, setEditingPartId] = useState<string | null>(null)
-  const [partDate, setPartDate] = useState('')
-  const [partLoading, setPartLoading] = useState(false)
+  const [showEncForm, setShowEncForm] = useState(false)
+  const [encDate, setEncDate] = useState('')
+  const [encLoading, setEncLoading] = useState(false)
 
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<{ id: string; type: 'intensivo' | 'encontro' } | null>(null)
   const supabase = createClient()
 
   const fetchData = useCallback(() => {
-    supabase.from('intensivo_records').select('*').eq('mentee_id', menteeId)
+    supabase.from('intensivo_records').select('*').eq('mentee_id', menteeId).eq('participated', true)
       .order('created_at', { ascending: false }).then(({ data }) => { if (data) setIntensivos(data) })
+    supabase.from('presential_events').select('*').eq('mentee_id', menteeId)
+      .order('created_at', { ascending: false }).then(({ data }) => { if (data) setEncontros(data) })
   }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  // Split records into two lists
-  const indicacoes = intensivos.filter((r) => r.indication_name)
-  const participacoes = intensivos.filter((r) => r.participated)
-
-  // ─── Indicação handlers ───
-  function resetIndForm() {
-    setEditingIndId(null); setIndName(''); setIndPhone(''); setShowIndForm(false)
-  }
-  function openEditInd(rec: IntensivoRecord) {
-    setEditingIndId(rec.id); setIndName(rec.indication_name || ''); setIndPhone(rec.indication_phone || '')
-    setShowIndForm(true)
-  }
-  async function handleSubmitInd(e: React.FormEvent) {
-    e.preventDefault(); setIndLoading(true)
-    const data = { participated: false, indication_name: indName, indication_phone: indPhone || undefined }
-    if (editingIndId) {
-      await updateIntensivoRecord(editingIndId, data)
-    } else {
-      await addIntensivoRecord(menteeId, data)
-    }
-    resetIndForm(); setIndLoading(false); fetchData()
+  async function handleAddIntensivo(e: React.FormEvent) {
+    e.preventDefault(); setIntLoading(true)
+    await addIntensivoRecord(menteeId, { participated: true, participation_date: intDate || undefined })
+    setIntDate(''); setShowIntForm(false); setIntLoading(false); fetchData()
   }
 
-  // ─── Participação handlers ───
-  function resetPartForm() {
-    setEditingPartId(null); setPartDate(''); setShowPartForm(false)
-  }
-  function openEditPart(rec: IntensivoRecord) {
-    setEditingPartId(rec.id); setPartDate(rec.participation_date || '')
-    setShowPartForm(true)
-  }
-  async function handleSubmitPart(e: React.FormEvent) {
-    e.preventDefault(); setPartLoading(true)
-    const data = { participated: true, participation_date: partDate || undefined }
-    if (editingPartId) {
-      await updateIntensivoRecord(editingPartId, data)
-    } else {
-      await addIntensivoRecord(menteeId, data)
-    }
-    resetPartForm(); setPartLoading(false); fetchData()
+  async function handleAddEncontro(e: React.FormEvent) {
+    e.preventDefault(); setEncLoading(true)
+    await supabase.from('presential_events').insert({ mentee_id: menteeId, event_date: encDate })
+    setEncDate(''); setShowEncForm(false); setEncLoading(false); fetchData()
   }
 
-  // ─── Delete handler ───
-  async function handleDelete(id: string) {
+  async function handleDelete() {
+    if (!confirmDeleteId) return
+    const { id, type } = confirmDeleteId
     setConfirmDeleteId(null)
-    setIntensivos((prev) => prev.filter((i) => i.id !== id))
-    const undoTimeout = setTimeout(async () => { await deleteIntensivoRecord(id); fetchData() }, 5000)
-    toast('Registro excluído', { action: { label: 'Desfazer', onClick: () => { clearTimeout(undoTimeout); fetchData() } }, duration: 5000 })
+    if (type === 'intensivo') {
+      setIntensivos((prev) => prev.filter((i) => i.id !== id))
+      const undoTimeout = setTimeout(async () => { await deleteIntensivoRecord(id); fetchData() }, 5000)
+      toast('Registro excluído', { action: { label: 'Desfazer', onClick: () => { clearTimeout(undoTimeout); fetchData() } }, duration: 5000 })
+    } else {
+      setEncontros((prev) => prev.filter((i) => i.id !== id))
+      const undoTimeout = setTimeout(async () => { await supabase.from('presential_events').delete().eq('id', id); fetchData() }, 5000)
+      toast('Registro excluído', { action: { label: 'Desfazer', onClick: () => { clearTimeout(undoTimeout); fetchData() } }, duration: 5000 })
+    }
   }
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* ═══ SEÇÃO 1: Indicação para o Intensivo ═══ */}
+      {/* ═══ Participação no Intensivo ═══ */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <p className="label-xs uppercase">Indicação para o Intensivo ({indicacoes.length})</p>
-          <Button size="sm" variant="outline" onClick={() => { resetIndForm(); setShowIndForm(!showIndForm) }}>
+          <p className="label-xs uppercase">Participação no Intensivo ({intensivos.length})</p>
+          <Button size="sm" variant="outline" onClick={() => setShowIntForm(!showIntForm)}>
             <Plus className="mr-1 h-3 w-3" /> Registrar
           </Button>
         </div>
-
-        <Dialog open={showIndForm} onOpenChange={(open) => { if (!open) resetIndForm() }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingIndId ? 'Editar indicação' : 'Nova indicação para o intensivo'}</DialogTitle>
-              <DialogDescription>Registre uma indicação feita pelo mentorado para o intensivo.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmitInd} className="space-y-3">
-              <div className="space-y-1">
-                <Label htmlFor="int-ind-name">Nome do indicado *</Label>
-                <Input id="int-ind-name" value={indName} onChange={(e) => setIndName(e.target.value)} required />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="int-ind-phone">Telefone</Label>
-                <Input id="int-ind-phone" value={indPhone} onChange={(e) => setIndPhone(e.target.value)} />
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={resetIndForm}>Cancelar</Button>
-                <Button type="submit" disabled={indLoading}>{indLoading ? 'Salvando...' : 'Salvar'}</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {indicacoes.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-            <Users className="h-8 w-8 mb-2 opacity-40" />
-            <p className="text-sm">Nenhuma indicação registrada</p>
-            <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => { resetIndForm(); setShowIndForm(true) }}>
-              <Plus className="h-3 w-3 mr-1" /> Registrar primeira
-            </Button>
-          </div>
-        )}
-        {indicacoes.map((item) => (
-          <div key={item.id} className={`group rounded-lg border p-3 text-sm transition-colors hover:bg-muted/30 ${item.converted ? 'border-success/30 bg-success/5' : 'border-border bg-card'}`}>
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="font-medium text-foreground">{item.indication_name}</p>
-                  {item.converted && <Badge variant="success" className="text-[10px]">Converteu</Badge>}
-                </div>
-                {item.indication_phone && <p className="text-muted-foreground">{item.indication_phone}</p>}
-                {item.converted && item.converted_name && (
-                  <p className="text-xs text-success mt-1">Fechou: {item.converted_name} {item.converted_value ? `— R$ ${Number(item.converted_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}</p>
-                )}
-              </div>
-              <div className="flex items-center gap-1">
-                {!item.converted && (
-                  <Button size="sm" variant="ghost" className="h-7 text-[10px] text-success" onClick={async () => {
-                    const name = window.prompt('Quem fechou?')
-                    if (!name) return
-                    const valueStr = window.prompt('Valor (ex: 5000)')
-                    const value = valueStr ? parseFloat(valueStr) : undefined
-                    await updateIntensivoRecord(item.id, { converted: true, converted_name: name, converted_value: value })
-                    fetchData()
-                  }}>Converteu?</Button>
-                )}
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditInd(item)} aria-label="Editar"><Pencil className="h-3 w-3" /></Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteId(item.id)} aria-label="Excluir"><Trash2 className="h-3 w-3" /></Button>
-                </div>
-              </div>
+        {showIntForm && (
+          <form onSubmit={handleAddIntensivo} className="flex items-end gap-2 rounded-lg border border-border bg-muted/50 p-3">
+            <div className="flex-1 space-y-1">
+              <Label className="text-xs">Data *</Label>
+              <Input type="date" value={intDate} onChange={(e) => setIntDate(e.target.value)} required className="h-8 text-xs" />
             </div>
+            <Button type="submit" size="sm" className="h-8" disabled={intLoading}>{intLoading ? 'Salvando...' : 'Salvar'}</Button>
+            <Button type="button" size="sm" variant="ghost" className="h-8" onClick={() => setShowIntForm(false)}>X</Button>
+          </form>
+        )}
+        {intensivos.length === 0 && !showIntForm && (
+          <p className="text-sm text-muted-foreground text-center py-4">Nenhuma participação registrada</p>
+        )}
+        {intensivos.map((item) => (
+          <div key={item.id} className="group flex items-center justify-between rounded-lg border border-border bg-card p-3 text-sm hover:bg-muted/30">
+            <div className="flex items-center gap-2">
+              <Badge variant="success" className="text-[10px]">Participou</Badge>
+              <span className="text-muted-foreground text-xs">{item.participation_date ? formatDateBR(item.participation_date) : '—'}</span>
+            </div>
+            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100" onClick={() => setConfirmDeleteId({ id: item.id, type: 'intensivo' })}><Trash2 className="h-3 w-3" /></Button>
           </div>
         ))}
       </div>
 
       <Separator className="border-border/50" />
 
-      {/* ═══ SEÇÃO 2: Participação do Intensivo ═══ */}
+      {/* ═══ Encontro da Elite Premium ═══ */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <p className="label-xs uppercase">Participação do Intensivo ({participacoes.length})</p>
-          <Button size="sm" variant="outline" onClick={() => { resetPartForm(); setShowPartForm(!showPartForm) }}>
+          <p className="label-xs uppercase">Encontro da Elite Premium ({encontros.length})</p>
+          <Button size="sm" variant="outline" onClick={() => setShowEncForm(!showEncForm)}>
             <Plus className="mr-1 h-3 w-3" /> Registrar
           </Button>
         </div>
-
-        <Dialog open={showPartForm} onOpenChange={(open) => { if (!open) resetPartForm() }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingPartId ? 'Editar participação' : 'Nova participação no intensivo'}</DialogTitle>
-              <DialogDescription>Registre a participação do mentorado no intensivo.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmitPart} className="space-y-3">
-              <div className="space-y-1">
-                <Label htmlFor="int-part-date">Data de participação *</Label>
-                <Input id="int-part-date" type="date" value={partDate} onChange={(e) => setPartDate(e.target.value)} required />
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={resetPartForm}>Cancelar</Button>
-                <Button type="submit" disabled={partLoading}>{partLoading ? 'Salvando...' : 'Salvar'}</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {participacoes.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-            <Calendar className="h-8 w-8 mb-2 opacity-40" />
-            <p className="text-sm">Nenhuma participação registrada</p>
-            <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => { resetPartForm(); setShowPartForm(true) }}>
-              <Plus className="h-3 w-3 mr-1" /> Registrar primeira
-            </Button>
-          </div>
-        )}
-        {participacoes.map((item) => (
-          <div key={item.id} className="group rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:bg-muted/30">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-2">
-                <Badge variant="success">Participou</Badge>
-                {item.participation_date && <span className="text-muted-foreground text-xs">{formatDateBR(item.participation_date)}</span>}
-              </div>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditPart(item)} aria-label="Editar"><Pencil className="h-3 w-3" /></Button>
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteId(item.id)} aria-label="Excluir"><Trash2 className="h-3 w-3" /></Button>
-              </div>
+        {showEncForm && (
+          <form onSubmit={handleAddEncontro} className="flex items-end gap-2 rounded-lg border border-border bg-muted/50 p-3">
+            <div className="flex-1 space-y-1">
+              <Label className="text-xs">Data *</Label>
+              <Input type="date" value={encDate} onChange={(e) => setEncDate(e.target.value)} required className="h-8 text-xs" />
             </div>
+            <Button type="submit" size="sm" className="h-8" disabled={encLoading}>{encLoading ? 'Salvando...' : 'Salvar'}</Button>
+            <Button type="button" size="sm" variant="ghost" className="h-8" onClick={() => setShowEncForm(false)}>X</Button>
+          </form>
+        )}
+        {encontros.length === 0 && !showEncForm && (
+          <p className="text-sm text-muted-foreground text-center py-4">Nenhuma participação registrada</p>
+        )}
+        {encontros.map((item) => (
+          <div key={item.id} className="group flex items-center justify-between rounded-lg border border-border bg-card p-3 text-sm hover:bg-muted/30">
+            <div className="flex items-center gap-2">
+              <Badge variant="success" className="text-[10px]">Participou</Badge>
+              <span className="text-muted-foreground text-xs">{item.event_date ? formatDateBR(item.event_date) : '—'}</span>
+            </div>
+            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100" onClick={() => setConfirmDeleteId({ id: item.id, type: 'encontro' })}><Trash2 className="h-3 w-3" /></Button>
           </div>
         ))}
       </div>
 
-      <Separator className="border-border/50" />
-
-      {/* ═══ SEÇÃO 3: Encontro Presencial ═══ */}
-      <CardPresentialEvents menteeId={menteeId} />
-
-      {/* Confirm delete dialog (shared) */}
+      {/* Confirm delete dialog */}
       <Dialog open={!!confirmDeleteId} onOpenChange={() => setConfirmDeleteId(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>Excluir registro?</DialogTitle><DialogDescription>Esta ação não pode ser desfeita.</DialogDescription></DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>Cancelar</Button>
-            <Button variant="destructive" onClick={() => confirmDeleteId && handleDelete(confirmDeleteId)}>Excluir</Button>
+            <Button variant="destructive" onClick={handleDelete}>Excluir</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  )
-}
-
-// ─── Card: Encontro Presencial (Gap 4) ───
-function CardPresentialEvents({ menteeId }: { menteeId: string }) {
-  const [items, setItems] = useState<Database['public']['Tables']['presential_events']['Row'][]>([])
-  const [showForm, setShowForm] = useState(false)
-  const [eventDate, setEventDate] = useState('')
-  const [broughtGuest, setBroughtGuest] = useState(false)
-  const [guestName, setGuestName] = useState('')
-  const [guestPhone, setGuestPhone] = useState('')
-  const [eventNotes, setEventNotes] = useState('')
-  const [loading, setLoading] = useState(false)
-  const supabase = createClient()
-
-  const fetchData = useCallback(() => {
-    supabase.from('presential_events').select('*').eq('mentee_id', menteeId)
-      .order('event_date', { ascending: false }).then(({ data }) => { if (data) setItems(data) })
-  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchData() }, [fetchData])
-
-  function resetForm() { setEventDate(''); setBroughtGuest(false); setGuestName(''); setGuestPhone(''); setEventNotes(''); setShowForm(false) }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault(); setLoading(true)
-    await addPresentialEvent(menteeId, {
-      event_date: eventDate,
-      brought_guest: broughtGuest,
-      guest_name: broughtGuest ? guestName || undefined : undefined,
-      guest_phone: broughtGuest ? guestPhone || undefined : undefined,
-      notes: eventNotes || undefined,
-    })
-    resetForm(); setLoading(false); fetchData()
-  }
-
-  const totalGuests = items.filter((i) => i.brought_guest).length
-  const totalConverted = items.filter((i) => i.converted).length
-  const totalValue = items.reduce((s, i) => s + Number(i.converted_value ?? 0), 0)
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <p className="label-xs uppercase">Encontro Presencial ({items.length})</p>
-        <Button size="sm" variant="outline" onClick={() => { resetForm(); setShowForm(!showForm) }}><Plus className="mr-1 h-3 w-3" /> Registrar</Button>
-      </div>
-
-      {items.length > 0 && (
-        <div className="flex gap-3 text-xs text-muted-foreground">
-          <span>{items.length} participações</span>
-          <span>{totalGuests} convidados</span>
-          <span className="text-success">{totalConverted} converteram</span>
-          {totalValue > 0 && <span className="text-success font-medium">R$ {totalValue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>}
-        </div>
-      )}
-
-      <Dialog open={showForm} onOpenChange={(open) => { if (!open) resetForm() }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Registrar Encontro Presencial</DialogTitle>
-            <DialogDescription>Registre a participação no encontro presencial da mentoria.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="space-y-1"><Label>Data do encontro *</Label><Input type="date" value={eventDate} onChange={(e) => setEventDate(e.target.value)} required /></div>
-            <div className="flex items-center gap-2">
-              <input type="checkbox" id="pe-guest" checked={broughtGuest} onChange={(e) => setBroughtGuest(e.target.checked)} className="h-4 w-4 rounded border-input" />
-              <Label htmlFor="pe-guest">Levou convidado</Label>
-            </div>
-            {broughtGuest && (
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1"><Label>Nome do convidado</Label><Input value={guestName} onChange={(e) => setGuestName(e.target.value)} /></div>
-                <div className="space-y-1"><Label>Telefone</Label><Input value={guestPhone} onChange={(e) => setGuestPhone(e.target.value)} /></div>
-              </div>
-            )}
-            <div className="space-y-1"><Label>Observações</Label><Input value={eventNotes} onChange={(e) => setEventNotes(e.target.value)} /></div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={resetForm}>Cancelar</Button>
-              <Button type="submit" disabled={loading}>{loading ? 'Salvando...' : 'Salvar'}</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {items.length === 0 && !showForm && (
-        <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-          <Calendar className="h-8 w-8 mb-2 opacity-40" />
-          <p className="text-sm">Nenhum encontro registrado</p>
-          <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => setShowForm(true)}><Plus className="h-3 w-3 mr-1" /> Registrar primeiro</Button>
-        </div>
-      )}
-
-      {items.map((item) => (
-        <div key={item.id} className={`group rounded-lg border p-3 text-sm transition-colors hover:bg-muted/30 ${item.converted ? 'border-success/30 bg-success/5' : 'border-border bg-card'}`}>
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">{formatDateBR(item.event_date)}</span>
-                {item.brought_guest && <Badge variant="info" className="text-[10px]">Convidado</Badge>}
-                {item.converted && <Badge variant="success" className="text-[10px]">Converteu</Badge>}
-              </div>
-              {item.guest_name && <p className="mt-1 text-foreground">Convidado: {item.guest_name} {item.guest_phone ? `— ${item.guest_phone}` : ''}</p>}
-              {item.converted && item.converted_name && (
-                <p className="text-xs text-success mt-0.5">Fechou: {item.converted_name} {item.converted_value ? `— R$ ${Number(item.converted_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}</p>
-              )}
-              {item.notes && <p className="text-xs text-muted-foreground mt-0.5">{item.notes}</p>}
-            </div>
-            <div className="flex items-center gap-1">
-              {item.brought_guest && !item.converted && (
-                <Button size="sm" variant="ghost" className="h-7 text-[10px] text-success" onClick={async () => {
-                  const name = window.prompt('Quem fechou?')
-                  if (!name) return
-                  const valueStr = window.prompt('Valor (ex: 5000)')
-                  const value = valueStr ? parseFloat(valueStr) : undefined
-                  await updatePresentialEvent(item.id, { converted: true, converted_name: name, converted_value: value })
-                  fetchData()
-                }}>Converteu?</Button>
-              )}
-            </div>
-          </div>
-        </div>
-      ))}
     </div>
   )
 }
@@ -2541,7 +2853,7 @@ const TESTIMONIAL_CATEGORIES: { value: TestimonialCategory; label: string }[] = 
   { value: 'encontro_elite_premium', label: 'Encontro Elite Premium' },
 ]
 
-function TabTestimonials({ menteeId }: { menteeId: string }) {
+function TabTestimonials({ menteeId, mentee }: { menteeId: string; mentee: MenteeWithStats }) {
   const [items, setItems] = useState<Testimonial[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -2555,6 +2867,7 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
   const [uploading, setUploading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [defaultEmployeeCount, setDefaultEmployeeCount] = useState('')
   const supabase = createClient()
 
   const fetchData = useCallback(() => {
@@ -2567,6 +2880,22 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
   }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  // Fetch num_colaboradores from action plan for auto-fill
+  useEffect(() => {
+    supabase
+      .from('action_plans')
+      .select('data')
+      .eq('mentee_id', menteeId)
+      .not('data', 'is', null)
+      .maybeSingle()
+      .then(({ data: ap }) => {
+        if (ap?.data) {
+          const d = ap.data as Record<string, unknown>
+          if (d.num_colaboradores) setDefaultEmployeeCount(String(d.num_colaboradores))
+        }
+      })
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function toggleCategory(cat: TestimonialCategory) {
     setCategories((prev) =>
@@ -2688,7 +3017,15 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
         <Badge variant="muted" className="text-[10px] ml-auto">{items.length}</Badge>
       </div>
       <div className="flex items-center justify-end">
-        <Button size="sm" variant="outline" onClick={() => { resetForm(); setShowForm(!showForm) }}>
+        <Button size="sm" variant="outline" onClick={() => {
+          resetForm()
+          if (!showForm) {
+            if (mentee.niche) setNiche(mentee.niche)
+            if (mentee.faturamento_atual != null) setRevenueRange(`R$ ${mentee.faturamento_atual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)
+            if (defaultEmployeeCount) setEmployeeCount(defaultEmployeeCount)
+          }
+          setShowForm(!showForm)
+        }}>
           <Plus className="mr-1 h-3 w-3" /> Registrar
         </Button>
       </div>

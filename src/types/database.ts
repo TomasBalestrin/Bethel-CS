@@ -340,18 +340,26 @@ export interface Database {
           converted_name: string | null
           converted_value: number | null
           converted_at: string | null
+          indication_date: string | null
+          quantity_indicated: number
+          quantity_confirmed: number
+          revenue_generated: number
           created_at: string
         }
         Insert: {
           id?: string
           mentee_id: string
-          indicated_name: string
-          indicated_phone: string
+          indicated_name?: string
+          indicated_phone?: string
           notes?: string | null
           converted?: boolean
           converted_name?: string | null
           converted_value?: number | null
           converted_at?: string | null
+          indication_date?: string | null
+          quantity_indicated?: number
+          quantity_confirmed?: number
+          revenue_generated?: number
           created_at?: string
         }
         Update: {
@@ -363,6 +371,10 @@ export interface Database {
           converted_name?: string | null
           converted_value?: number | null
           converted_at?: string | null
+          indication_date?: string | null
+          quantity_indicated?: number
+          quantity_confirmed?: number
+          revenue_generated?: number
         }
         Relationships: []
       }
@@ -748,6 +760,7 @@ export interface Database {
           recording_url: string | null
           recording_status: 'pending' | 'processing' | 'ready' | 'failed' | 'unavailable'
           call_type: 'voice' | 'video'
+          notes: string | null
           created_at: string
         }
         Insert: {
@@ -762,6 +775,7 @@ export interface Database {
           recording_url?: string | null
           recording_status?: 'pending' | 'processing' | 'ready' | 'failed' | 'unavailable'
           call_type?: 'voice' | 'video'
+          notes?: string | null
           created_at?: string
         }
         Update: {
@@ -775,6 +789,152 @@ export interface Database {
           recording_url?: string | null
           recording_status?: 'pending' | 'processing' | 'ready' | 'failed' | 'unavailable'
           call_type?: 'voice' | 'video'
+          notes?: string | null
+        }
+        Relationships: []
+      }
+      delivery_events: {
+        Row: {
+          id: string
+          delivery_type: string
+          delivery_date: string
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          delivery_type: string
+          delivery_date: string
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          delivery_type?: string
+          delivery_date?: string
+          notes?: string | null
+        }
+        Relationships: []
+      }
+      delivery_participations: {
+        Row: {
+          id: string
+          delivery_event_id: string
+          mentee_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          delivery_event_id: string
+          mentee_id: string
+          created_at?: string
+        }
+        Update: {
+          delivery_event_id?: string
+          mentee_id?: string
+        }
+        Relationships: []
+      }
+      task_columns: {
+        Row: {
+          id: string
+          name: string
+          position: number
+          color: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          position?: number
+          color?: string | null
+          created_at?: string
+        }
+        Update: {
+          name?: string
+          position?: number
+          color?: string | null
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          id: string
+          mentee_id: string | null
+          column_id: string | null
+          title: string
+          description: string | null
+          notes: string | null
+          due_date: string | null
+          completed_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          mentee_id?: string | null
+          column_id?: string | null
+          title: string
+          description?: string | null
+          notes?: string | null
+          due_date?: string | null
+          completed_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          mentee_id?: string | null
+          column_id?: string | null
+          title?: string
+          description?: string | null
+          notes?: string | null
+          due_date?: string | null
+          completed_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      task_attachments: {
+        Row: {
+          id: string
+          task_id: string
+          file_url: string
+          file_name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          task_id: string
+          file_url: string
+          file_name: string
+          created_at?: string
+        }
+        Update: {
+          file_url?: string
+          file_name?: string
+        }
+        Relationships: []
+      }
+      attendance_sessions: {
+        Row: {
+          id: string
+          mentee_id: string
+          specialist_id: string
+          started_at: string
+          ended_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          mentee_id: string
+          specialist_id: string
+          started_at?: string
+          ended_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          ended_at?: string | null
         }
         Relationships: []
       }

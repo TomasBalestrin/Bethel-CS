@@ -749,7 +749,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
                 {empresaData.num_colaboradores && <ContactRow icon={Users} label="Colaboradores" value={empresaData.num_colaboradores} color="text-info" bg="bg-info/10" />}
                 {mentee.faturamento_atual != null && <ContactRow icon={DollarSign} label="Faturamento atual" value={formatBRL(mentee.faturamento_atual)} color="text-success" bg="bg-success/10" />}
                 {mentee.faturamento_antes_mentoria != null && <ContactRow icon={DollarSign} label="Fat. antes da mentoria" value={formatBRL(mentee.faturamento_antes_mentoria)} color="text-warning" bg="bg-warning/10" />}
-                {empresaData.faturamento_medio != null && empresaData.faturamento_medio > 0 && <ContactRow icon={DollarSign} label="Fat. médio (formulário)" value={formatBRL(empresaData.faturamento_medio)} color="text-info" bg="bg-info/10" />}
+                {empresaData.faturamento_medio != null && empresaData.faturamento_medio > 0 && <ContactRow icon={DollarSign} label="Fat. médio (formulário)" value={formatBRL(empresaData.faturamento_medio / 100)} color="text-info" bg="bg-info/10" />}
               </div>
               {(empresaData.motivacao_elite_premium || empresaData.expectativas_resultados) && (
                 <div className="px-3 pb-2 space-y-2 border-t border-border/50 pt-2">

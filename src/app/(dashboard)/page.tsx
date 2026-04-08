@@ -296,19 +296,90 @@ export default async function DashboardPage({ searchParams }: Props) {
     ? Math.round(totalAttendanceMinutes / totalAttendanceSessions)
     : 0
 
+  // ─── Attendance by initiator ───
+  let sessionsInitiatedByMentee = 0
+  let sessionsInitiatedByCS = 0
+  if (attendanceMsgs && attendanceMsgs.length > 0) {
+    const byMentee2: Record<string, { sent_at: string; direction: string }[]> = {}
+    for (const m of attendanceMsgs) {
+      if (!byMentee2[m.mentee_id]) byMentee2[m.mentee_id] = []
+      byMentee2[m.mentee_id].push({ sent_at: m.sent_at, direction: m.direction })
+    }
+    for (const msgs of Object.values(byMentee2)) {
+      const sessions2: typeof msgs[] = [[msgs[0]]]
+      for (let i = 1; i < msgs.length; i++) {
+        const gap = new Date(msgs[i].sent_at).getTime() - new Date(msgs[i - 1].sent_at).getTime()
+        if (gap > gapMs) sessions2.push([msgs[i]])
+        else sessions2[sessions2.length - 1].push(msgs[i])
+      }
+      for (const session of sessions2) {
+        const hasOutgoing = session.some((m) => m.direction === 'outgoing')
+        if (!hasOutgoing) continue
+        if (session[0].direction === 'incoming') sessionsInitiatedByMentee++
+        else sessionsInitiatedByCS++
+      }
+    }
+  }
+
+  // ─── Wait time (time from mentee msg until CS replies) ───
+  let totalWaitMs = 0
+  let waitCount = 0
+  if (attendanceMsgs && attendanceMsgs.length > 0) {
+    const byMentee3: Record<string, { sent_at: string; direction: string }[]> = {}
+    for (const m of attendanceMsgs) {
+      if (!byMentee3[m.mentee_id]) byMentee3[m.mentee_id] = []
+      byMentee3[m.mentee_id].push({ sent_at: m.sent_at, direction: m.direction })
+    }
+    for (const msgs of Object.values(byMentee3)) {
+      for (let i = 0; i < msgs.length; i++) {
+        if (msgs[i].direction === 'incoming') {
+          // Find next outgoing message
+          for (let j = i + 1; j < msgs.length; j++) {
+            if (msgs[j].direction === 'outgoing') {
+              const wait = new Date(msgs[j].sent_at).getTime() - new Date(msgs[i].sent_at).getTime()
+              totalWaitMs += wait
+              waitCount++
+              break
+            }
+          }
+        }
+      }
+    }
+  }
+  const avgWaitMinutes = waitCount > 0 ? Math.round(totalWaitMs / waitCount / 60000) : 0
+
+  // ─── Manual attendance sessions (start/stop buttons) ───
+  let manualAttendanceQuery = supabase.from('attendance_sessions').select('started_at, ended_at').not('ended_at', 'is', null)
+  if (startDate) manualAttendanceQuery = manualAttendanceQuery.gte('started_at', startDate)
+  if (endDate) manualAttendanceQuery = manualAttendanceQuery.lte('started_at', endDate + 'T23:59:59')
+  if (specialistId) manualAttendanceQuery = manualAttendanceQuery.eq('specialist_id', specialistId)
+  const { data: manualSessions } = await manualAttendanceQuery
+
+  let totalManualMinutes = 0
+  const manualCount = manualSessions?.length ?? 0
+  manualSessions?.forEach((s) => {
+    if (s.started_at && s.ended_at) {
+      totalManualMinutes += (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 60000
+    }
+  })
+  const avgManualAttendanceMinutes = manualCount > 0 ? Math.round(totalManualMinutes / manualCount) : 0
+
   // ─── SEÇÃO 2: Visão Geral ───
   const allMentees = filteredMentees
-  const totalMentees = allMentees.filter((m) => m.status === 'ativo').length
-  const fitMentees = allMentees.filter((m) => m.cliente_fit && m.status === 'ativo').length
-  const cancelados = allMentees.filter((m) => m.status === 'cancelado').length
+  const activeMentees = allMentees.filter((m) => m.status === 'ativo')
+  const totalMentees = activeMentees.length
+  const fitMentees = activeMentees.filter((m) => m.cliente_fit).length
   const totalIndications = indicationCount ?? 0
 
-  // ─── Revenue growth (faturamento antes vs atual) ───
-  const menteesWithFat = allMentees.filter((m) => m.faturamento_atual != null && m.faturamento_antes_mentoria != null && Number(m.faturamento_antes_mentoria) > 0)
+  // ─── Revenue growth (sum faturamento_atual / sum faturamento_antes) ───
+  const menteesWithFat = activeMentees.filter((m) => m.faturamento_atual != null && m.faturamento_antes_mentoria != null && Number(m.faturamento_antes_mentoria) > 0)
+  const sumFatAtual = menteesWithFat.reduce((s, m) => s + Number(m.faturamento_atual), 0)
+  const sumFatAntes = menteesWithFat.reduce((s, m) => s + Number(m.faturamento_antes_mentoria), 0)
+  const growthPct = sumFatAntes > 0 ? Math.round(((sumFatAtual - sumFatAntes) / sumFatAntes) * 100) : 0
   const growthCount = menteesWithFat.filter((m) => Number(m.faturamento_atual) > Number(m.faturamento_antes_mentoria)).length
-  const avgGrowth = menteesWithFat.length > 0
-    ? Math.round(menteesWithFat.reduce((s, m) => s + ((Number(m.faturamento_atual) - Number(m.faturamento_antes_mentoria)) / Number(m.faturamento_antes_mentoria)) * 100, 0) / menteesWithFat.length)
-    : 0
+
+  // ─── Sum faturamento_atual (Bethel Metrics) ───
+  const totalFaturamentoAtual = activeMentees.reduce((s, m) => s + (m.faturamento_atual != null ? Number(m.faturamento_atual) : 0), 0)
 
   // ─── SEÇÃO 3: Sucesso ───
   const totalRevenue = revenues?.reduce((s, r) => s + Number(r.sale_value), 0) ?? 0
@@ -342,9 +413,6 @@ export default async function DashboardPage({ searchParams }: Props) {
   const totalLigacaoDuration = totalCalls > 0 ? totalCallMinutes : ligacoesManuais.reduce((s, c) => s + Number(c.duration_minutes), 0)
   const totalWhatsapp = totalWppOut > 0 ? totalWppOut : whatsappsManuais.length
   const totalWhatsappIn = totalWppIn
-  const avgWhatsappDuration = whatsappsManuais.length > 0
-    ? Math.round(whatsappsManuais.reduce((s, c) => s + Number(c.duration_minutes), 0) / whatsappsManuais.length)
-    : 0
 
   // ─── SEÇÃO 5: Receita ───
   const revByType: Record<string, number> = {
@@ -382,15 +450,13 @@ export default async function DashboardPage({ searchParams }: Props) {
         totalMentees,
         fitMentees,
         totalIndications,
-        cancelados,
       }}
       section3={{
-        totalRevenue,
+        totalFaturamentoAtual,
         engByType,
         totalTestimonials,
-        cancelados,
         totalStageChanges,
-        avgGrowth,
+        growthPct,
         growthCount,
         growthTotal: menteesWithFat.length,
       }}
@@ -399,8 +465,11 @@ export default async function DashboardPage({ searchParams }: Props) {
         totalLigacaoDuration,
         totalWhatsapp,
         totalWhatsappIn,
-        avgWhatsappDuration,
         totalAtendimentos: totalAttendanceSessions,
+        atendimentosMentee: sessionsInitiatedByMentee,
+        atendimentosCS: sessionsInitiatedByCS,
+        avgWaitMinutes,
+        avgManualAttendanceMinutes,
         totalAttendanceMinutes,
         avgAttendanceMinutes,
       }}

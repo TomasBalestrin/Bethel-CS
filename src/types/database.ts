@@ -916,6 +916,28 @@ export interface Database {
         }
         Relationships: []
       }
+      attendance_sessions: {
+        Row: {
+          id: string
+          mentee_id: string
+          specialist_id: string
+          started_at: string
+          ended_at: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          mentee_id: string
+          specialist_id: string
+          started_at?: string
+          ended_at?: string | null
+          created_at?: string
+        }
+        Update: {
+          ended_at?: string | null
+        }
+        Relationships: []
+      }
       system_settings: {
         Row: {
           key: string

@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
-import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown, Sparkles, ChevronUp, BellOff, Pencil, Check, ClipboardCheck } from 'lucide-react'
+import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown, Sparkles, ChevronUp, BellOff, Pencil, Check, ClipboardCheck, Timer, TimerOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
@@ -91,6 +91,10 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const [callNoteText, setCallNoteText] = useState('')
   const [savingCallNote, setSavingCallNote] = useState(false)
 
+  // Attendance session (start/stop)
+  const [activeSession, setActiveSession] = useState<string | null>(null)
+  const [sessionStart, setSessionStart] = useState<Date | null>(null)
+
   // Create task from chat
   const [taskFormOpen, setTaskFormOpen] = useState(false)
   const [taskTitle, setTaskTitle] = useState('')
@@ -158,6 +162,19 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           .order('created_at', { ascending: false })
           .limit(20)
         if (calls) setCallRecords(calls)
+
+        // Check for active attendance session
+        const { data: activeSess } = await supabase
+          .from('attendance_sessions')
+          .select('id, started_at')
+          .eq('mentee_id', menteeId)
+          .is('ended_at', null)
+          .order('started_at', { ascending: false })
+          .limit(1)
+        if (activeSess && activeSess.length > 0) {
+          setActiveSession(activeSess[0].id)
+          setSessionStart(new Date(activeSess[0].started_at))
+        }
 
         // Fetch latest attendance note
         const { data: notes } = await supabase
@@ -598,6 +615,47 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
             <PhoneCall className="h-3 w-3" />
             Ligações {callRecords.length > 0 && `(${callRecords.length})`}
           </Button>
+          {activeSession ? (
+            <Button
+              size="sm"
+              variant="destructive"
+              className="h-8 gap-1.5 text-xs"
+              onClick={async () => {
+                const sb = createClient()
+                await sb.from('attendance_sessions').update({ ended_at: new Date().toISOString() }).eq('id', activeSession)
+                const dur = sessionStart ? Math.round((Date.now() - sessionStart.getTime()) / 60000) : 0
+                setActiveSession(null)
+                setSessionStart(null)
+                toast.success(`Atendimento finalizado (${dur} min)`)
+              }}
+            >
+              <TimerOff className="h-3 w-3" />
+              <span className="hidden sm:inline">Finalizar</span>
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 text-xs border-success/50 text-success hover:bg-success/10"
+              onClick={async () => {
+                const sb = createClient()
+                const { data: { user } } = await sb.auth.getUser()
+                if (!user) return
+                const { data: sess } = await sb.from('attendance_sessions').insert({
+                  mentee_id: menteeId,
+                  specialist_id: user.id,
+                }).select('id, started_at').single()
+                if (sess) {
+                  setActiveSession(sess.id)
+                  setSessionStart(new Date(sess.started_at))
+                  toast.success('Atendimento iniciado')
+                }
+              }}
+            >
+              <Timer className="h-3 w-3" />
+              <span className="hidden sm:inline">Iniciar</span>
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"

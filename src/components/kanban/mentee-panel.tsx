@@ -46,6 +46,7 @@ import {
   Loader2,
   Building2,
   XCircle,
+  CalendarCheck,
 } from 'lucide-react'
 import { formatDateBR } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
@@ -1473,6 +1474,103 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
 }
 
 // ─── Tab: Acompanhamento (unified grid) ───
+// ─── Card: Entregas Mentoria ───
+const DELIVERY_TYPES = [
+  { key: 'hotseat', label: 'Hotseat' },
+  { key: 'comercial', label: 'Comercial' },
+  { key: 'gestao', label: 'Gestão' },
+  { key: 'mkt', label: 'Mkt' },
+  { key: 'extras', label: 'Entregas Extras' },
+  { key: 'mentoria_individual', label: 'Mentoria Individual' },
+]
+
+function CardEntregasMentoria({ menteeId, startDate }: { menteeId: string; startDate: string | null }) {
+  const [deliveryStats, setDeliveryStats] = useState<Record<string, { delivered: number; participated: number }>>({})
+  const supabase = createClient()
+
+  useEffect(() => {
+    async function fetchDeliveries() {
+      // Fetch all delivery events since mentee start date
+      let eventsQuery = supabase.from('delivery_events').select('id, delivery_type, delivery_date')
+      if (startDate) {
+        eventsQuery = eventsQuery.gte('delivery_date', startDate)
+      }
+      const { data: events } = await eventsQuery
+
+      // Fetch participations for this mentee
+      const { data: participations } = await supabase
+        .from('delivery_participations')
+        .select('delivery_event_id')
+        .eq('mentee_id', menteeId)
+
+      const participatedSet = new Set(participations?.map((p) => p.delivery_event_id) ?? [])
+
+      // Calculate stats per type
+      const stats: Record<string, { delivered: number; participated: number }> = {}
+      for (const dt of DELIVERY_TYPES) {
+        stats[dt.key] = { delivered: 0, participated: 0 }
+      }
+
+      events?.forEach((ev) => {
+        const type = ev.delivery_type
+        if (!stats[type]) stats[type] = { delivered: 0, participated: 0 }
+        stats[type].delivered++
+        if (participatedSet.has(ev.id)) {
+          stats[type].participated++
+        }
+      })
+
+      setDeliveryStats(stats)
+    }
+    fetchDeliveries()
+  }, [menteeId, startDate]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const totalDelivered = Object.values(deliveryStats).reduce((s, d) => s + d.delivered, 0)
+  const totalParticipated = Object.values(deliveryStats).reduce((s, d) => s + d.participated, 0)
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center gap-2 -mx-4 -mt-4 px-4 py-3 border-b border-border bg-muted/30">
+        <CalendarCheck className="h-4 w-4 text-accent" />
+        <h3 className="font-heading font-semibold text-sm">Entregas Mentoria</h3>
+        <span className="text-[10px] text-muted-foreground ml-auto">
+          {totalParticipated}/{totalDelivered} participações
+        </span>
+      </div>
+
+      <div className="space-y-2">
+        {DELIVERY_TYPES.map((dt) => {
+          const stat = deliveryStats[dt.key] ?? { delivered: 0, participated: 0 }
+          const pct = stat.delivered > 0 ? Math.round((stat.participated / stat.delivered) * 100) : 0
+          return (
+            <div key={dt.key} className="rounded-lg border border-border bg-card p-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <p className="text-sm font-medium text-foreground">{dt.label}</p>
+                <span className="text-[10px] text-muted-foreground">{pct}%</span>
+              </div>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className="text-muted-foreground">Entregues: </span>
+                  <span className="font-semibold tabular">{stat.delivered}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Participou: </span>
+                  <span className="font-semibold tabular text-success">{stat.participated}</span>
+                </div>
+              </div>
+              {stat.delivered > 0 && (
+                <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${pct}%` }} />
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function TabAcompanhamento({ menteeId, mentee }: { menteeId: string; mentee: MenteeWithStats }) {
   const [stats, setStats] = useState({ indications: 0, converted: 0, convertedValue: 0, revenue: 0, testimonials: 0, sessions: 0, extras: 0 })
   const supabase = createClient()
@@ -1528,6 +1626,9 @@ function TabAcompanhamento({ menteeId, mentee }: { menteeId: string; mentee: Men
 
       {/* Cards grid — all same width */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden lg:col-span-2">
+          <CardEntregasMentoria menteeId={menteeId} startDate={mentee.start_date} />
+        </div>
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
           <CardIndicacoes menteeId={menteeId} />
         </div>

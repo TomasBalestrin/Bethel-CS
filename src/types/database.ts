@@ -793,6 +793,47 @@ export interface Database {
         }
         Relationships: []
       }
+      delivery_events: {
+        Row: {
+          id: string
+          delivery_type: string
+          delivery_date: string
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          delivery_type: string
+          delivery_date: string
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          delivery_type?: string
+          delivery_date?: string
+          notes?: string | null
+        }
+        Relationships: []
+      }
+      delivery_participations: {
+        Row: {
+          id: string
+          delivery_event_id: string
+          mentee_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          delivery_event_id: string
+          mentee_id: string
+          created_at?: string
+        }
+        Update: {
+          delivery_event_id?: string
+          mentee_id?: string
+        }
+        Relationships: []
+      }
       system_settings: {
         Row: {
           key: string

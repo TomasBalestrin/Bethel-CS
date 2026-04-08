@@ -606,3 +606,108 @@ export async function bulkImportStages(input: BulkStageInput): Promise<BulkImpor
   revalidatePath('/etapas-mentoria')
   return { total: input.rows.length, created, errors }
 }
+
+// ─── Bulk Import: Delivery Events ──────────────────────────────────────────
+
+interface BulkDeliveryEventsInput {
+  rows: { date: string; type: string }[]
+}
+
+export async function bulkImportDeliveryEvents(input: BulkDeliveryEventsInput): Promise<BulkImportResult> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { total: 0, created: 0, errors: [{ row: 0, name: '', error: 'Não autenticado' }] }
+
+  const VALID_TYPES = ['hotseat', 'comercial', 'gestao', 'mkt', 'extras', 'mentoria_individual']
+  let created = 0
+  const errors: BulkImportResult['errors'] = []
+
+  for (let i = 0; i < input.rows.length; i++) {
+    const row = input.rows[i]
+    const rowNum = i + 2
+    const typeNorm = row.type.toLowerCase().trim()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, '_')
+
+    const matchedType = VALID_TYPES.find((t) => typeNorm.includes(t)) || typeNorm
+
+    if (!row.date) { errors.push({ row: rowNum, name: row.type, error: 'Data obrigatória' }); continue }
+
+    const { error } = await supabase.from('delivery_events').insert({
+      delivery_type: matchedType,
+      delivery_date: row.date,
+    })
+
+    if (error) { errors.push({ row: rowNum, name: row.type, error: error.message }); continue }
+    created++
+  }
+
+  return { total: input.rows.length, created, errors }
+}
+
+// ─── Bulk Import: Delivery Participations ──────────────────────────────────
+
+interface BulkDeliveryParticipationsInput {
+  rows: { date: string; type: string; name?: string; phone?: string; email?: string }[]
+}
+
+export async function bulkImportDeliveryParticipations(input: BulkDeliveryParticipationsInput): Promise<BulkImportResult> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { total: 0, created: 0, errors: [{ row: 0, name: '', error: 'Não autenticado' }] }
+
+  // Fetch all mentees for matching
+  const { data: mentees } = await supabase.from('mentees').select('id, full_name, phone, email')
+  if (!mentees) return { total: 0, created: 0, errors: [{ row: 0, name: '', error: 'Erro ao buscar mentorados' }] }
+
+  let created = 0
+  const errors: BulkImportResult['errors'] = []
+
+  for (let i = 0; i < input.rows.length; i++) {
+    const row = input.rows[i]
+    const rowNum = i + 2
+    const identifier = row.name || row.phone || row.email || ''
+
+    if (!row.date || !row.type) { errors.push({ row: rowNum, name: identifier, error: 'Data e tipo obrigatórios' }); continue }
+
+    // Match mentee by name, phone, or email
+    const mentee = mentees.find((m) => {
+      if (row.name && m.full_name.toLowerCase().trim() === row.name.toLowerCase().trim()) return true
+      if (row.phone && m.phone.replace(/\D/g, '') === row.phone.replace(/\D/g, '')) return true
+      if (row.email && m.email?.toLowerCase().trim() === row.email.toLowerCase().trim()) return true
+      return false
+    })
+
+    if (!mentee) { errors.push({ row: rowNum, name: identifier, error: 'Mentorado não encontrado' }); continue }
+
+    // Find matching delivery event
+    const typeNorm = row.type.toLowerCase().trim()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, '_')
+
+    const { data: events } = await supabase
+      .from('delivery_events')
+      .select('id')
+      .eq('delivery_date', row.date)
+      .ilike('delivery_type', `%${typeNorm}%`)
+      .limit(1)
+
+    if (!events || events.length === 0) {
+      errors.push({ row: rowNum, name: identifier, error: `Entrega não encontrada (${row.type} em ${row.date})` })
+      continue
+    }
+
+    const { error } = await supabase.from('delivery_participations').insert({
+      delivery_event_id: events[0].id,
+      mentee_id: mentee.id,
+    })
+
+    if (error) {
+      if (error.code === '23505') { created++; continue } // duplicate, count as success
+      errors.push({ row: rowNum, name: identifier, error: error.message }); continue
+    }
+    created++
+  }
+
+  return { total: input.rows.length, created, errors }
+}

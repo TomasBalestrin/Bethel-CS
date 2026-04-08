@@ -19,8 +19,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Upload, FileText, CheckCircle2, XCircle, AlertCircle, ArrowRight, Users, ClipboardList, GitBranch } from 'lucide-react'
-import { bulkCreateMentees, bulkImportActionPlans, bulkImportStages } from '@/lib/actions/mentee-actions'
+import { Upload, FileText, CheckCircle2, XCircle, AlertCircle, ArrowRight, Users, ClipboardList, GitBranch, CalendarCheck, UserCheck } from 'lucide-react'
+import { bulkCreateMentees, bulkImportActionPlans, bulkImportStages, bulkImportDeliveryEvents, bulkImportDeliveryParticipations } from '@/lib/actions/mentee-actions'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -32,7 +32,7 @@ interface FieldDef {
   aliases: string[]
 }
 
-type ImportTab = 'mentees' | 'action_plan' | 'stages'
+type ImportTab = 'mentees' | 'action_plan' | 'stages' | 'delivery_events' | 'delivery_participations'
 type ImportStep = 'upload' | 'mapping' | 'preview' | 'importing' | 'done'
 
 interface ImportResult {
@@ -112,6 +112,23 @@ const STAGE_FIELDS: FieldDef[] = [
   { key: '__stage_name', label: 'Nome da Etapa', required: true, type: 'text', aliases: ['etapa', 'stage', 'fase', 'funil', 'status', 'etapa atual', 'estagio'] },
 ]
 
+// ─── Field Definitions: Delivery Events ───────────────────────────────────
+
+const DELIVERY_EVENT_FIELDS: FieldDef[] = [
+  { key: 'date', label: 'Data da entrega', required: true, type: 'date', aliases: ['data', 'date', 'dia', 'data da entrega', 'data entrega'] },
+  { key: 'type', label: 'Tipo de entrega', required: true, type: 'text', aliases: ['tipo', 'type', 'entrega', 'tipo de entrega', 'categoria', 'hotseat', 'comercial', 'gestao', 'gestão', 'mkt', 'marketing', 'extras', 'mentoria individual'] },
+]
+
+// ─── Field Definitions: Delivery Participations ───────────────────────────
+
+const DELIVERY_PARTICIPATION_FIELDS: FieldDef[] = [
+  { key: 'date', label: 'Data da entrega', required: true, type: 'date', aliases: ['data', 'date', 'dia', 'data da entrega', 'data entrega'] },
+  { key: 'type', label: 'Tipo de entrega', required: true, type: 'text', aliases: ['tipo', 'type', 'entrega', 'tipo de entrega', 'categoria'] },
+  { key: 'name', label: 'Nome do mentorado', required: false, type: 'text', aliases: ['nome', 'name', 'nome completo', 'full name', 'mentorado'] },
+  { key: 'phone', label: 'Telefone', required: false, type: 'text', aliases: ['telefone', 'phone', 'whatsapp', 'cel', 'celular'] },
+  { key: 'email', label: 'Email', required: false, type: 'text', aliases: ['email', 'e-mail', 'mail'] },
+]
+
 const SKIP_VALUE = '__skip__'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -140,6 +157,8 @@ const TABS: { key: ImportTab; label: string; icon: typeof Users; description: st
   { key: 'mentees', label: 'Mentorados', icon: Users, description: 'Criar novos mentorados a partir de CSV/Excel' },
   { key: 'action_plan', label: 'Plano de Ação', icon: ClipboardList, description: 'Importar respostas do formulário para mentorados existentes' },
   { key: 'stages', label: 'Etapas', icon: GitBranch, description: 'Atualizar a etapa do funil de mentorados existentes' },
+  { key: 'delivery_events', label: 'Entregas', icon: CalendarCheck, description: 'Importar datas das entregas da mentoria (Hotseat, Comercial, etc.)' },
+  { key: 'delivery_participations', label: 'Participação', icon: UserCheck, description: 'Importar quem participou de cada entrega (identifica por nome, telefone ou email)' },
 ]
 
 // ─── Component ──────────────────────────────────────────────────────────────
@@ -165,7 +184,11 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
   const [result, setResult] = useState<ImportResult | null>(null)
   const [dragOver, setDragOver] = useState(false)
 
-  const currentFields = activeTab === 'mentees' ? MENTEE_FIELDS : activeTab === 'action_plan' ? ACTION_PLAN_FIELDS : STAGE_FIELDS
+  const currentFields = activeTab === 'mentees' ? MENTEE_FIELDS
+    : activeTab === 'action_plan' ? ACTION_PLAN_FIELDS
+    : activeTab === 'stages' ? STAGE_FIELDS
+    : activeTab === 'delivery_events' ? DELIVERY_EVENT_FIELDS
+    : DELIVERY_PARTICIPATION_FIELDS
 
   function reset() {
     setStep('upload')
@@ -240,13 +263,12 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
     } else if (activeTab === 'action_plan') {
       const mapped = rows.map((raw) => {
         const out = getMappedRow(raw)
-        // Also store display name for error reporting
         const matchVal = String(out.__match_value ?? '')
         out.__display_name = matchVal
         return out
       })
       res = await bulkImportActionPlans({ rows: mapped, matchField })
-    } else {
+    } else if (activeTab === 'stages') {
       const mapped = rows.map((raw) => {
         const out = getMappedRow(raw)
         return {
@@ -255,6 +277,24 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
         }
       })
       res = await bulkImportStages({ rows: mapped, matchField })
+    } else if (activeTab === 'delivery_events') {
+      const mapped = rows.map((raw) => {
+        const out = getMappedRow(raw)
+        return { date: String(out.date ?? ''), type: String(out.type ?? '') }
+      })
+      res = await bulkImportDeliveryEvents({ rows: mapped })
+    } else {
+      const mapped = rows.map((raw) => {
+        const out = getMappedRow(raw)
+        return {
+          date: String(out.date ?? ''),
+          type: String(out.type ?? ''),
+          name: out.name ? String(out.name) : undefined,
+          phone: out.phone ? String(out.phone) : undefined,
+          email: out.email ? String(out.email) : undefined,
+        }
+      })
+      res = await bulkImportDeliveryParticipations({ rows: mapped })
     }
 
     setResult(res)
@@ -266,6 +306,8 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
     mentees: { importing: 'Importando mentorados...', button: `Importar ${rows.length} mentorados`, success: 'importados' },
     action_plan: { importing: 'Importando planos de ação...', button: `Importar ${rows.length} planos`, success: 'vinculados' },
     stages: { importing: 'Atualizando etapas...', button: `Atualizar ${rows.length} etapas`, success: 'atualizados' },
+    delivery_events: { importing: 'Importando entregas...', button: `Importar ${rows.length} entregas`, success: 'importadas' },
+    delivery_participations: { importing: 'Importando participações...', button: `Importar ${rows.length} participações`, success: 'registradas' },
   }
 
   return (
@@ -330,7 +372,7 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
                 />
               </div>
 
-              {activeTab !== 'mentees' && (
+              {activeTab !== 'mentees' && activeTab !== 'delivery_events' && activeTab !== 'delivery_participations' && (
                 <div className="rounded-lg border border-border/50 p-3 space-y-2">
                   <p className="text-sm font-medium">Identificar mentorado por:</p>
                   <Select value={matchField} onValueChange={(v) => setMatchField(v as typeof matchField)}>

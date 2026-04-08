@@ -79,9 +79,12 @@ export async function deleteMentee(menteeId: string) {
 
 export async function addIndication(
   menteeId: string,
-  indicatedName: string,
-  indicatedPhone: string,
-  notes?: string
+  data: {
+    indication_date: string
+    quantity_indicated: number
+    quantity_confirmed: number
+    revenue_generated: number
+  }
 ) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -89,9 +92,10 @@ export async function addIndication(
 
   const { error } = await supabase.from('indications').insert({
     mentee_id: menteeId,
-    indicated_name: indicatedName,
-    indicated_phone: indicatedPhone,
-    notes: notes || null,
+    indication_date: data.indication_date,
+    quantity_indicated: data.quantity_indicated,
+    quantity_confirmed: data.quantity_confirmed,
+    revenue_generated: data.revenue_generated,
   })
 
   if (error) return { error: error.message }
@@ -102,7 +106,12 @@ export async function addIndication(
 
 export async function updateIndication(
   recordId: string,
-  data: { indicated_name?: string; indicated_phone?: string; converted?: boolean; converted_name?: string; converted_value?: number; converted_at?: string }
+  data: {
+    indication_date?: string
+    quantity_indicated?: number
+    quantity_confirmed?: number
+    revenue_generated?: number
+  }
 ) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -110,7 +119,7 @@ export async function updateIndication(
 
   const { error } = await supabase
     .from('indications')
-    .update({ indicated_name: data.indicated_name, indicated_phone: data.indicated_phone })
+    .update(data)
     .eq('id', recordId)
 
   if (error) return { error: error.message }

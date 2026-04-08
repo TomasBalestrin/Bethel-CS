@@ -1687,7 +1687,7 @@ function CardExtraDeliveries({ menteeId }: { menteeId: string }) {
   )
 }
 
-// ─── Tab: Receita Nova ───
+// ─── Tab: LTV do Mentorado ───
 function TabRevenue({ menteeId }: { menteeId: string }) {
   const [items, setItems] = useState<RevenueRecord[]>([])
   const [products, setProducts] = useState<Product[]>([])
@@ -1805,7 +1805,7 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
       {/* Card header */}
       <div className="flex items-center gap-2 -mx-4 -mt-4 px-4 py-3 border-b border-border bg-muted/30">
         <DollarSign className="h-4 w-4 text-success" />
-        <h3 className="font-heading font-semibold text-sm">Receita</h3>
+        <h3 className="font-heading font-semibold text-sm">LTV do Mentorado</h3>
         <span className="text-xs font-medium text-success tabular ml-auto">
           R$ {totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
         </span>
@@ -1936,13 +1936,21 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
 }
 
 // ─── Card: Indicações CS ───
+function parseCurrencyInd(raw: string): number {
+  return parseInt(raw.replace(/\D/g, '') || '0', 10)
+}
+function fmtCurrencyInd(cents: number): string {
+  return (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 function CardIndicacoes({ menteeId }: { menteeId: string }) {
-  // Indications state
   const [indications, setIndications] = useState<Indication[]>([])
-  const [showIndForm, setShowIndForm] = useState(false)
-  const [editingIndId, setEditingIndId] = useState<string | null>(null)
-  const [indName, setIndName] = useState('')
-  const [indPhone, setIndPhone] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [indDate, setIndDate] = useState('')
+  const [qtyIndicated, setQtyIndicated] = useState('')
+  const [qtyConfirmed, setQtyConfirmed] = useState('')
+  const [revenueCents, setRevenueCents] = useState(0)
   const [indLoading, setIndLoading] = useState(false)
   const [confirmDeleteInd, setConfirmDeleteInd] = useState<string | null>(null)
 
@@ -1955,29 +1963,52 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
-  // ─── Indications handlers ───
-  function openEditInd(ind: Indication) {
-    setEditingIndId(ind.id); setIndName(ind.indicated_name); setIndPhone(ind.indicated_phone)
-    setShowIndForm(true)
+  function resetForm() {
+    setEditingId(null); setIndDate(''); setQtyIndicated(''); setQtyConfirmed(''); setRevenueCents(0)
   }
-  function resetIndForm() {
-    setEditingIndId(null); setIndName(''); setIndPhone(''); setShowIndForm(false)
+
+  function openEdit(ind: Indication) {
+    setEditingId(ind.id)
+    setIndDate(ind.indication_date ?? '')
+    setQtyIndicated(String(ind.quantity_indicated ?? 0))
+    setQtyConfirmed(String(ind.quantity_confirmed ?? 0))
+    setRevenueCents(Math.round((ind.revenue_generated ?? 0) * 100))
+    setShowForm(true)
   }
-  async function handleSubmitInd(e: React.FormEvent) {
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setIndLoading(true)
-    if (editingIndId) {
-      await updateIndication(editingIndId, { indicated_name: indName, indicated_phone: indPhone })
-    } else {
-      await addIndication(menteeId, indName, indPhone)
+    const data = {
+      indication_date: indDate,
+      quantity_indicated: parseInt(qtyIndicated || '0', 10),
+      quantity_confirmed: parseInt(qtyConfirmed || '0', 10),
+      revenue_generated: revenueCents / 100,
     }
-    resetIndForm(); setIndLoading(false); fetchAll()
+    if (editingId) {
+      await updateIndication(editingId, data)
+    } else {
+      await addIndication(menteeId, data)
+    }
+    setIndLoading(false); fetchAll()
+    // Keep form open for adding in series (reset fields but don't close)
+    if (!editingId) {
+      resetForm()
+      // Keep showForm true for "+" series flow
+    } else {
+      resetForm(); setShowForm(false)
+    }
   }
-  async function handleDeleteInd(id: string) {
+
+  async function handleDelete(id: string) {
     setConfirmDeleteInd(null)
     setIndications((prev) => prev.filter((i) => i.id !== id))
     const undoTimeout = setTimeout(async () => { await deleteIndication(id); fetchAll() }, 5000)
     toast('Indicação excluída', { action: { label: 'Desfazer', onClick: () => { clearTimeout(undoTimeout); fetchAll() } }, duration: 5000 })
   }
+
+  const totalIndicated = indications.reduce((s, i) => s + (i.quantity_indicated ?? 0), 0)
+  const totalConfirmed = indications.reduce((s, i) => s + (i.quantity_confirmed ?? 0), 0)
+  const totalRevenue = indications.reduce((s, i) => s + Number(i.revenue_generated ?? 0), 0)
 
   return (
     <div className="p-4 space-y-4">
@@ -1986,89 +2017,117 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
         <Users className="h-4 w-4 text-accent" />
         <h3 className="font-heading font-semibold text-sm">Indicações</h3>
         <div className="flex items-center gap-1.5 ml-auto">
-          {indications.filter((i) => i.converted).length > 0 && (
-            <span className="text-[10px] text-success font-medium">{indications.filter((i) => i.converted).length} convertidas</span>
+          {totalConfirmed > 0 && (
+            <span className="text-[10px] text-success font-medium">{totalConfirmed} confirmadas</span>
           )}
-          <Badge variant="muted" className="text-[10px]">{indications.length}</Badge>
+          <Badge variant="muted" className="text-[10px]">{totalIndicated} indicados</Badge>
         </div>
       </div>
 
+      {/* Summary */}
+      {indications.length > 0 && (
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="rounded-md border border-border bg-card p-2">
+            <p className="text-[10px] text-muted-foreground">Indicados</p>
+            <p className="font-bold text-sm tabular">{totalIndicated}</p>
+          </div>
+          <div className="rounded-md border border-border bg-card p-2">
+            <p className="text-[10px] text-muted-foreground">Confirmados</p>
+            <p className="font-bold text-sm tabular text-success">{totalConfirmed}</p>
+          </div>
+          <div className="rounded-md border border-border bg-card p-2">
+            <p className="text-[10px] text-muted-foreground">Receita</p>
+            <p className="font-bold text-sm tabular text-success">R$ {totalRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-end">
-        <Button size="sm" variant="outline" onClick={() => { resetIndForm(); setShowIndForm(!showIndForm) }}>
-          <Plus className="mr-1 h-3 w-3" /> Registrar indicação
+        <Button size="sm" variant="outline" onClick={() => { resetForm(); setShowForm(!showForm) }}>
+          <Plus className="mr-1 h-3 w-3" /> Registrar
         </Button>
       </div>
 
-      <Dialog open={showIndForm} onOpenChange={(open) => { if (!open) resetIndForm() }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{editingIndId ? 'Editar indicação' : 'Nova indicação'}</DialogTitle>
-            <DialogDescription>Registre uma indicação feita pelo mentorado.</DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmitInd} className="space-y-3">
+      {showForm && (
+        <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-border bg-muted/50 p-4">
+          <div className="flex items-center justify-between">
+            <p className="label-xs">{editingId ? 'Editar registro' : 'Nova indicação'}</p>
+            {!editingId && (
+              <p className="text-[10px] text-muted-foreground">O formulário fica aberto para adicionar em série</p>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label htmlFor="ind-name">Nome do indicado *</Label>
-              <Input id="ind-name" value={indName} onChange={(e) => setIndName(e.target.value)} required />
+              <Label htmlFor="ind-date">Data *</Label>
+              <Input id="ind-date" type="date" value={indDate} onChange={(e) => setIndDate(e.target.value)} required />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="ind-phone">Telefone *</Label>
-              <Input id="ind-phone" value={indPhone} onChange={(e) => setIndPhone(e.target.value)} required />
+              <Label htmlFor="ind-qty">Qtd. indicados *</Label>
+              <Input id="ind-qty" type="number" min="0" value={qtyIndicated} onChange={(e) => setQtyIndicated(e.target.value)} required />
             </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={resetIndForm}>Cancelar</Button>
-              <Button type="submit" disabled={indLoading}>{indLoading ? 'Salvando...' : 'Salvar'}</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+            <div className="space-y-1">
+              <Label htmlFor="ind-confirmed">Qtd. confirmados</Label>
+              <Input id="ind-confirmed" type="number" min="0" value={qtyConfirmed} onChange={(e) => setQtyConfirmed(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="ind-revenue">Receita gerada</Label>
+              <Input
+                id="ind-revenue"
+                inputMode="numeric"
+                value={revenueCents > 0 ? `R$ ${fmtCurrencyInd(revenueCents)}` : ''}
+                placeholder="R$ 0,00"
+                onChange={(e) => setRevenueCents(parseCurrencyInd(e.target.value))}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => { resetForm(); setShowForm(false) }}>Fechar</Button>
+            <Button type="submit" size="sm" disabled={indLoading}>
+              {indLoading ? 'Salvando...' : editingId ? 'Salvar' : <><Plus className="h-3 w-3 mr-1" /> Adicionar</>}
+            </Button>
+          </div>
+        </form>
+      )}
 
-      {indications.length === 0 && (
+      {indications.length === 0 && !showForm && (
         <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
           <Users className="h-8 w-8 mb-2 opacity-40" />
           <p className="text-sm">Nenhuma indicação registrada</p>
-          <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => { resetIndForm(); setShowIndForm(true) }}>
+          <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => { resetForm(); setShowForm(true) }}>
             <Plus className="h-3 w-3 mr-1" /> Registrar primeira
           </Button>
         </div>
       )}
+
       {indications.map((item) => (
-        <div key={item.id} className={`group rounded-lg border p-3 text-sm transition-colors hover:bg-muted/30 ${item.converted ? 'border-success/30 bg-success/5' : 'border-border bg-card'}`}>
+        <div key={item.id} className="group rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:bg-muted/30">
           <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <p className="font-medium text-foreground">{item.indicated_name}</p>
-                {item.converted && <Badge variant="success" className="text-[10px]">Converteu</Badge>}
+            <div className="space-y-1">
+              <p className="font-medium text-foreground">
+                {item.indication_date ? new Date(item.indication_date).toLocaleDateString('pt-BR') : 'Sem data'}
+              </p>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span>{item.quantity_indicated ?? 0} indicados</span>
+                <span className="text-success">{item.quantity_confirmed ?? 0} confirmados</span>
+                {Number(item.revenue_generated) > 0 && (
+                  <span className="text-success font-medium">R$ {Number(item.revenue_generated).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                )}
               </div>
-              <p className="text-muted-foreground">{item.indicated_phone}</p>
-              {item.converted && item.converted_name && (
-                <p className="text-xs text-success mt-1">Fechou: {item.converted_name} {item.converted_value ? `— R$ ${Number(item.converted_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}</p>
-              )}
             </div>
-            <div className="flex items-center gap-1">
-              {!item.converted && (
-                <Button size="sm" variant="ghost" className="h-7 text-[10px] text-success" onClick={async () => {
-                  const name = window.prompt('Quem fechou?')
-                  if (!name) return
-                  const valueStr = window.prompt('Valor (ex: 5000)')
-                  const value = valueStr ? parseFloat(valueStr) : undefined
-                  await updateIndication(item.id, { converted: true, converted_name: name, converted_value: value, converted_at: new Date().toISOString().split('T')[0] })
-                  fetchAll()
-                }}>Converteu?</Button>
-              )}
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditInd(item)} aria-label="Editar"><Pencil className="h-3 w-3" /></Button>
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteInd(item.id)} aria-label="Excluir"><Trash2 className="h-3 w-3" /></Button>
-              </div>
+            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(item)} aria-label="Editar"><Pencil className="h-3 w-3" /></Button>
+              <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteInd(item.id)} aria-label="Excluir"><Trash2 className="h-3 w-3" /></Button>
             </div>
           </div>
         </div>
       ))}
+
       <Dialog open={!!confirmDeleteInd} onOpenChange={() => setConfirmDeleteInd(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>Excluir indicação?</DialogTitle><DialogDescription>Esta ação não pode ser desfeita.</DialogDescription></DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmDeleteInd(null)}>Cancelar</Button>
-            <Button variant="destructive" onClick={() => confirmDeleteInd && handleDeleteInd(confirmDeleteInd)}>Excluir</Button>
+            <Button variant="destructive" onClick={() => confirmDeleteInd && handleDelete(confirmDeleteInd)}>Excluir</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

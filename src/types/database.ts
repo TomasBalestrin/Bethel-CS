@@ -340,18 +340,26 @@ export interface Database {
           converted_name: string | null
           converted_value: number | null
           converted_at: string | null
+          indication_date: string | null
+          quantity_indicated: number
+          quantity_confirmed: number
+          revenue_generated: number
           created_at: string
         }
         Insert: {
           id?: string
           mentee_id: string
-          indicated_name: string
-          indicated_phone: string
+          indicated_name?: string
+          indicated_phone?: string
           notes?: string | null
           converted?: boolean
           converted_name?: string | null
           converted_value?: number | null
           converted_at?: string | null
+          indication_date?: string | null
+          quantity_indicated?: number
+          quantity_confirmed?: number
+          revenue_generated?: number
           created_at?: string
         }
         Update: {
@@ -363,6 +371,10 @@ export interface Database {
           converted_name?: string | null
           converted_value?: number | null
           converted_at?: string | null
+          indication_date?: string | null
+          quantity_indicated?: number
+          quantity_confirmed?: number
+          revenue_generated?: number
         }
         Relationships: []
       }

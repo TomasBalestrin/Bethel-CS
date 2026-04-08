@@ -5,7 +5,7 @@ import { useParams, useSearchParams } from 'next/navigation'
 import DailyIframe from '@daily-co/daily-js'
 import { Phone, Loader2, PhoneOff, Mic, MicOff } from 'lucide-react'
 import Image from 'next/image'
-import { getOrCreateCall, destroyCall, getActiveCall } from '@/lib/daily-call'
+import { destroyCall, getActiveCall, forceNewCall } from '@/lib/daily-call'
 
 export default function MenteeCallPage() {
   const params = useParams()
@@ -230,19 +230,14 @@ function MenteeVoiceCall({ roomUrl, token, specialistName, status, onStatusChang
   useEffect(() => {
     if (status !== 'joining' || !roomUrl || !token) return
 
+    // Force new call object for clean audio state
     console.log('[MenteeCall] Joining room:', roomUrl)
-    const call = getOrCreateCall(roomUrl)
-    const meetingState = call.meetingState()
-
-    if (meetingState === 'joined-meeting') {
-      onStatusChange('active')
-      updateRemoteCount()
-      return
-    }
+    const call = forceNewCall(roomUrl)
 
     call.on('joined-meeting', () => {
       onStatusChange('active')
       updateRemoteCount()
+      call.setLocalAudio(true)
     })
     call.on('participant-joined', () => updateRemoteCount())
     call.on('participant-updated', () => updateRemoteCount())
@@ -250,12 +245,16 @@ function MenteeVoiceCall({ roomUrl, token, specialistName, status, onStatusChang
     call.on('left-meeting', () => { if (!endedRef.current) doEnd() })
     call.on('error', () => { if (!endedRef.current) doEnd() })
 
-    call.join({ url: roomUrl, token, startAudioOff: false, startVideoOff: true }).then(() => {
-      // Ensure microphone is on after joining
-      call.setLocalAudio(true)
+    // Request mic permission first, then join
+    call.startCamera({ audioSource: true, videoSource: false }).then(() => {
+      console.log('[MenteeCall] Mic granted, joining...')
+      call.join({ url: roomUrl, token, startAudioOff: false, startVideoOff: true })
     }).catch(() => {
-      setEnded(true)
-      onStatusChange('ended')
+      console.log('[MenteeCall] startCamera failed, joining directly...')
+      call.join({ url: roomUrl, token, startAudioOff: false, startVideoOff: true }).catch(() => {
+        setEnded(true)
+        onStatusChange('ended')
+      })
     })
 
     // eslint-disable-next-line react-hooks/exhaustive-deps

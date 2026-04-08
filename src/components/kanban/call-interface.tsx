@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback, memo } from 'react'
 import { Mic, MicOff, PhoneOff, Loader2 } from 'lucide-react'
-import { getOrCreateCall, destroyCall, getActiveCall } from '@/lib/daily-call'
+import { destroyCall, getActiveCall, forceNewCall } from '@/lib/daily-call'
 
 interface CallInterfaceProps {
   roomUrl: string
@@ -85,25 +85,28 @@ export const CallInterface = memo(function CallInterface({
   useEffect(() => {
     if (!roomUrl || !token) return
 
-    const call = getOrCreateCall(roomUrl)
-
-    // If already joined (remount), just update state
-    const meetingState = call.meetingState()
-    if (meetingState === 'joined-meeting') {
-      console.log('[Call] Already joined, restoring state')
-      setJoined(true)
-      updateRemoteCount()
-      return
-    }
-
-    if (meetingState === 'joining-meeting') {
-      console.log('[Call] Already joining, waiting...')
-      call.on('joined-meeting', () => {
+    // Check if we have an existing call for this room
+    let call = getActiveCall()
+    if (call) {
+      const meetingState = call.meetingState()
+      if (meetingState === 'joined-meeting') {
+        console.log('[Call] Already joined, restoring state')
         setJoined(true)
         updateRemoteCount()
-      })
-      return
+        return
+      }
+      if (meetingState === 'joining-meeting') {
+        console.log('[Call] Already joining, waiting...')
+        call.on('joined-meeting', () => {
+          setJoined(true)
+          updateRemoteCount()
+        })
+        return
+      }
     }
+
+    // Force new call object to ensure clean audio state
+    call = forceNewCall(roomUrl)
 
     console.log('[Call] Joining room:', roomUrl)
 
@@ -111,6 +114,8 @@ export const CallInterface = memo(function CallInterface({
       console.log('[Call] joined-meeting — cloud recording enabled at room level')
       setJoined(true)
       updateRemoteCount()
+      // Ensure audio is active
+      call!.setLocalAudio(true)
     })
     call.on('participant-joined', () => updateRemoteCount())
     call.on('participant-updated', () => updateRemoteCount())
@@ -124,13 +129,14 @@ export const CallInterface = memo(function CallInterface({
       if (!endedRef.current) doEnd()
     })
 
-    call.join({ url: roomUrl, token, startAudioOff: false, startVideoOff: true }).then(() => {
-      console.log('[Call] join() resolved')
-      // Ensure microphone is on after joining
-      call.setLocalAudio(true)
-    }).catch((err) => {
-      console.error('[Call] join() failed:', err)
-      setEnded(true)
+    // Request mic permission then join
+    call.startCamera({ audioSource: true, videoSource: false }).then(() => {
+      console.log('[Call] Mic permission granted, joining...')
+      call!.join({ url: roomUrl, token, startAudioOff: false, startVideoOff: true })
+    }).catch(() => {
+      // Fallback: join without pre-requesting camera
+      console.log('[Call] startCamera failed, joining directly...')
+      call!.join({ url: roomUrl, token, startAudioOff: false, startVideoOff: true })
     })
 
     // DO NOT destroy call on unmount — singleton persists

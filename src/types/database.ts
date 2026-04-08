@@ -834,6 +834,88 @@ export interface Database {
         }
         Relationships: []
       }
+      task_columns: {
+        Row: {
+          id: string
+          name: string
+          position: number
+          color: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          position?: number
+          color?: string | null
+          created_at?: string
+        }
+        Update: {
+          name?: string
+          position?: number
+          color?: string | null
+        }
+        Relationships: []
+      }
+      tasks: {
+        Row: {
+          id: string
+          mentee_id: string | null
+          column_id: string | null
+          title: string
+          description: string | null
+          notes: string | null
+          due_date: string | null
+          completed_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          mentee_id?: string | null
+          column_id?: string | null
+          title: string
+          description?: string | null
+          notes?: string | null
+          due_date?: string | null
+          completed_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          mentee_id?: string | null
+          column_id?: string | null
+          title?: string
+          description?: string | null
+          notes?: string | null
+          due_date?: string | null
+          completed_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      task_attachments: {
+        Row: {
+          id: string
+          task_id: string
+          file_url: string
+          file_name: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          task_id: string
+          file_url: string
+          file_name: string
+          created_at?: string
+        }
+        Update: {
+          file_url?: string
+          file_name?: string
+        }
+        Relationships: []
+      }
       system_settings: {
         Row: {
           key: string

@@ -47,6 +47,7 @@ import {
   Building2,
   XCircle,
   CalendarCheck,
+  ClipboardCheck,
 } from 'lucide-react'
 import { formatDateBR } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
@@ -1474,6 +1475,57 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
 }
 
 // ─── Tab: Acompanhamento (unified grid) ───
+// ─── Card: Tarefas do Mentorado ───
+function CardMenteeTasks({ menteeId }: { menteeId: string }) {
+  const [tasks, setTasks] = useState<Database['public']['Tables']['tasks']['Row'][]>([])
+  const [columns, setColumns] = useState<Database['public']['Tables']['task_columns']['Row'][]>([])
+  const supabase = createClient()
+
+  useEffect(() => {
+    supabase.from('tasks').select('*').eq('mentee_id', menteeId).order('created_at', { ascending: false })
+      .then(({ data }) => { if (data) setTasks(data) })
+    supabase.from('task_columns').select('*').order('position')
+      .then(({ data }) => { if (data) setColumns(data) })
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const getColName = (colId: string | null) => columns.find((c) => c.id === colId)?.name ?? '—'
+  const isOverdue = (t: typeof tasks[0]) => t.due_date && !t.completed_at && new Date(t.due_date) < new Date(new Date().toISOString().split('T')[0])
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center gap-2 -mx-4 -mt-4 px-4 py-3 border-b border-border bg-muted/30">
+        <ClipboardCheck className="h-4 w-4 text-accent" />
+        <h3 className="font-heading font-semibold text-sm">Tarefas</h3>
+        <Badge variant="muted" className="text-[10px] ml-auto">{tasks.length}</Badge>
+      </div>
+      {tasks.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-4">Nenhuma tarefa vinculada</p>
+      ) : (
+        <div className="space-y-2">
+          {tasks.map((task) => (
+            <div key={task.id} className={`rounded-lg border p-3 text-sm ${isOverdue(task) ? 'border-destructive/30 bg-destructive/5' : task.completed_at ? 'border-success/30 bg-success/5' : 'border-border bg-card'}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className={`font-medium leading-tight ${task.completed_at ? 'line-through text-muted-foreground' : ''}`}>{task.title}</p>
+                  {task.description && <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{task.description}</p>}
+                </div>
+                <Badge variant={isOverdue(task) ? 'destructive' : task.completed_at ? 'success' : 'muted'} className="text-[10px] shrink-0">
+                  {isOverdue(task) ? 'Atrasada' : task.completed_at ? 'Concluída' : getColName(task.column_id)}
+                </Badge>
+              </div>
+              {task.due_date && (
+                <p className={`text-[10px] mt-1 ${isOverdue(task) ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  Prazo: {new Date(task.due_date).toLocaleDateString('pt-BR')}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Card: Entregas Mentoria ───
 const DELIVERY_TYPES = [
   { key: 'hotseat', label: 'Hotseat' },
@@ -1626,6 +1678,9 @@ function TabAcompanhamento({ menteeId, mentee }: { menteeId: string; mentee: Men
 
       {/* Cards grid — all same width */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden lg:col-span-2">
+          <CardMenteeTasks menteeId={menteeId} />
+        </div>
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden lg:col-span-2">
           <CardEntregasMentoria menteeId={menteeId} startDate={mentee.start_date} />
         </div>

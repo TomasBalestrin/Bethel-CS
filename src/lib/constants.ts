@@ -4,7 +4,7 @@ import {
   GraduationCap,
   Users,
   MessageSquareQuote,
-  Target,
+  ClipboardCheck,
   Shield,
   UserCog,
   type LucideIcon,
@@ -23,7 +23,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Etapas Mentoria', href: '/etapas-mentoria', icon: GraduationCap },
   { label: 'Mentorados', href: '/mentorados', icon: Users },
   { label: 'Depoimentos', href: '/depoimentos', icon: MessageSquareQuote },
-  { label: 'Objetivos', href: '/objetivos', icon: Target },
+  { label: 'Tarefas', href: '/tarefas', icon: ClipboardCheck },
   { label: 'Especialistas', href: '/especialistas', icon: UserCog, adminOnly: true },
   { label: 'Admin', href: '/admin', icon: Shield, adminOnly: true },
 ]

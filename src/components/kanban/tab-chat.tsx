@@ -3,9 +3,11 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
-import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown, Sparkles, ChevronUp, BellOff, Pencil, Check } from 'lucide-react'
+import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown, Sparkles, ChevronUp, BellOff, Pencil, Check, ClipboardCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Dialog,
   DialogContent,
@@ -16,6 +18,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { useCallStore } from '@/store/call-store'
 import { toast } from 'sonner'
+import { createTask } from '@/lib/actions/task-actions'
 import type { Database } from '@/types/database'
 
 type WppMessage = Database['public']['Tables']['wpp_messages']['Row']
@@ -87,6 +90,14 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const [editingCallNote, setEditingCallNote] = useState<string | null>(null)
   const [callNoteText, setCallNoteText] = useState('')
   const [savingCallNote, setSavingCallNote] = useState(false)
+
+  // Create task from chat
+  const [taskFormOpen, setTaskFormOpen] = useState(false)
+  const [taskTitle, setTaskTitle] = useState('')
+  const [taskDesc, setTaskDesc] = useState('')
+  const [taskDueDate, setTaskDueDate] = useState('')
+  const [taskNotes, setTaskNotes] = useState('')
+  const [taskLoading, setTaskLoading] = useState(false)
 
   // Message windowing
   const [visibleLimit, setVisibleLimit] = useState(80)
@@ -589,6 +600,15 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           </Button>
           <Button
             size="sm"
+            variant="outline"
+            className="h-8 gap-1.5 text-xs"
+            onClick={() => setTaskFormOpen(true)}
+          >
+            <ClipboardCheck className="h-3 w-3" />
+            <span className="hidden sm:inline">Tarefa</span>
+          </Button>
+          <Button
+            size="sm"
             variant="ghost"
             className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
             onClick={async (e) => {
@@ -1029,6 +1049,53 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
               Fechar
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create task dialog */}
+      <Dialog open={taskFormOpen} onOpenChange={(open) => { if (!open) { setTaskFormOpen(false); setTaskTitle(''); setTaskDesc(''); setTaskDueDate(''); setTaskNotes('') } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Nova tarefa para {menteeName}</DialogTitle>
+            <DialogDescription>A tarefa será vinculada a este mentorado.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={async (e) => {
+            e.preventDefault()
+            setTaskLoading(true)
+            const res = await createTask({
+              title: taskTitle,
+              description: taskDesc || undefined,
+              notes: taskNotes || undefined,
+              due_date: taskDueDate || undefined,
+              mentee_id: menteeId,
+            })
+            setTaskLoading(false)
+            if (res.error) { toast.error(res.error); return }
+            toast.success('Tarefa criada')
+            setTaskFormOpen(false)
+            setTaskTitle(''); setTaskDesc(''); setTaskDueDate(''); setTaskNotes('')
+          }} className="space-y-3">
+            <div className="space-y-1">
+              <Label>Título *</Label>
+              <Input value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} required placeholder="O que precisa ser feito?" />
+            </div>
+            <div className="space-y-1">
+              <Label>Descrição</Label>
+              <Textarea value={taskDesc} onChange={(e) => setTaskDesc(e.target.value)} className="min-h-[80px] resize-y" placeholder="Descreva a tarefa..." />
+            </div>
+            <div className="space-y-1">
+              <Label>Data de entrega</Label>
+              <Input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>Observações</Label>
+              <Textarea value={taskNotes} onChange={(e) => setTaskNotes(e.target.value)} className="min-h-[60px] resize-y" placeholder="Anotações..." />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setTaskFormOpen(false)}>Cancelar</Button>
+              <Button type="submit" size="sm" disabled={taskLoading}>{taskLoading ? 'Criando...' : 'Criar tarefa'}</Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

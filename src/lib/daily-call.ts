@@ -15,6 +15,9 @@ export function getOrCreateCall(roomUrl?: string, enableVideo = false): DailyCal
     activeCall = DailyIframe.createCallObject({
       audioSource: true,
       videoSource: enableVideo,
+      // Ensure getUserMedia is called for audio
+      startAudioOff: false,
+      startVideoOff: !enableVideo,
     })
     activeRoomUrl = roomUrl || null
   }
@@ -32,4 +35,13 @@ export function destroyCall() {
 
 export function getActiveCall(): DailyCall | null {
   return activeCall
+}
+
+/**
+ * Force destroy and recreate the call object.
+ * Use when starting a new call to avoid stale audio state.
+ */
+export function forceNewCall(roomUrl: string, enableVideo = false): DailyCall {
+  destroyCall()
+  return getOrCreateCall(roomUrl, enableVideo)
 }

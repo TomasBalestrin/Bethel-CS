@@ -250,7 +250,10 @@ function MenteeVoiceCall({ roomUrl, token, specialistName, status, onStatusChang
     call.on('left-meeting', () => { if (!endedRef.current) doEnd() })
     call.on('error', () => { if (!endedRef.current) doEnd() })
 
-    call.join({ url: roomUrl, token }).catch(() => {
+    call.join({ url: roomUrl, token, startAudioOff: false, startVideoOff: true }).then(() => {
+      // Ensure microphone is on after joining
+      call.setLocalAudio(true)
+    }).catch(() => {
       setEnded(true)
       onStatusChange('ended')
     })

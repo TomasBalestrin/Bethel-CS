@@ -82,12 +82,7 @@ function VideoCallPortal({ roomUrl, token, menteeName, menteeLink }: {
     }
 
     frame.on('joined-meeting', () => {
-      try {
-        frame.startRecording()
-        console.log('[CallPortal/Video] Cloud recording started')
-      } catch (err) {
-        console.error('[CallPortal/Video] Failed to start recording:', err)
-      }
+      console.log('[CallPortal/Video] Joined meeting — cloud recording enabled at room level')
     })
 
     frame.on('left-meeting', () => {
@@ -102,8 +97,14 @@ function VideoCallPortal({ roomUrl, token, menteeName, menteeLink }: {
         let attempts = 0
         const recordingPoll = setInterval(async () => {
           attempts++
-          if (attempts > 20) {
+          if (attempts > 40) {
             clearInterval(recordingPoll)
+            // Mark as failed in DB
+            fetch('/api/calls/check-recording', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ callId: cid, markFailed: true }),
+            }).catch(() => {})
             toast.error('Gravação não encontrada. Verifique no histórico de ligações.')
             return
           }
@@ -195,8 +196,13 @@ function VoiceCallPortal({ roomUrl, token, callId, menteeName, menteeLink }: {
     let attempts = 0
     const recordingPoll = setInterval(async () => {
       attempts++
-      if (attempts > 20) {
+      if (attempts > 40) {
         clearInterval(recordingPoll)
+        fetch('/api/calls/check-recording', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ callId, markFailed: true }),
+        }).catch(() => {})
         toast.error('Gravação não encontrada. Verifique no histórico de ligações.')
         return
       }

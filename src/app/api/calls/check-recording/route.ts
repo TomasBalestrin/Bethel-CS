@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  const { callId } = await request.json()
+  const { callId, markFailed } = await request.json()
   if (!callId) return NextResponse.json({ error: 'callId obrigatório' }, { status: 400 })
 
   // Get the call record
@@ -19,6 +19,16 @@ export async function POST(request: NextRequest) {
 
   if (!call) return NextResponse.json({ error: 'Ligação não encontrada' }, { status: 404 })
   if (call.recording_status === 'ready') return NextResponse.json({ status: 'ready' })
+  if (call.recording_status === 'failed') return NextResponse.json({ status: 'failed' })
+
+  // Mark as failed if polling exhausted
+  if (markFailed) {
+    await supabase
+      .from('call_records')
+      .update({ recording_status: 'failed' })
+      .eq('id', callId)
+    return NextResponse.json({ status: 'failed' })
+  }
 
   // Check Daily API for recordings
   try {

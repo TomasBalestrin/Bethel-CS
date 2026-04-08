@@ -108,16 +108,9 @@ export const CallInterface = memo(function CallInterface({
     console.log('[Call] Joining room:', roomUrl)
 
     call.on('joined-meeting', () => {
-      console.log('[Call] joined-meeting')
+      console.log('[Call] joined-meeting — cloud recording enabled at room level')
       setJoined(true)
       updateRemoteCount()
-      // Start cloud recording automatically
-      try {
-        call.startRecording()
-        console.log('[Call] Cloud recording started')
-      } catch (err) {
-        console.error('[Call] Failed to start recording:', err)
-      }
     })
     call.on('participant-joined', () => updateRemoteCount())
     call.on('participant-updated', () => updateRemoteCount())

@@ -11,8 +11,12 @@ export async function POST(request: NextRequest) {
 
   await supabase
     .from('call_records')
-    .update({ ended_at: new Date().toISOString() })
+    .update({
+      ended_at: new Date().toISOString(),
+      recording_status: 'processing',
+    })
     .eq('id', callId)
+    .eq('recording_status', 'pending')
 
   return NextResponse.json({ ok: true })
 }

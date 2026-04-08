@@ -13,35 +13,45 @@ export default async function EtapasMentoriaPage() {
     userRole = profile?.role ?? 'especialista'
   }
 
-  // Fetch stages first (needed for orphan repair)
-  const { data: stages } = await supabase
-    .from('kanban_stages')
-    .select('id, name, type, position, created_at')
-    .eq('type', 'mentorship')
-    .order('position')
+  // Fetch ALL stages (both types) + mentorship stages + mentees in parallel
+  const [{ data: allStages }, { data: mentorshipStages }, menteesResult] = await Promise.all([
+    supabase.from('kanban_stages').select('id, type').order('position'),
+    supabase
+      .from('kanban_stages')
+      .select('id, name, type, position, created_at')
+      .eq('type', 'mentorship')
+      .order('position'),
+    (() => {
+      let q = supabase
+        .from('mentees')
+        .select(MENTEE_SUMMARY_FIELDS)
+        .eq('kanban_type', 'mentorship')
+      if (userRole !== 'admin' && user) {
+        q = q.eq('created_by', user.id)
+      }
+      return q
+    })(),
+  ])
 
-  const firstStageId = stages && stages.length > 0 ? stages[0].id : null
+  const stages = mentorshipStages ?? []
+  const firstStageId = stages.length > 0 ? stages[0].id : null
+  const validStageIds = new Set((allStages ?? []).map((s) => s.id))
+  const menteeList = menteesResult.data ?? []
 
-  // Auto-repair: fix mentees with kanban_type='mentorship' but no stage
-  if (firstStageId && userRole === 'admin') {
-    await supabase
-      .from('mentees')
-      .update({ current_stage_id: firstStageId })
-      .eq('kanban_type', 'mentorship')
-      .is('current_stage_id', null)
+  // Auto-repair: fix mentees with null or invalid current_stage_id
+  if (firstStageId) {
+    const orphans = menteeList.filter(
+      (m) => !m.current_stage_id || !validStageIds.has(m.current_stage_id)
+    )
+    if (orphans.length > 0) {
+      await supabase
+        .from('mentees')
+        .update({ current_stage_id: firstStageId })
+        .in('id', orphans.map((m) => m.id))
+      orphans.forEach((m) => { m.current_stage_id = firstStageId })
+    }
   }
 
-  // Fetch mentees
-  let menteesQuery = supabase
-    .from('mentees')
-    .select(MENTEE_SUMMARY_FIELDS)
-    .eq('kanban_type', 'mentorship')
-  if (userRole !== 'admin' && user) {
-    menteesQuery = menteesQuery.eq('created_by', user.id)
-  }
-  const { data: mentees } = await menteesQuery
-
-  const menteeList = mentees ?? []
   const menteeIds = menteeList.map((m) => m.id)
 
   // Fetch all stats + specialists + allMentees in parallel
@@ -107,7 +117,7 @@ export default async function EtapasMentoriaPage() {
     <KanbanBoard
       title="Etapas Mentoria"
       kanbanType="mentorship"
-      stages={stages ?? []}
+      stages={stages}
       initialMentees={menteesWithStats}
       existingMentees={allMentees ?? []}
       isAdmin={userRole === 'admin'}

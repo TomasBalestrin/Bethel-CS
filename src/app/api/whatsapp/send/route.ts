@@ -74,9 +74,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Nenhuma instância WhatsApp conectada' }, { status: 404 })
     }
 
-    // 4. Resolve NextTrack UUID from instance_id
-    // The instance_id stored in DB is the NextTrack format: "phone_hash"
-    // We need the UUID for the API. Try to find it via the instance record.
+    // 4. Use DB instance_id directly as NextTrack instance identifier
+    //    Each specialist has their own instance in wpp_instances table
     const nextrackUUID = instance.instance_id
 
     // 5. Format phone
@@ -103,7 +102,8 @@ export async function POST(request: NextRequest) {
     }
 
     if (!result.success) {
-      return NextResponse.json({ error: result.error }, { status: 500 })
+      console.error('[WPP Send] NextTrack error:', result.error, { menteeId, instanceId: nextrackUUID, phone })
+      return NextResponse.json({ error: result.error || 'Falha ao enviar via WhatsApp' }, { status: 502 })
     }
 
     // 7. Save message with correct specialist + instance
@@ -121,7 +121,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('[WPP Send] Error:', err)
-    return NextResponse.json({ error: String(err) }, { status: 500 })
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[WPP Send] Uncaught error:', message, err)
+    return NextResponse.json({ error: `Erro interno: ${message}` }, { status: 500 })
   }
 }

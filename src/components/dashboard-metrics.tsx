@@ -28,6 +28,7 @@ import {
   Database,
   FileText,
 } from 'lucide-react'
+import { MenteeFilters, EMPTY_FILTERS, type MenteeFilterValues } from '@/components/mentee-filters'
 
 interface DashboardMetricsProps {
   userName: string
@@ -38,6 +39,12 @@ interface DashboardMetricsProps {
     startDate: string | null
     endDate: string | null
     fitFilter: string | null
+  }
+  advancedFilters: MenteeFilterValues
+  filterOptions: {
+    funisOrigem: string[]
+    closers: string[]
+    nichos: string[]
   }
   section2: {
     totalMentees: number
@@ -124,6 +131,52 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
   function updateFilter(key: string, value: string) {
     pushParams(key, value)
   }
+
+  // Advanced filters — debounced for currency inputs
+  const [localAdvFilters, setLocalAdvFilters] = useState<MenteeFilterValues>(props.advancedFilters)
+
+  const handleAdvFilterChange = useCallback((key: keyof MenteeFilterValues, value: string) => {
+    setLocalAdvFilters((prev) => ({ ...prev, [key]: value }))
+  }, [])
+
+  // Debounce currency filter changes (500ms), push non-currency immediately
+  useEffect(() => {
+    const currencyKeys: (keyof MenteeFilterValues)[] = ['fatInicialMin', 'fatInicialMax', 'fatAtualMin', 'fatAtualMax']
+    const timer = setTimeout(() => {
+      for (const key of currencyKeys) {
+        const current = searchParams.get(key) ?? ''
+        const local = localAdvFilters[key] || ''
+        if (local !== current) {
+          pushParams(key, local)
+        }
+      }
+    }, 500)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localAdvFilters.fatInicialMin, localAdvFilters.fatInicialMax, localAdvFilters.fatAtualMin, localAdvFilters.fatAtualMax])
+
+  // Non-currency filters: push immediately on change
+  useEffect(() => {
+    const nonCurrencyKeys: (keyof MenteeFilterValues)[] = ['funilOrigem', 'closer', 'mesAniversario', 'numColaboradores', 'estado', 'nicho']
+    for (const key of nonCurrencyKeys) {
+      const current = searchParams.get(key) ?? ''
+      const local = localAdvFilters[key] || ''
+      if (local !== current) {
+        pushParams(key, local)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localAdvFilters.funilOrigem, localAdvFilters.closer, localAdvFilters.mesAniversario, localAdvFilters.numColaboradores, localAdvFilters.estado, localAdvFilters.nicho])
+
+  const handleClearAdvFilters = useCallback(() => {
+    setLocalAdvFilters(EMPTY_FILTERS)
+    const params = new URLSearchParams(searchParams.toString())
+    const advKeys: (keyof MenteeFilterValues)[] = ['fatInicialMin', 'fatInicialMax', 'fatAtualMin', 'fatAtualMax', 'funilOrigem', 'closer', 'mesAniversario', 'numColaboradores', 'estado', 'nicho']
+    for (const key of advKeys) {
+      params.delete(key)
+    }
+    router.push(`/?${params.toString()}`)
+  }, [router, searchParams])
 
   return (
     <div className="space-y-6">
@@ -224,6 +277,14 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
           })}
         </div>
       </section>
+
+      {/* ═══ FILTROS AVANÇADOS ═══ */}
+      <MenteeFilters
+        filters={localAdvFilters}
+        onFilterChange={handleAdvFilterChange}
+        onClearAll={handleClearAdvFilters}
+        options={props.filterOptions}
+      />
 
       {/* ═══ VISÃO GERAL DOS MENTORADOS ═══ */}
       <section className="rounded-lg border border-border bg-card shadow-card overflow-hidden">

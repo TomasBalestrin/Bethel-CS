@@ -7,6 +7,16 @@ interface Props {
     start?: string
     end?: string
     fit?: string
+    fatInicialMin?: string
+    fatInicialMax?: string
+    fatAtualMin?: string
+    fatAtualMax?: string
+    funilOrigem?: string
+    closer?: string
+    mesAniversario?: string
+    numColaboradores?: string
+    estado?: string
+    nicho?: string
   }
 }
 
@@ -36,15 +46,86 @@ export default async function DashboardPage({ searchParams }: Props) {
   // Specialist: admin can pick from URL, specialist always uses own ID
   const specialistId = isAdmin ? (searchParams.specialist || null) : user!.id
 
+  // Advanced filters
+  const fatInicialMin = searchParams.fatInicialMin || null
+  const fatInicialMax = searchParams.fatInicialMax || null
+  const fatAtualMin = searchParams.fatAtualMin || null
+  const fatAtualMax = searchParams.fatAtualMax || null
+  const funilOrigem = searchParams.funilOrigem || null
+  const closer = searchParams.closer || null
+  const mesAniversario = searchParams.mesAniversario || null
+  const numColaboradores = searchParams.numColaboradores || null
+  const estado = searchParams.estado || null
+  const nicho = searchParams.nicho || null
+
   // ─── Mentees (only fields needed for dashboard) ───
-  let menteesQuery = supabase.from('mentees').select('id, status, cliente_fit, priority_level, created_by, faturamento_atual, faturamento_antes_mentoria')
+  let menteesQuery = supabase.from('mentees').select('id, status, cliente_fit, priority_level, created_by, faturamento_atual, faturamento_antes_mentoria, funnel_origin, closer_name, birth_date, state, niche')
   if (fitFilter === 'true') menteesQuery = menteesQuery.eq('cliente_fit', true)
   if (fitFilter === 'false') menteesQuery = menteesQuery.eq('cliente_fit', false)
   if (specialistId) menteesQuery = menteesQuery.eq('created_by', specialistId)
 
+  // Apply direct DB filters
+  if (funilOrigem) menteesQuery = menteesQuery.eq('funnel_origin', funilOrigem)
+  if (closer) menteesQuery = menteesQuery.eq('closer_name', closer)
+  if (estado) menteesQuery = menteesQuery.eq('state', estado)
+  if (nicho) menteesQuery = menteesQuery.eq('niche', nicho)
+
   // Get mentee IDs for filtering related tables
   const { data: mentees } = await menteesQuery
-  const menteeIds = (mentees ?? []).map((m) => m.id)
+  let filteredMentees = mentees ?? []
+
+  // Apply in-memory filters that can't be done in Supabase query
+  if (fatInicialMin) {
+    const min = Number(fatInicialMin) / 100
+    filteredMentees = filteredMentees.filter((m) => m.faturamento_antes_mentoria != null && Number(m.faturamento_antes_mentoria) >= min)
+  }
+  if (fatInicialMax) {
+    const max = Number(fatInicialMax) / 100
+    filteredMentees = filteredMentees.filter((m) => m.faturamento_antes_mentoria != null && Number(m.faturamento_antes_mentoria) <= max)
+  }
+  if (fatAtualMin) {
+    const min = Number(fatAtualMin) / 100
+    filteredMentees = filteredMentees.filter((m) => m.faturamento_atual != null && Number(m.faturamento_atual) >= min)
+  }
+  if (fatAtualMax) {
+    const max = Number(fatAtualMax) / 100
+    filteredMentees = filteredMentees.filter((m) => m.faturamento_atual != null && Number(m.faturamento_atual) <= max)
+  }
+  if (mesAniversario) {
+    filteredMentees = filteredMentees.filter((m) => {
+      if (!m.birth_date) return false
+      const month = new Date(m.birth_date).getMonth() + 1
+      return String(month) === mesAniversario
+    })
+  }
+
+  // Num colaboradores filter (from action_plans)
+  if (numColaboradores) {
+    const menteeIdsForColab = filteredMentees.map((m) => m.id)
+    if (menteeIdsForColab.length > 0) {
+      const { data: actionPlans } = await supabase
+        .from('action_plans')
+        .select('mentee_id, data')
+        .in('mentee_id', menteeIdsForColab)
+        .not('data', 'is', null)
+      const validIds = new Set<string>()
+      actionPlans?.forEach((ap) => {
+        const data = ap.data as Record<string, unknown> | null
+        if (data?.num_colaboradores && String(data.num_colaboradores) === numColaboradores) {
+          validIds.add(ap.mentee_id)
+        }
+      })
+      filteredMentees = filteredMentees.filter((m) => validIds.has(m.id))
+    }
+  }
+
+  const menteeIds = filteredMentees.map((m) => m.id)
+
+  // Fetch distinct values for filter dropdowns
+  const allMenteesForOptions = mentees ?? []
+  const funisOrigemOptions = Array.from(new Set(allMenteesForOptions.map((m) => m.funnel_origin).filter(Boolean))) as string[]
+  const closerOptions = Array.from(new Set(allMenteesForOptions.map((m) => m.closer_name).filter(Boolean))) as string[]
+  const nichoOptions = Array.from(new Set(allMenteesForOptions.map((m) => m.niche).filter(Boolean))) as string[]
 
   // ─── Revenue (only needed fields) ───
   let revenueQuery = supabase.from('revenue_records').select('sale_value, revenue_type')
@@ -190,7 +271,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     : 0
 
   // ─── SEÇÃO 2: Visão Geral ───
-  const allMentees = mentees ?? []
+  const allMentees = filteredMentees
   const totalMentees = allMentees.filter((m) => m.status === 'ativo').length
   const fitMentees = allMentees.filter((m) => m.cliente_fit && m.status === 'ativo').length
   const cancelados = allMentees.filter((m) => m.status === 'cancelado').length
@@ -254,6 +335,23 @@ export default async function DashboardPage({ searchParams }: Props) {
       specialists={specialists ?? []}
       isAdmin={isAdmin}
       filters={{ specialistId, startDate, endDate, fitFilter }}
+      advancedFilters={{
+        fatInicialMin: searchParams.fatInicialMin ?? '',
+        fatInicialMax: searchParams.fatInicialMax ?? '',
+        fatAtualMin: searchParams.fatAtualMin ?? '',
+        fatAtualMax: searchParams.fatAtualMax ?? '',
+        funilOrigem: searchParams.funilOrigem ?? '',
+        closer: searchParams.closer ?? '',
+        mesAniversario: searchParams.mesAniversario ?? '',
+        numColaboradores: searchParams.numColaboradores ?? '',
+        estado: searchParams.estado ?? '',
+        nicho: searchParams.nicho ?? '',
+      }}
+      filterOptions={{
+        funisOrigem: funisOrigemOptions.sort(),
+        closers: closerOptions.sort(),
+        nichos: nichoOptions.sort(),
+      }}
       section2={{
         totalMentees,
         fitMentees,

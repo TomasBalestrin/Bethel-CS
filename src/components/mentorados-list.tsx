@@ -23,6 +23,7 @@ import { BulkImportDialog } from '@/components/kanban/bulk-import-dialog'
 import { bulkDeleteMentees, bulkMoveMentees, bulkAssignSpecialist } from '@/lib/actions/mentee-actions'
 import { useUnreadCounts } from '@/hooks/use-unread-counts'
 import { formatDateBR } from '@/lib/format'
+import { MenteeFilters, EMPTY_FILTERS, type MenteeFilterValues } from '@/components/mentee-filters'
 import type { MenteeWithStats } from '@/types/kanban'
 import type { KanbanType } from '@/types/database'
 
@@ -47,6 +48,8 @@ interface MentoradosListProps {
   isAdmin?: boolean
   specialists?: { id: string; full_name: string }[]
   stages?: Stage[]
+  filterOptions?: { funisOrigem: string[]; closers: string[]; nichos: string[] }
+  colaboradoresMap?: Record<string, string>
 }
 
 export function MentoradosList({
@@ -55,6 +58,8 @@ export function MentoradosList({
   isAdmin = false,
   specialists = [],
   stages = [],
+  filterOptions = { funisOrigem: [], closers: [], nichos: [] },
+  colaboradoresMap = {},
 }: MentoradosListProps) {
   const router = useRouter()
   const [menteeList, setMenteeList] = useState<MenteeWithStats[]>(initialMentees)
@@ -81,28 +86,89 @@ export function MentoradosList({
   const [targetStageId, setTargetStageId] = useState('')
   const [targetSpecialistId, setTargetSpecialistId] = useState('')
 
+  // Advanced filters
+  const [advFilters, setAdvFilters] = useState<MenteeFilterValues>(EMPTY_FILTERS)
+
+  const handleFilterChange = useCallback((key: keyof MenteeFilterValues, value: string) => {
+    setAdvFilters((prev) => ({ ...prev, [key]: value }))
+  }, [])
+
+  const handleClearFilters = useCallback(() => {
+    setAdvFilters(EMPTY_FILTERS)
+  }, [])
+
   const PAGE_SIZE = 30
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
   const loadMoreRef = useRef<HTMLDivElement>(null)
 
   const filtered = menteeList.filter((m) => {
-    if (!debouncedSearch) return true
-    const term = debouncedSearch.toLowerCase()
-    return (
-      m.full_name.toLowerCase().includes(term) ||
-      m.phone.toLowerCase().includes(term) ||
-      (m.email?.toLowerCase().includes(term) ?? false) ||
-      (m.product_name?.toLowerCase().includes(term) ?? false)
-    )
+    // Text search
+    if (debouncedSearch) {
+      const term = debouncedSearch.toLowerCase()
+      const matches =
+        m.full_name.toLowerCase().includes(term) ||
+        m.phone.toLowerCase().includes(term) ||
+        (m.email?.toLowerCase().includes(term) ?? false) ||
+        (m.product_name?.toLowerCase().includes(term) ?? false)
+      if (!matches) return false
+    }
+
+    // Faturamento inicial (antes da mentoria) - values stored in cents
+    if (advFilters.fatInicialMin) {
+      const min = Number(advFilters.fatInicialMin) / 100
+      if (m.faturamento_antes_mentoria == null || Number(m.faturamento_antes_mentoria) < min) return false
+    }
+    if (advFilters.fatInicialMax) {
+      const max = Number(advFilters.fatInicialMax) / 100
+      if (m.faturamento_antes_mentoria == null || Number(m.faturamento_antes_mentoria) > max) return false
+    }
+
+    // Faturamento atual - values stored in cents
+    if (advFilters.fatAtualMin) {
+      const min = Number(advFilters.fatAtualMin) / 100
+      if (m.faturamento_atual == null || Number(m.faturamento_atual) < min) return false
+    }
+    if (advFilters.fatAtualMax) {
+      const max = Number(advFilters.fatAtualMax) / 100
+      if (m.faturamento_atual == null || Number(m.faturamento_atual) > max) return false
+    }
+
+    // Funil de origem
+    if (advFilters.funilOrigem && m.funnel_origin !== advFilters.funilOrigem) return false
+
+    // Closer
+    if (advFilters.closer && m.closer_name !== advFilters.closer) return false
+
+    // Mês de aniversário
+    if (advFilters.mesAniversario && m.birth_date) {
+      const month = new Date(m.birth_date).getMonth() + 1
+      if (String(month) !== advFilters.mesAniversario) return false
+    } else if (advFilters.mesAniversario && !m.birth_date) {
+      return false
+    }
+
+    // Número de colaboradores
+    if (advFilters.numColaboradores) {
+      const menteeColab = colaboradoresMap[m.id]
+      if (!menteeColab || menteeColab !== advFilters.numColaboradores) return false
+    }
+
+    // Estado
+    if (advFilters.estado && m.state !== advFilters.estado) return false
+
+    // Nicho
+    if (advFilters.nicho && m.niche !== advFilters.nicho) return false
+
+    return true
   })
 
   const visibleMentees = filtered.slice(0, visibleCount)
   const hasMore = visibleCount < filtered.length
 
-  // Reset visible count when search changes
+  // Reset visible count when search or filters change
   useEffect(() => {
     setVisibleCount(PAGE_SIZE)
-  }, [debouncedSearch])
+  }, [debouncedSearch, advFilters])
 
   // Infinite scroll observer
   useEffect(() => {
@@ -352,6 +418,16 @@ export function MentoradosList({
           placeholder="Buscar por nome, telefone, email..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+
+      {/* Advanced Filters */}
+      <div className="mt-4">
+        <MenteeFilters
+          filters={advFilters}
+          onFilterChange={handleFilterChange}
+          onClearAll={handleClearFilters}
+          options={filterOptions}
         />
       </div>
 

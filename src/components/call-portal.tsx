@@ -17,7 +17,7 @@ export function CallPortal() {
 
   if (!isActive) return null
 
-  if (callType === 'video') {
+  if (callType === 'video' && roomUrl && token) {
     return (
       <VideoCallPortal
         roomUrl={roomUrl!}

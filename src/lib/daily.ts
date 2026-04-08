@@ -12,7 +12,7 @@ export async function createRoom(enableVideo = false): Promise<{ name: string; u
   const body = {
     privacy: 'private',
     properties: {
-      max_participants: 2,
+      max_participants: 4,
       exp: Math.floor(Date.now() / 1000) + 7200,
       start_video_off: !enableVideo,
       start_audio_off: false,

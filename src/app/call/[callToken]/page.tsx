@@ -224,6 +224,7 @@ function MenteeVoiceCall({ roomUrl, token, specialistName, status, onStatusChang
   useEffect(() => {
     if (status !== 'joining' || !roomUrl || !token) return
 
+    console.log('[MenteeCall] Joining room:', roomUrl)
     const call = getOrCreateCall(roomUrl)
     const meetingState = call.meetingState()
 

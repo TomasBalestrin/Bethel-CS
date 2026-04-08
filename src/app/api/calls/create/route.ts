@@ -126,6 +126,7 @@ export async function POST(request: NextRequest) {
   }
 
   const roomUrl = room.url || getRoomUrl(room.name)
+  console.log('[Calls/Create] Specialist room:', { roomName: room.name, roomUrl, storedUrl: room.url, menteeId })
 
   return NextResponse.json({
     callId: callRecord?.id,

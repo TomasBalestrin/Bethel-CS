@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { sendTextMessage, sendMediaMessage, getInstanceUUID } from '@/lib/nextapps'
+import { sendTextMessage, sendMediaMessage } from '@/lib/nextapps'
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,8 +74,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Nenhuma instância WhatsApp conectada' }, { status: 404 })
     }
 
-    // 4. Resolve NextTrack UUID: env var takes priority, fallback to DB instance_id
-    const nextrackUUID = getInstanceUUID(instance.instance_id)
+    // 4. Use DB instance_id directly as NextTrack instance identifier
+    //    Each specialist has their own instance in wpp_instances table
+    const nextrackUUID = instance.instance_id
 
     // 5. Format phone
     let phone = mentee.phone.replace(/\D/g, '')

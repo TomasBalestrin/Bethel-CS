@@ -42,8 +42,20 @@ export async function POST(request: NextRequest) {
           recording_url: rec.download_url,
           recording_status: 'ready',
           duration_seconds: Math.round(rec.duration),
+          transcription_status: 'pending',
         })
         .eq('id', callId)
+
+      // Auto-trigger transcription in background
+      const origin = request.nextUrl.origin
+      fetch(`${origin}/api/calls/transcribe`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Cookie: request.headers.get('cookie') || '',
+        },
+        body: JSON.stringify({ callId }),
+      }).catch((err) => console.error('[check-recording] Transcribe trigger failed:', err))
 
       return NextResponse.json({ status: 'ready', recording_url: rec.download_url })
     }

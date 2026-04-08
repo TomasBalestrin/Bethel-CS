@@ -22,7 +22,7 @@ import { createTask } from '@/lib/actions/task-actions'
 import type { Database } from '@/types/database'
 
 type WppMessage = Database['public']['Tables']['wpp_messages']['Row']
-type CallRecord = Pick<Database['public']['Tables']['call_records']['Row'], 'id' | 'mentee_id' | 'duration_seconds' | 'recording_status' | 'recording_url' | 'notes' | 'created_at'>
+type CallRecord = Pick<Database['public']['Tables']['call_records']['Row'], 'id' | 'mentee_id' | 'duration_seconds' | 'recording_status' | 'recording_url' | 'transcription' | 'transcription_status' | 'notes' | 'created_at'>
 type AttendanceNote = Database['public']['Tables']['attendance_notes']['Row']
 
 interface TabChatProps {
@@ -157,7 +157,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         // Fetch call history
         const { data: calls } = await supabase
           .from('call_records')
-          .select('id, mentee_id, duration_seconds, recording_status, recording_url, notes, created_at')
+          .select('id, mentee_id, duration_seconds, recording_status, recording_url, transcription, transcription_status, notes, created_at')
           .eq('mentee_id', menteeId)
           .order('created_at', { ascending: false })
           .limit(20)
@@ -1022,9 +1022,36 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                       <span className="text-xs text-destructive">Gravação falhou</span>
                     )}
 
-                    {/* Transcription placeholder */}
+                    {/* Transcription */}
                     <p className="text-xs text-muted-foreground mt-1">Transcrição:</p>
-                    <p className="text-xs text-muted-foreground/60 italic">Em breve — disponível após upgrade do plano</p>
+                    {call.transcription_status === 'ready' && call.transcription ? (
+                      <p className="text-xs text-foreground whitespace-pre-line bg-muted/50 rounded p-2 max-h-40 overflow-y-auto">{call.transcription}</p>
+                    ) : call.transcription_status === 'processing' ? (
+                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Loader2 className="h-3 w-3 animate-spin" /> Transcrevendo...
+                      </span>
+                    ) : call.transcription_status === 'failed' ? (
+                      <span className="text-xs text-destructive">Falha na transcrição</span>
+                    ) : call.recording_status === 'ready' ? (
+                      <button
+                        onClick={async () => {
+                          try {
+                            const res = await fetch('/api/calls/transcribe', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ callId: call.id }),
+                            })
+                            if (res.ok) toast.success('Transcrição iniciada')
+                            else toast.error('Erro ao iniciar transcrição')
+                          } catch { toast.error('Erro ao iniciar transcrição') }
+                        }}
+                        className="text-xs text-accent hover:underline"
+                      >
+                        Transcrever gravação
+                      </button>
+                    ) : (
+                      <span className="text-xs text-muted-foreground/60 italic">Disponível após gravação</span>
+                    )}
 
                     {/* Call notes */}
                     <div className="mt-2 pt-2 border-t border-border/50">
@@ -1103,7 +1130,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t border-border">
-            <p className="text-[10px] text-muted-foreground">Transcrição automática disponível em breve</p>
+            <p className="text-[10px] text-muted-foreground">Transcrição via OpenAI Whisper</p>
             <Button variant="outline" size="sm" onClick={() => { setCallsModalOpen(false); setPlayingRecording(null) }}>
               Fechar
             </Button>

@@ -759,6 +759,8 @@ export interface Database {
           duration_seconds: number | null
           recording_url: string | null
           recording_status: 'pending' | 'processing' | 'ready' | 'failed' | 'unavailable'
+          transcription: string | null
+          transcription_status: 'pending' | 'processing' | 'ready' | 'failed' | null
           call_type: 'voice' | 'video'
           notes: string | null
           created_at: string
@@ -774,6 +776,8 @@ export interface Database {
           duration_seconds?: number | null
           recording_url?: string | null
           recording_status?: 'pending' | 'processing' | 'ready' | 'failed' | 'unavailable'
+          transcription?: string | null
+          transcription_status?: 'pending' | 'processing' | 'ready' | 'failed' | null
           call_type?: 'voice' | 'video'
           notes?: string | null
           created_at?: string
@@ -788,6 +792,8 @@ export interface Database {
           duration_seconds?: number | null
           recording_url?: string | null
           recording_status?: 'pending' | 'processing' | 'ready' | 'failed' | 'unavailable'
+          transcription?: string | null
+          transcription_status?: 'pending' | 'processing' | 'ready' | 'failed' | null
           call_type?: 'voice' | 'video'
           notes?: string | null
         }

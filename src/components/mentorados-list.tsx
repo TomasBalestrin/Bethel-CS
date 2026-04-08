@@ -490,7 +490,7 @@ export function MentoradosList({
                         className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
                         style={{ backgroundColor: `${color}15`, color }}
                       >
-                        P{m.priority_level}
+                        Prioridade {m.priority_level}
                       </span>
                     )}
                   </div>

@@ -610,6 +610,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
             title="Marcar como não lida"
           >
             <BellOff className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Marcar como não lida</span>
           </Button>
           <span className={`h-2 w-2 rounded-full shrink-0 ${instanceStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'}`} />
           <span className="text-[10px] text-muted-foreground hidden sm:inline">

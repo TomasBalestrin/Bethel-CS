@@ -44,6 +44,7 @@ import {
   Briefcase,
   Mic,
   Loader2,
+  Building2,
 } from 'lucide-react'
 import { formatDateBR } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
@@ -206,7 +207,7 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
   if (!mentee) return null
 
   const isAdmin = userRole === 'admin'
-  const priorityLabel = `P${mentee.priority_level}`
+  const priorityLabel = `Prioridade ${mentee.priority_level}`
   const isLoading = !fullData
 
   if (!open) return null
@@ -501,6 +502,27 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
 }) {
   const [saving, setSaving] = useState(false)
 
+  // Fetch action plan data for Empresa block (nome_empresa, num_colaboradores)
+  const [empresaData, setEmpresaData] = useState<{ nome_empresa?: string; num_colaboradores?: string }>({})
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('action_plans')
+      .select('data')
+      .eq('mentee_id', mentee.id)
+      .not('data', 'is', null)
+      .maybeSingle()
+      .then(({ data: ap }) => {
+        if (ap?.data) {
+          const d = ap.data as Record<string, unknown>
+          setEmpresaData({
+            nome_empresa: d.nome_empresa ? String(d.nome_empresa) : undefined,
+            num_colaboradores: d.num_colaboradores ? String(d.num_colaboradores) : undefined,
+          })
+        }
+      })
+  }, [mentee.id])
+
   const [form, setForm] = useState({
     full_name: mentee.full_name,
     phone: mentee.phone,
@@ -699,6 +721,23 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
               {mentee.birth_date && <ContactRow icon={Calendar} label="Nascimento" value={formatDateBR(mentee.birth_date)} color="text-muted-foreground" bg="bg-muted" />}
             </div>
           </div>
+
+          {/* Empresa — nome, nicho, colaboradores, faturamento */}
+          {(empresaData.nome_empresa || mentee.niche || empresaData.num_colaboradores || mentee.faturamento_atual != null || mentee.faturamento_antes_mentoria != null) && (
+            <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+              <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-success/5 to-transparent">
+                <Building2 className="h-3.5 w-3.5 text-success" />
+                <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Empresa</h3>
+              </div>
+              <div className="px-3 py-2 space-y-0">
+                {empresaData.nome_empresa && <ContactRow icon={Building2} label="Nome" value={empresaData.nome_empresa} color="text-success" bg="bg-success/10" />}
+                {mentee.niche && <ContactRow icon={Target} label="Nicho" value={mentee.niche} color="text-accent" bg="bg-accent/10" />}
+                {empresaData.num_colaboradores && <ContactRow icon={Users} label="Colaboradores" value={empresaData.num_colaboradores} color="text-info" bg="bg-info/10" />}
+                {mentee.faturamento_atual != null && <ContactRow icon={DollarSign} label="Faturamento atual" value={formatBRL(mentee.faturamento_atual)} color="text-success" bg="bg-success/10" />}
+                {mentee.faturamento_antes_mentoria != null && <ContactRow icon={DollarSign} label="Fat. antes da mentoria" value={formatBRL(mentee.faturamento_antes_mentoria)} color="text-warning" bg="bg-warning/10" />}
+              </div>
+            </div>
+          )}
 
           {/* Performance (Bethel Metrics) — fills the space below contact */}
           {hasMetrics ? (

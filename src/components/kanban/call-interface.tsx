@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback, memo } from 'react'
 import { Mic, MicOff, PhoneOff, Loader2 } from 'lucide-react'
-import { getOrCreateCall, destroyCall, getActiveCall, forceNewCall } from '@/lib/daily-call'
+import { destroyCall, getActiveCall, forceNewCall } from '@/lib/daily-call'
 
 interface CallInterfaceProps {
   roomUrl: string

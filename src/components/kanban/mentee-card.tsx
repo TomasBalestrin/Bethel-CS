@@ -90,7 +90,7 @@ export function MenteeCard({ mentee, unreadCount = 0, onClick }: MenteeCardProps
             </span>
             <span className="flex items-center gap-1" title="Receita">
               <DollarSign size={12} />
-              R$ {(mentee.revenue_total / 100).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              R$ {mentee.revenue_total.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </span>
             {mentee.days_since_contact != null && (
               <span

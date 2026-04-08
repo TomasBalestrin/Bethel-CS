@@ -11,6 +11,7 @@ import {
   type DragEndEvent,
 } from '@dnd-kit/core'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import {
   Dialog,
   DialogContent,
@@ -19,7 +20,14 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Plus, Rocket, ChevronRight } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Plus, Rocket, ChevronRight, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { KanbanColumn } from './kanban-column'
 import { MenteeCard } from './mentee-card'
@@ -53,6 +61,8 @@ export function KanbanBoard({
 }: KanbanBoardProps) {
   const [mentees, setMentees] = useState<MenteeWithStats[]>(initialMentees)
   const [activeId, setActiveId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedSpecialist, setSelectedSpecialist] = useState<string>('all')
   const { unreadMap, lastMessageMap } = useUnreadCounts()
 
   useEffect(() => {
@@ -157,8 +167,17 @@ export function KanbanBoard({
     setTransitionMentee(null)
   }
 
+  const filteredMentees = mentees.filter((m) => {
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      if (!m.full_name?.toLowerCase().includes(q)) return false
+    }
+    if (selectedSpecialist !== 'all' && m.created_by !== selectedSpecialist) return false
+    return true
+  })
+
   const getMenteesForStage = (stageId: string) =>
-    mentees
+    filteredMentees
       .filter((m) => m.current_stage_id === stageId)
       .sort((a, b) => {
         // 1. Unread messages first
@@ -183,14 +202,42 @@ export function KanbanBoard({
 
   return (
     <div>
-      <div className="mb-4 sm:mb-6 flex items-center justify-between">
-        <h1 className="font-heading text-xl sm:text-2xl font-bold text-foreground">
-          {title}
-        </h1>
-        <Button onClick={() => setDialogOpen(true)} className="hidden sm:inline-flex">
-          <Plus className="mr-2 h-4 w-4" />
-          Novo Mentorado
-        </Button>
+      <div className="mb-4 sm:mb-6 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h1 className="font-heading text-xl sm:text-2xl font-bold text-foreground">
+            {title}
+          </h1>
+          <Button onClick={() => setDialogOpen(true)} className="hidden sm:inline-flex">
+            <Plus className="mr-2 h-4 w-4" />
+            Novo Mentorado
+          </Button>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome do mentorado..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          {isAdmin && specialists.length > 0 && (
+            <Select value={selectedSpecialist} onValueChange={setSelectedSpecialist}>
+              <SelectTrigger className="w-full sm:w-[220px]">
+                <SelectValue placeholder="Filtrar por especialista" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os especialistas</SelectItem>
+                {specialists.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.full_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
       </div>
 
       <DndContext

@@ -57,6 +57,7 @@ interface TasksBoardProps {
   tasks: Task[]
   mentees: { id: string; full_name: string }[]
   attachments: TaskAttachment[]
+  specialists: { id: string; full_name: string }[]
   isAdmin: boolean
 }
 
@@ -65,10 +66,11 @@ function isOverdue(task: Task): boolean {
   return new Date(task.due_date) < new Date(new Date().toISOString().split('T')[0])
 }
 
-export function TasksBoard({ columns, tasks: initialTasks, mentees, attachments: initialAttachments, isAdmin }: TasksBoardProps) {
+export function TasksBoard({ columns, tasks: initialTasks, mentees, attachments: initialAttachments, specialists, isAdmin }: TasksBoardProps) {
   const router = useRouter()
   const [tasks, setTasks] = useState(initialTasks)
   const [attachments] = useState(initialAttachments)
+  const [specialistFilter, setSpecialistFilter] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [taskDetail, setTaskDetail] = useState<Task | null>(null)
@@ -197,18 +199,36 @@ export function TasksBoard({ columns, tasks: initialTasks, mentees, attachments:
     router.refresh()
   }
 
+  // Filter by specialist
+  const filteredTasks = specialistFilter
+    ? tasks.filter((t) => t.created_by === specialistFilter)
+    : tasks
+
   // Separate overdue tasks
-  const overdueTasks = tasks.filter(isOverdue)
-  const tasksByColumn = (colId: string) => tasks.filter((t) => t.column_id === colId && !isOverdue(t))
+  const overdueTasks = filteredTasks.filter(isOverdue)
+  const tasksByColumn = (colId: string) => filteredTasks.filter((t) => t.column_id === colId && !isOverdue(t))
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-heading text-2xl font-bold text-foreground">Tarefas</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{tasks.length} tarefa{tasks.length !== 1 ? 's' : ''}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{filteredTasks.length} tarefa{filteredTasks.length !== 1 ? 's' : ''}{specialistFilter ? ` (filtrado)` : ''}</p>
         </div>
         <div className="flex items-center gap-2">
+          {isAdmin && specialists.length > 0 && (
+            <Select value={specialistFilter || '__all__'} onValueChange={(v) => setSpecialistFilter(v === '__all__' ? '' : v)}>
+              <SelectTrigger className="w-44 h-9 text-xs">
+                <SelectValue placeholder="Todos especialistas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all__">Todos especialistas</SelectItem>
+                {specialists.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           {isAdmin && (
             <Button size="sm" variant="outline" onClick={() => setShowColumnConfig(true)} className="gap-1.5">
               <Settings className="h-3.5 w-3.5" /> Colunas

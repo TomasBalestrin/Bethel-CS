@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import DailyIframe from '@daily-co/daily-js'
 import { Phone, Loader2, PhoneOff, Mic, MicOff } from 'lucide-react'
 import Image from 'next/image'
@@ -9,7 +9,9 @@ import { getOrCreateCall, destroyCall, getActiveCall } from '@/lib/daily-call'
 
 export default function MenteeCallPage() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const callToken = params.callToken as string
+  const roomParam = searchParams.get('room') // Room name from URL — ensures same room as specialist
 
   const [status, setStatus] = useState<'loading' | 'ready' | 'joining' | 'active' | 'ended' | 'error'>('loading')
   const [specialistName, setSpecialistName] = useState('')
@@ -22,7 +24,10 @@ export default function MenteeCallPage() {
   useEffect(() => {
     async function init() {
       try {
-        const res = await fetch(`/api/calls/mentee-token/${callToken}`)
+        const url = roomParam
+          ? `/api/calls/mentee-token/${callToken}?room=${roomParam}`
+          : `/api/calls/mentee-token/${callToken}`
+        const res = await fetch(url)
         if (!res.ok) {
           const data = await res.json().catch(() => ({}))
           setError(data.error || 'Link inválido ou ligação encerrada')
@@ -34,6 +39,7 @@ export default function MenteeCallPage() {
         setRoomUrl(data.roomUrl)
         setSpecialistName(data.specialistName)
         setCallType(data.callType || 'voice')
+        console.log('[MenteeCall] Room from API:', data.roomUrl, 'roomParam:', roomParam)
         setStatus('ready')
       } catch {
         setError('Erro ao conectar')
@@ -41,7 +47,7 @@ export default function MenteeCallPage() {
       }
     }
     init()
-  }, [callToken])
+  }, [callToken, roomParam])
 
   function handleJoinClick() {
     if (!roomUrl || !token) return

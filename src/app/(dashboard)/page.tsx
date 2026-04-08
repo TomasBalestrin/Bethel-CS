@@ -160,8 +160,8 @@ export default async function DashboardPage({ searchParams }: Props) {
   if (specialistId && menteeIds.length > 0) revenueQuery = revenueQuery.in('mentee_id', menteeIds)
   else if (specialistId && menteeIds.length === 0) revenueQuery = revenueQuery.eq('mentee_id', 'none')
 
-  // ─── Testimonials (count only) ───
-  let testimonialsQuery = supabase.from('testimonials').select('id', { count: 'exact', head: true })
+  // ─── Testimonials (need mentee_id for distinct count) ───
+  let testimonialsQuery = supabase.from('testimonials').select('id, mentee_id')
   if (startDate) testimonialsQuery = testimonialsQuery.gte('created_at', startDate)
   if (endDate) testimonialsQuery = testimonialsQuery.lte('created_at', endDate + 'T23:59:59')
   if (specialistId && menteeIds.length > 0) testimonialsQuery = testimonialsQuery.in('mentee_id', menteeIds)
@@ -187,13 +187,22 @@ export default async function DashboardPage({ searchParams }: Props) {
   if (endDate) csQuery = csQuery.lte('activity_date', endDate)
   if (specialistId) csQuery = csQuery.eq('specialist_id', specialistId)
 
-  // ─── Stage Changes (count for dashboard) ───
+  // ─── Stage Changes (need mentee_id for distinct count) ───
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let stageChangesQuery = supabase.from('stage_changes' as never).select('id' as never, { count: 'exact', head: true } as never) as any
+  let stageChangesQuery = supabase.from('stage_changes' as never).select('mentee_id' as never) as any
   if (startDate) stageChangesQuery = stageChangesQuery.gte('changed_at', startDate)
   if (endDate) stageChangesQuery = stageChangesQuery.lte('changed_at', endDate + 'T23:59:59')
   if (specialistId && menteeIds.length > 0) stageChangesQuery = stageChangesQuery.in('mentee_id', menteeIds)
   else if (specialistId && menteeIds.length === 0) stageChangesQuery = stageChangesQuery.eq('mentee_id', 'none')
+
+  // ─── Delivery events + participations (for Engajamento section) ───
+  let deliveryEventsQuery = supabase.from('delivery_events').select('id, delivery_type, delivery_date')
+  if (startDate) deliveryEventsQuery = deliveryEventsQuery.gte('delivery_date', startDate)
+  if (endDate) deliveryEventsQuery = deliveryEventsQuery.lte('delivery_date', endDate)
+
+  let deliveryPartQuery = supabase.from('delivery_participations').select('delivery_event_id, mentee_id')
+  if (specialistId && menteeIds.length > 0) deliveryPartQuery = deliveryPartQuery.in('mentee_id', menteeIds)
+  else if (specialistId && menteeIds.length === 0) deliveryPartQuery = deliveryPartQuery.eq('mentee_id', 'none')
 
   // ─── Call Records (count + total duration) ───
   let callsQuery = supabase.from('call_records').select('duration_seconds')
@@ -228,15 +237,17 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   const [
     { data: revenues },
-    { count: testimonialCount },
+    { data: testimonials },
     { count: indicationCount },
     { data: engagements },
     { data: csActivities },
-    { count: stageChangeCount },
+    { data: stageChanges },
     { data: callRecords },
     { count: wppOutCount },
     { count: wppInCount },
     { data: attendanceMsgs },
+    { data: deliveryEvents },
+    { data: deliveryParts },
   ] = await Promise.all([
     revenueQuery,
     testimonialsQuery,
@@ -248,6 +259,8 @@ export default async function DashboardPage({ searchParams }: Props) {
     wppOutQuery,
     wppInQuery,
     attendanceMsgsQuery,
+    deliveryEventsQuery,
+    deliveryPartQuery,
   ])
 
   // ─── Calculate attendance sessions + active duration ───
@@ -388,10 +401,25 @@ export default async function DashboardPage({ searchParams }: Props) {
   const engByType: Record<string, number> = { aula: 0, live: 0, evento: 0, whatsapp_contato: 0 }
   engagements?.forEach((e) => { engByType[e.type] = (engByType[e.type] ?? 0) + Number(e.value) })
 
-  const totalTestimonials = testimonialCount ?? 0
+  // Testimonials: total + distinct mentees
+  const totalTestimonials = testimonials?.length ?? 0
+  const menteesWithTestimonial = new Set(testimonials?.map((t) => t.mentee_id) ?? []).size
 
-  // ─── SEÇÃO 3b: Stage changes ───
-  const totalStageChanges = (stageChangeCount as number) ?? 0
+  // Stage changes: distinct mentees who advanced
+  const menteesAdvanced = new Set(((stageChanges as { mentee_id: string }[] | null) ?? []).map((s) => s.mentee_id)).size
+
+  // ─── SEÇÃO Engajamento: delivery stats ───
+  const deliveryTypeKeys = ['hotseat', 'comercial', 'gestao', 'mkt', 'extras', 'mentoria_individual']
+  const deliveryEventIds = new Set((deliveryEvents ?? []).map((e) => e.id))
+  const filteredParts = (deliveryParts ?? []).filter((p) => deliveryEventIds.has(p.delivery_event_id))
+
+  const deliveryStats: Record<string, { delivered: number; participated: number }> = {}
+  for (const key of deliveryTypeKeys) {
+    const eventsOfType = (deliveryEvents ?? []).filter((e) => e.delivery_type === key)
+    const eventIdsOfType = new Set(eventsOfType.map((e) => e.id))
+    const partsOfType = filteredParts.filter((p) => eventIdsOfType.has(p.delivery_event_id))
+    deliveryStats[key] = { delivered: eventsOfType.length, participated: partsOfType.length }
+  }
 
   // ─── SEÇÃO 4: Trabalho CS (automático + manual) ───
   // Manual CS activities
@@ -453,12 +481,19 @@ export default async function DashboardPage({ searchParams }: Props) {
       }}
       section3={{
         totalFaturamentoAtual,
-        engByType,
         totalTestimonials,
-        totalStageChanges,
+        menteesWithTestimonial,
+        menteesAdvanced,
         growthPct,
         growthCount,
         growthTotal: menteesWithFat.length,
+        totalMentees,
+      }}
+      engajamento={{
+        deliveryStats,
+        eventos: engByType.evento ?? 0,
+        intensivo: engByType.live ?? 0,
+        encontro: engByType.whatsapp_contato ?? 0,
       }}
       section4={{
         totalLigacoes,
@@ -478,7 +513,6 @@ export default async function DashboardPage({ searchParams }: Props) {
         upsell: revByType.upsell,
         indicacao_perpetuo: revByType.indicacao_perpetuo,
         indicacao_intensivo: revByType.indicacao_intensivo,
-        indicacao_encontro: revByType.indicacao_encontro,
         total: totalRevenue,
       }}
       birthdayMentees={birthdayList}

@@ -55,12 +55,19 @@ interface DashboardMetricsProps {
   }
   section3: {
     totalFaturamentoAtual: number
-    engByType: Record<string, number>
     totalTestimonials: number
-    totalStageChanges: number
+    menteesWithTestimonial: number
+    menteesAdvanced: number
     growthPct: number
     growthCount: number
     growthTotal: number
+    totalMentees: number
+  }
+  engajamento: {
+    deliveryStats: Record<string, { delivered: number; participated: number }>
+    eventos: number
+    intensivo: number
+    encontro: number
   }
   section4: {
     totalLigacoes: number
@@ -80,7 +87,6 @@ interface DashboardMetricsProps {
     upsell: number
     indicacao_perpetuo: number
     indicacao_intensivo: number
-    indicacao_encontro: number
     total: number
   }
   birthdayMentees: { id: string; full_name: string; daysUntil: number }[]
@@ -352,17 +358,52 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
           <h2 className="text-sm font-semibold text-foreground">Sucesso do cliente</h2>
         </div>
         <div className="p-4">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             <MetricCard icon={TrendingUp} label="Crescimento faturamento" value={props.section3.growthPct !== 0 ? `${props.section3.growthPct > 0 ? '+' : ''}${props.section3.growthPct}%` : '—'} color={props.section3.growthPct > 0 ? 'text-success' : 'text-destructive'} bg={props.section3.growthPct > 0 ? 'bg-success/10' : 'bg-destructive/10'} source={`${props.section3.growthCount}/${props.section3.growthTotal} cresceram`} />
             <MetricCard icon={DollarSign} label="Faturamento total (Bethel Metrics)" value={formatBRL(props.section3.totalFaturamentoAtual)} color="text-success" bg="bg-success/10" source="soma faturamento_atual mentorados ativos" />
-            <MetricCard icon={TrendingUp} label="Avanço nas etapas" value={`${props.section3.totalStageChanges} movimentações`} color="text-info" bg="bg-info/10" source="stage_changes" />
+            <MetricCard icon={TrendingUp} label="Avanço nas etapas" value={`${props.section3.menteesAdvanced} mentorados`} color="text-info" bg="bg-info/10" source="mentorados distintos que avançaram" />
+            <MetricCard icon={MessageSquareQuote} label="Nº de depoimentos" value={props.section3.totalTestimonials} color="text-warning" bg="bg-warning/10" source="testimonials" note={props.section3.totalMentees > 0 ? `${Math.round((props.section3.totalTestimonials / props.section3.totalMentees) * 100)}% dos mentorados` : ''} />
+            <MetricCard icon={Users} label="Mentorados com depoimento" value={props.section3.menteesWithTestimonial} color="text-warning" bg="bg-warning/10" source="mentorados distintos com depoimento" note={props.section3.totalMentees > 0 ? `${Math.round((props.section3.menteesWithTestimonial / props.section3.totalMentees) * 100)}% dos mentorados` : ''} />
           </div>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5 mt-3">
-            <MetricCard icon={BookOpen} label="Área de membros" value={`${props.section3.engByType.aula ?? 0} acessos`} color="text-accent" bg="bg-accent/10" source="engagement_records (aula)" />
-            <MetricCard icon={Video} label="Mentorias ao vivo" value={`${props.section3.engByType.live ?? 0} presenças`} color="text-info" bg="bg-info/10" source="engagement_records (live)" />
-            <MetricCard icon={CalendarCheck} label="Eventos" value={`${props.section3.engByType.evento ?? 0} participações`} color="text-warning" bg="bg-warning/10" source="engagement_records (evento)" />
-            <MetricCard icon={Headphones} label="Canal do especialista" value={`${props.section3.engByType.whatsapp_contato ?? 0} contatos`} color="text-success" bg="bg-success/10" source="engagement_records (whatsapp)" />
-            <MetricCard icon={MessageSquareQuote} label="Depoimentos" value={props.section3.totalTestimonials} color="text-warning" bg="bg-warning/10" source="testimonials" />
+        </div>
+      </section>
+
+      {/* ═══ ENGAJAMENTO ═══ */}
+      <section className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-gradient-to-r from-info/5 to-transparent">
+          <BookOpen className="h-4 w-4 text-info" />
+          <h2 className="text-sm font-semibold text-foreground">Engajamento</h2>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            {[
+              { key: 'hotseat', label: 'Hotseat' },
+              { key: 'comercial', label: 'Comercial' },
+              { key: 'gestao', label: 'Gestão' },
+              { key: 'mkt', label: 'Mkt' },
+              { key: 'extras', label: 'Entregas Extras' },
+              { key: 'mentoria_individual', label: 'Mentoria Individual' },
+            ].map(({ key, label }) => {
+              const stat = props.engajamento.deliveryStats[key] ?? { delivered: 0, participated: 0 }
+              const rate = stat.delivered > 0 ? Math.round((stat.participated / stat.delivered) * 100) : 0
+              return (
+                <MetricCard
+                  key={key}
+                  icon={CalendarCheck}
+                  label={label}
+                  value={`${stat.participated}/${stat.delivered}`}
+                  color="text-info"
+                  bg="bg-info/10"
+                  source={`${rate}% taxa de participação`}
+                  note={`Entregues: ${stat.delivered} · Participou: ${stat.participated}`}
+                />
+              )
+            })}
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 mt-3">
+            <MetricCard icon={CalendarCheck} label="Eventos" value={props.engajamento.eventos} color="text-warning" bg="bg-warning/10" source="engagement_records (evento)" />
+            <MetricCard icon={Video} label="Participação Intensivo" value={props.engajamento.intensivo} color="text-accent" bg="bg-accent/10" source="engagement_records (live)" />
+            <MetricCard icon={Star} label="Encontro Elite Premium" value={props.engajamento.encontro} color="text-success" bg="bg-success/10" source="engagement_records" />
           </div>
         </div>
       </section>
@@ -388,19 +429,18 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
         </div>
       </section>
 
-      {/* ═══ RECEITA NOVA ═══ */}
+      {/* ═══ LTV DOS MENTORADOS ═══ */}
       <section className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
           <DollarSign className="h-4 w-4 text-accent" />
-          <h2 className="text-sm font-semibold text-foreground">Receita nova</h2>
+          <h2 className="text-sm font-semibold text-foreground">LTV dos Mentorados</h2>
         </div>
         <div className="p-4">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             <MetricCard icon={DollarSign} label="Crossell" value={formatBRL(props.section5.crossell)} color="text-success" bg="bg-success/10" source="revenue_records (crossell)" />
-            <MetricCard icon={TrendingUp} label="Ascensão (Upsell)" value={formatBRL(props.section5.upsell)} color="text-accent" bg="bg-accent/10" source="revenue_records (upsell)" />
-            <MetricCard icon={UserPlus} label="Indicação Perpétuo" value={formatBRL(props.section5.indicacao_perpetuo)} color="text-info" bg="bg-info/10" source="revenue_records (indic_perpetuo)" />
-            <MetricCard icon={UserPlus} label="Indicação Intensivo" value={formatBRL(props.section5.indicacao_intensivo)} color="text-warning" bg="bg-warning/10" source="revenue_records (indic_intensivo)" />
-            <MetricCard icon={UserPlus} label="Indicação Encontro" value={formatBRL(props.section5.indicacao_encontro)} color="text-accent" bg="bg-accent/10" source="revenue_records (indic_encontro)" />
+            <MetricCard icon={TrendingUp} label="Ascensão" value={formatBRL(props.section5.upsell)} color="text-accent" bg="bg-accent/10" source="revenue_records (upsell)" />
+            <MetricCard icon={UserPlus} label="Indicação que fechou" value={formatBRL(props.section5.indicacao_perpetuo)} color="text-info" bg="bg-info/10" source="revenue_records (indic_perpetuo)" />
+            <MetricCard icon={UserPlus} label="Indicação intensivo que fechou" value={formatBRL(props.section5.indicacao_intensivo)} color="text-warning" bg="bg-warning/10" source="revenue_records (indic_intensivo)" />
             <MetricCard icon={DollarSign} label="Total geral" value={formatBRL(props.section5.total)} color="text-foreground" bg="bg-muted" source="revenue_records (soma)" highlight />
           </div>
         </div>

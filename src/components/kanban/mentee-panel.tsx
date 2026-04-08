@@ -386,7 +386,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
               { value: 'acompanhamento', label: 'Acompanhamento' },
               { value: 'engajamento', label: 'Engajamento' },
               { value: 'historico', label: 'Histórico' },
-              { value: 'intensivo', label: 'Intensivo' },
+              { value: 'intensivo', label: 'Eventos' },
               { value: 'chat', label: 'Chat' },
             ].map((tab) => (
               <TabsTrigger
@@ -2335,227 +2335,133 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
   )
 }
 
-// ─── Tab: Intensivo ───
+// ─── Tab: Eventos ───
 function TabIntensivo({ menteeId }: { menteeId: string }) {
   const [intensivos, setIntensivos] = useState<IntensivoRecord[]>([])
+  const [encontros, setEncontros] = useState<Database['public']['Tables']['presential_events']['Row'][]>([])
 
-  // Indicação form state
-  const [showIndForm, setShowIndForm] = useState(false)
-  const [editingIndId, setEditingIndId] = useState<string | null>(null)
-  const [indName, setIndName] = useState('')
-  const [indPhone, setIndPhone] = useState('')
-  const [indLoading, setIndLoading] = useState(false)
+  const [showIntForm, setShowIntForm] = useState(false)
+  const [intDate, setIntDate] = useState('')
+  const [intLoading, setIntLoading] = useState(false)
 
-  // Participação form state
-  const [showPartForm, setShowPartForm] = useState(false)
-  const [editingPartId, setEditingPartId] = useState<string | null>(null)
-  const [partDate, setPartDate] = useState('')
-  const [partLoading, setPartLoading] = useState(false)
+  const [showEncForm, setShowEncForm] = useState(false)
+  const [encDate, setEncDate] = useState('')
+  const [encLoading, setEncLoading] = useState(false)
 
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<{ id: string; type: 'intensivo' | 'encontro' } | null>(null)
   const supabase = createClient()
 
   const fetchData = useCallback(() => {
-    supabase.from('intensivo_records').select('*').eq('mentee_id', menteeId)
+    supabase.from('intensivo_records').select('*').eq('mentee_id', menteeId).eq('participated', true)
       .order('created_at', { ascending: false }).then(({ data }) => { if (data) setIntensivos(data) })
+    supabase.from('presential_events').select('*').eq('mentee_id', menteeId)
+      .order('created_at', { ascending: false }).then(({ data }) => { if (data) setEncontros(data) })
   }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  // Split records into two lists
-  const indicacoes = intensivos.filter((r) => r.indication_name)
-  const participacoes = intensivos.filter((r) => r.participated)
-
-  // ─── Indicação handlers ───
-  function resetIndForm() {
-    setEditingIndId(null); setIndName(''); setIndPhone(''); setShowIndForm(false)
-  }
-  function openEditInd(rec: IntensivoRecord) {
-    setEditingIndId(rec.id); setIndName(rec.indication_name || ''); setIndPhone(rec.indication_phone || '')
-    setShowIndForm(true)
-  }
-  async function handleSubmitInd(e: React.FormEvent) {
-    e.preventDefault(); setIndLoading(true)
-    const data = { participated: false, indication_name: indName, indication_phone: indPhone || undefined }
-    if (editingIndId) {
-      await updateIntensivoRecord(editingIndId, data)
-    } else {
-      await addIntensivoRecord(menteeId, data)
-    }
-    resetIndForm(); setIndLoading(false); fetchData()
+  async function handleAddIntensivo(e: React.FormEvent) {
+    e.preventDefault(); setIntLoading(true)
+    await addIntensivoRecord(menteeId, { participated: true, participation_date: intDate || undefined })
+    setIntDate(''); setShowIntForm(false); setIntLoading(false); fetchData()
   }
 
-  // ─── Participação handlers ───
-  function resetPartForm() {
-    setEditingPartId(null); setPartDate(''); setShowPartForm(false)
-  }
-  function openEditPart(rec: IntensivoRecord) {
-    setEditingPartId(rec.id); setPartDate(rec.participation_date || '')
-    setShowPartForm(true)
-  }
-  async function handleSubmitPart(e: React.FormEvent) {
-    e.preventDefault(); setPartLoading(true)
-    const data = { participated: true, participation_date: partDate || undefined }
-    if (editingPartId) {
-      await updateIntensivoRecord(editingPartId, data)
-    } else {
-      await addIntensivoRecord(menteeId, data)
-    }
-    resetPartForm(); setPartLoading(false); fetchData()
+  async function handleAddEncontro(e: React.FormEvent) {
+    e.preventDefault(); setEncLoading(true)
+    await supabase.from('presential_events').insert({ mentee_id: menteeId, event_date: encDate })
+    setEncDate(''); setShowEncForm(false); setEncLoading(false); fetchData()
   }
 
-  // ─── Delete handler ───
-  async function handleDelete(id: string) {
+  async function handleDelete() {
+    if (!confirmDeleteId) return
+    const { id, type } = confirmDeleteId
     setConfirmDeleteId(null)
-    setIntensivos((prev) => prev.filter((i) => i.id !== id))
-    const undoTimeout = setTimeout(async () => { await deleteIntensivoRecord(id); fetchData() }, 5000)
-    toast('Registro excluído', { action: { label: 'Desfazer', onClick: () => { clearTimeout(undoTimeout); fetchData() } }, duration: 5000 })
+    if (type === 'intensivo') {
+      setIntensivos((prev) => prev.filter((i) => i.id !== id))
+      const undoTimeout = setTimeout(async () => { await deleteIntensivoRecord(id); fetchData() }, 5000)
+      toast('Registro excluído', { action: { label: 'Desfazer', onClick: () => { clearTimeout(undoTimeout); fetchData() } }, duration: 5000 })
+    } else {
+      setEncontros((prev) => prev.filter((i) => i.id !== id))
+      const undoTimeout = setTimeout(async () => { await supabase.from('presential_events').delete().eq('id', id); fetchData() }, 5000)
+      toast('Registro excluído', { action: { label: 'Desfazer', onClick: () => { clearTimeout(undoTimeout); fetchData() } }, duration: 5000 })
+    }
   }
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* ═══ SEÇÃO 1: Indicação para o Intensivo ═══ */}
+      {/* ═══ Participação no Intensivo ═══ */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <p className="label-xs uppercase">Indicação para o Intensivo ({indicacoes.length})</p>
-          <Button size="sm" variant="outline" onClick={() => { resetIndForm(); setShowIndForm(!showIndForm) }}>
+          <p className="label-xs uppercase">Participação no Intensivo ({intensivos.length})</p>
+          <Button size="sm" variant="outline" onClick={() => setShowIntForm(!showIntForm)}>
             <Plus className="mr-1 h-3 w-3" /> Registrar
           </Button>
         </div>
-
-        <Dialog open={showIndForm} onOpenChange={(open) => { if (!open) resetIndForm() }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingIndId ? 'Editar indicação' : 'Nova indicação para o intensivo'}</DialogTitle>
-              <DialogDescription>Registre uma indicação feita pelo mentorado para o intensivo.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmitInd} className="space-y-3">
-              <div className="space-y-1">
-                <Label htmlFor="int-ind-name">Nome do indicado *</Label>
-                <Input id="int-ind-name" value={indName} onChange={(e) => setIndName(e.target.value)} required />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="int-ind-phone">Telefone</Label>
-                <Input id="int-ind-phone" value={indPhone} onChange={(e) => setIndPhone(e.target.value)} />
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={resetIndForm}>Cancelar</Button>
-                <Button type="submit" disabled={indLoading}>{indLoading ? 'Salvando...' : 'Salvar'}</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {indicacoes.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-            <Users className="h-8 w-8 mb-2 opacity-40" />
-            <p className="text-sm">Nenhuma indicação registrada</p>
-            <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => { resetIndForm(); setShowIndForm(true) }}>
-              <Plus className="h-3 w-3 mr-1" /> Registrar primeira
-            </Button>
-          </div>
-        )}
-        {indicacoes.map((item) => (
-          <div key={item.id} className={`group rounded-lg border p-3 text-sm transition-colors hover:bg-muted/30 ${item.converted ? 'border-success/30 bg-success/5' : 'border-border bg-card'}`}>
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="font-medium text-foreground">{item.indication_name}</p>
-                  {item.converted && <Badge variant="success" className="text-[10px]">Converteu</Badge>}
-                </div>
-                {item.indication_phone && <p className="text-muted-foreground">{item.indication_phone}</p>}
-                {item.converted && item.converted_name && (
-                  <p className="text-xs text-success mt-1">Fechou: {item.converted_name} {item.converted_value ? `— R$ ${Number(item.converted_value).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : ''}</p>
-                )}
-              </div>
-              <div className="flex items-center gap-1">
-                {!item.converted && (
-                  <Button size="sm" variant="ghost" className="h-7 text-[10px] text-success" onClick={async () => {
-                    const name = window.prompt('Quem fechou?')
-                    if (!name) return
-                    const valueStr = window.prompt('Valor (ex: 5000)')
-                    const value = valueStr ? parseFloat(valueStr) : undefined
-                    await updateIntensivoRecord(item.id, { converted: true, converted_name: name, converted_value: value })
-                    fetchData()
-                  }}>Converteu?</Button>
-                )}
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditInd(item)} aria-label="Editar"><Pencil className="h-3 w-3" /></Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteId(item.id)} aria-label="Excluir"><Trash2 className="h-3 w-3" /></Button>
-                </div>
-              </div>
+        {showIntForm && (
+          <form onSubmit={handleAddIntensivo} className="flex items-end gap-2 rounded-lg border border-border bg-muted/50 p-3">
+            <div className="flex-1 space-y-1">
+              <Label className="text-xs">Data *</Label>
+              <Input type="date" value={intDate} onChange={(e) => setIntDate(e.target.value)} required className="h-8 text-xs" />
             </div>
+            <Button type="submit" size="sm" className="h-8" disabled={intLoading}>{intLoading ? 'Salvando...' : 'Salvar'}</Button>
+            <Button type="button" size="sm" variant="ghost" className="h-8" onClick={() => setShowIntForm(false)}>X</Button>
+          </form>
+        )}
+        {intensivos.length === 0 && !showIntForm && (
+          <p className="text-sm text-muted-foreground text-center py-4">Nenhuma participação registrada</p>
+        )}
+        {intensivos.map((item) => (
+          <div key={item.id} className="group flex items-center justify-between rounded-lg border border-border bg-card p-3 text-sm hover:bg-muted/30">
+            <div className="flex items-center gap-2">
+              <Badge variant="success" className="text-[10px]">Participou</Badge>
+              <span className="text-muted-foreground text-xs">{item.participation_date ? formatDateBR(item.participation_date) : '—'}</span>
+            </div>
+            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100" onClick={() => setConfirmDeleteId({ id: item.id, type: 'intensivo' })}><Trash2 className="h-3 w-3" /></Button>
           </div>
         ))}
       </div>
 
       <Separator className="border-border/50" />
 
-      {/* ═══ SEÇÃO 2: Participação do Intensivo ═══ */}
+      {/* ═══ Encontro da Elite Premium ═══ */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <p className="label-xs uppercase">Participação do Intensivo ({participacoes.length})</p>
-          <Button size="sm" variant="outline" onClick={() => { resetPartForm(); setShowPartForm(!showPartForm) }}>
+          <p className="label-xs uppercase">Encontro da Elite Premium ({encontros.length})</p>
+          <Button size="sm" variant="outline" onClick={() => setShowEncForm(!showEncForm)}>
             <Plus className="mr-1 h-3 w-3" /> Registrar
           </Button>
         </div>
-
-        <Dialog open={showPartForm} onOpenChange={(open) => { if (!open) resetPartForm() }}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingPartId ? 'Editar participação' : 'Nova participação no intensivo'}</DialogTitle>
-              <DialogDescription>Registre a participação do mentorado no intensivo.</DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleSubmitPart} className="space-y-3">
-              <div className="space-y-1">
-                <Label htmlFor="int-part-date">Data de participação *</Label>
-                <Input id="int-part-date" type="date" value={partDate} onChange={(e) => setPartDate(e.target.value)} required />
-              </div>
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={resetPartForm}>Cancelar</Button>
-                <Button type="submit" disabled={partLoading}>{partLoading ? 'Salvando...' : 'Salvar'}</Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        {participacoes.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-            <Calendar className="h-8 w-8 mb-2 opacity-40" />
-            <p className="text-sm">Nenhuma participação registrada</p>
-            <Button size="sm" variant="ghost" className="mt-2 text-xs text-accent" onClick={() => { resetPartForm(); setShowPartForm(true) }}>
-              <Plus className="h-3 w-3 mr-1" /> Registrar primeira
-            </Button>
-          </div>
-        )}
-        {participacoes.map((item) => (
-          <div key={item.id} className="group rounded-lg border border-border bg-card p-3 text-sm transition-colors hover:bg-muted/30">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-2">
-                <Badge variant="success">Participou</Badge>
-                {item.participation_date && <span className="text-muted-foreground text-xs">{formatDateBR(item.participation_date)}</span>}
-              </div>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditPart(item)} aria-label="Editar"><Pencil className="h-3 w-3" /></Button>
-                <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setConfirmDeleteId(item.id)} aria-label="Excluir"><Trash2 className="h-3 w-3" /></Button>
-              </div>
+        {showEncForm && (
+          <form onSubmit={handleAddEncontro} className="flex items-end gap-2 rounded-lg border border-border bg-muted/50 p-3">
+            <div className="flex-1 space-y-1">
+              <Label className="text-xs">Data *</Label>
+              <Input type="date" value={encDate} onChange={(e) => setEncDate(e.target.value)} required className="h-8 text-xs" />
             </div>
+            <Button type="submit" size="sm" className="h-8" disabled={encLoading}>{encLoading ? 'Salvando...' : 'Salvar'}</Button>
+            <Button type="button" size="sm" variant="ghost" className="h-8" onClick={() => setShowEncForm(false)}>X</Button>
+          </form>
+        )}
+        {encontros.length === 0 && !showEncForm && (
+          <p className="text-sm text-muted-foreground text-center py-4">Nenhuma participação registrada</p>
+        )}
+        {encontros.map((item) => (
+          <div key={item.id} className="group flex items-center justify-between rounded-lg border border-border bg-card p-3 text-sm hover:bg-muted/30">
+            <div className="flex items-center gap-2">
+              <Badge variant="success" className="text-[10px]">Participou</Badge>
+              <span className="text-muted-foreground text-xs">{item.event_date ? formatDateBR(item.event_date) : '—'}</span>
+            </div>
+            <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100" onClick={() => setConfirmDeleteId({ id: item.id, type: 'encontro' })}><Trash2 className="h-3 w-3" /></Button>
           </div>
         ))}
       </div>
 
-      <Separator className="border-border/50" />
-
-      {/* ═══ SEÇÃO 3: Encontro Presencial ═══ */}
-      <CardPresentialEvents menteeId={menteeId} />
-
-      {/* Confirm delete dialog (shared) */}
+      {/* Confirm delete dialog */}
       <Dialog open={!!confirmDeleteId} onOpenChange={() => setConfirmDeleteId(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>Excluir registro?</DialogTitle><DialogDescription>Esta ação não pode ser desfeita.</DialogDescription></DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>Cancelar</Button>
-            <Button variant="destructive" onClick={() => confirmDeleteId && handleDelete(confirmDeleteId)}>Excluir</Button>
+            <Button variant="destructive" onClick={handleDelete}>Excluir</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

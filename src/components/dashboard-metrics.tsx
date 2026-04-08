@@ -191,36 +191,36 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
     <div className="space-y-6">
       {/* Birthday Banner */}
       {props.birthdayMentees.length > 0 && (
-        <section className="rounded-xl border border-amber-300/50 bg-gradient-to-r from-amber-50 via-yellow-50 to-orange-50 dark:from-amber-950/30 dark:via-yellow-950/20 dark:to-orange-950/20 dark:border-amber-700/30 p-4 shadow-sm animate-fade-in">
+        <section className="rounded-xl border border-accent/30 bg-accent/10 p-4 shadow-sm animate-fade-in">
           <div className="flex items-start gap-3">
-            <div className="rounded-full bg-amber-100 dark:bg-amber-900/50 p-2.5 shrink-0">
-              <Cake className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            <div className="rounded-full bg-accent/20 p-2.5 shrink-0">
+              <Cake className="h-5 w-5 text-accent" />
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="font-heading font-semibold text-sm text-amber-900 dark:text-amber-200">
+              <h2 className="font-heading font-semibold text-sm text-foreground">
                 {props.birthdayMentees.some((m) => m.daysUntil === 0)
                   ? 'Aniversariantes hoje!'
                   : 'Aniversariantes nos pr\u00f3ximos dias'
                 }
               </h2>
-              <p className="text-xs text-amber-700/70 dark:text-amber-300/60 mt-0.5">
-                Envie um \u00e1udio de parab\u00e9ns para esses mentorados
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Envie um áudio de parabéns para esses mentorados
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {props.birthdayMentees.map((m) => (
                   <button
                     key={m.id}
                     onClick={() => router.push(`/mentorados?open=${m.id}`)}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-white/80 dark:bg-white/10 border border-amber-200/60 dark:border-amber-700/40 px-3 py-1.5 text-sm font-medium text-amber-900 dark:text-amber-200 hover:bg-white dark:hover:bg-white/20 transition-colors shadow-sm"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-card border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors shadow-sm"
                   >
-                    <Cake className="h-3.5 w-3.5 text-amber-500" />
+                    <Cake className="h-3.5 w-3.5 text-accent" />
                     {m.full_name}
                     {m.daysUntil === 0 ? (
-                      <span className="text-[10px] font-bold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-800/50 rounded-full px-1.5 py-0.5">HOJE</span>
+                      <span className="text-[10px] font-bold text-white bg-accent rounded-full px-1.5 py-0.5">HOJE</span>
                     ) : (
-                      <span className="text-[10px] text-amber-500/70">em {m.daysUntil} dia{m.daysUntil !== 1 ? 's' : ''}</span>
+                      <span className="text-[10px] text-muted-foreground">em {m.daysUntil} dia{m.daysUntil !== 1 ? 's' : ''}</span>
                     )}
-                    <ChevronRight className="h-3 w-3 text-amber-400" />
+                    <ChevronRight className="h-3 w-3 text-muted-foreground" />
                   </button>
                 ))}
               </div>

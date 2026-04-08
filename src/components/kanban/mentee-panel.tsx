@@ -844,7 +844,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
         </div>
       )}
 
-      {/* ── Registrar Cancelamento ── */}
+      {/* ── Solicitar Cancelamento ── */}
       {mentee.status !== 'cancelado' && (
         <div className="flex justify-start pt-2">
           <Button
@@ -854,7 +854,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
             className="text-xs gap-1.5"
           >
             <XCircle className="h-3.5 w-3.5" />
-            Registrar Cancelamento
+            Solicitar Cancelamento
           </Button>
         </div>
       )}
@@ -862,9 +862,9 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
       <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Registrar Cancelamento</DialogTitle>
+            <DialogTitle>Solicitação de Cancelamento</DialogTitle>
             <DialogDescription>
-              Descreva o motivo completo do cancelamento de {mentee.full_name}. Esta ação mudará o status para cancelado.
+              Registre o motivo completo da solicitação de cancelamento de {mentee.full_name}. O status do mentorado não será alterado.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={async (e) => {
@@ -875,12 +875,11 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
             }
             setCancelling(true)
             const timestamp = new Date().toLocaleDateString('pt-BR')
-            const cancelNote = `[CANCELAMENTO ${timestamp}] ${cancelReason.trim()}`
+            const cancelNote = `[SOLICITAÇÃO DE CANCELAMENTO ${timestamp}] ${cancelReason.trim()}`
             const existingNotes = mentee.notes?.trim() || ''
             const newNotes = existingNotes ? `${cancelNote}\n\n${existingNotes}` : cancelNote
 
             const result = await updateMentee(mentee.id, {
-              status: 'cancelado',
               notes: newNotes,
             })
             setCancelling(false)
@@ -890,15 +889,15 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
               return
             }
 
-            toast.success('Cancelamento registrado')
+            toast.success('Solicitação de cancelamento registrada')
             setCancelOpen(false)
             setCancelReason('')
             if (onMenteeUpdated) {
-              onMenteeUpdated({ ...mentee, status: 'cancelado', notes: newNotes })
+              onMenteeUpdated({ ...mentee, notes: newNotes })
             }
           }} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="cancel-reason">Motivo do cancelamento *</Label>
+              <Label htmlFor="cancel-reason">Motivo da solicitação *</Label>
               <Textarea
                 id="cancel-reason"
                 value={cancelReason}
@@ -906,7 +905,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
                 required
                 minLength={10}
                 className="min-h-[120px] resize-y"
-                placeholder="Descreva detalhadamente o motivo do cancelamento..."
+                placeholder="Descreva detalhadamente o motivo da solicitação de cancelamento..."
               />
               <p className="text-[10px] text-muted-foreground">Mínimo 10 caracteres. Será registrado nas observações do mentorado.</p>
             </div>
@@ -915,7 +914,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
                 Voltar
               </Button>
               <Button type="submit" variant="destructive" size="sm" disabled={cancelling || cancelReason.trim().length < 10}>
-                {cancelling ? 'Registrando...' : 'Confirmar Cancelamento'}
+                {cancelling ? 'Registrando...' : 'Registrar Solicitação'}
               </Button>
             </div>
           </form>

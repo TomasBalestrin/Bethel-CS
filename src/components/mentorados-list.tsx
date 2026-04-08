@@ -159,6 +159,18 @@ export function MentoradosList({
     // Nicho
     if (advFilters.nicho && m.niche !== advFilters.nicho) return false
 
+    // Data de início
+    if (advFilters.dataInicio && m.start_date) {
+      if (m.start_date < advFilters.dataInicio) return false
+    } else if (advFilters.dataInicio && !m.start_date) {
+      return false
+    }
+
+    // Data de término
+    if (advFilters.dataTermino && m.end_date) {
+      if (m.end_date > advFilters.dataTermino) return false
+    }
+
     return true
   })
 

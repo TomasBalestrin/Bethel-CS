@@ -166,7 +166,7 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
 
   // Non-currency filters: push immediately on change
   useEffect(() => {
-    const nonCurrencyKeys: (keyof MenteeFilterValues)[] = ['funilOrigem', 'closer', 'mesAniversario', 'numColaboradores', 'estado', 'nicho']
+    const nonCurrencyKeys: (keyof MenteeFilterValues)[] = ['funilOrigem', 'closer', 'mesAniversario', 'numColaboradores', 'estado', 'nicho', 'dataInicio', 'dataTermino']
     for (const key of nonCurrencyKeys) {
       const current = searchParams.get(key) ?? ''
       const local = localAdvFilters[key] || ''
@@ -175,12 +175,12 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localAdvFilters.funilOrigem, localAdvFilters.closer, localAdvFilters.mesAniversario, localAdvFilters.numColaboradores, localAdvFilters.estado, localAdvFilters.nicho])
+  }, [localAdvFilters.funilOrigem, localAdvFilters.closer, localAdvFilters.mesAniversario, localAdvFilters.numColaboradores, localAdvFilters.estado, localAdvFilters.nicho, localAdvFilters.dataInicio, localAdvFilters.dataTermino])
 
   const handleClearAdvFilters = useCallback(() => {
     setLocalAdvFilters(EMPTY_FILTERS)
     const params = new URLSearchParams(searchParams.toString())
-    const advKeys: (keyof MenteeFilterValues)[] = ['fatInicialMin', 'fatInicialMax', 'fatAtualMin', 'fatAtualMax', 'funilOrigem', 'closer', 'mesAniversario', 'numColaboradores', 'estado', 'nicho']
+    const advKeys: (keyof MenteeFilterValues)[] = ['fatInicialMin', 'fatInicialMax', 'fatAtualMin', 'fatAtualMax', 'funilOrigem', 'closer', 'mesAniversario', 'numColaboradores', 'estado', 'nicho', 'dataInicio', 'dataTermino']
     for (const key of advKeys) {
       params.delete(key)
     }

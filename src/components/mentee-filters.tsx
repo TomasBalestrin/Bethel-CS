@@ -55,6 +55,8 @@ export interface MenteeFilterValues {
   numColaboradores: string
   estado: string
   nicho: string
+  dataInicio: string
+  dataTermino: string
 }
 
 export const EMPTY_FILTERS: MenteeFilterValues = {
@@ -68,6 +70,8 @@ export const EMPTY_FILTERS: MenteeFilterValues = {
   numColaboradores: '',
   estado: '',
   nicho: '',
+  dataInicio: '',
+  dataTermino: '',
 }
 
 interface MenteeFiltersProps {
@@ -235,6 +239,28 @@ export function MenteeFilters({ filters, onFilterChange, onClearAll, options }: 
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Data de início */}
+            <div className="space-y-1">
+              <Label className="text-xs">Data de início</Label>
+              <Input
+                type="date"
+                className="text-xs h-9"
+                value={filters.dataInicio}
+                onChange={(e) => onFilterChange('dataInicio', e.target.value)}
+              />
+            </div>
+
+            {/* Data de término */}
+            <div className="space-y-1">
+              <Label className="text-xs">Data de término</Label>
+              <Input
+                type="date"
+                className="text-xs h-9"
+                value={filters.dataTermino}
+                onChange={(e) => onFilterChange('dataTermino', e.target.value)}
+              />
             </div>
           </div>
 

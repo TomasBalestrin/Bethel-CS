@@ -45,6 +45,7 @@ import {
   Mic,
   Loader2,
   Building2,
+  XCircle,
 } from 'lucide-react'
 import { formatDateBR } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
@@ -501,6 +502,9 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
   onTransitionToMentorship?: (mentee: MenteeWithStats) => void
 }) {
   const [saving, setSaving] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
+  const [cancelReason, setCancelReason] = useState('')
+  const [cancelling, setCancelling] = useState(false)
 
   // Fetch action plan data for Empresa block (nome_empresa, num_colaboradores)
   const [empresaData, setEmpresaData] = useState<{ nome_empresa?: string; num_colaboradores?: string }>({})
@@ -839,6 +843,84 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
           </div>
         </div>
       )}
+
+      {/* ── Registrar Cancelamento ── */}
+      {mentee.status !== 'cancelado' && (
+        <div className="flex justify-start pt-2">
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => setCancelOpen(true)}
+            className="text-xs gap-1.5"
+          >
+            <XCircle className="h-3.5 w-3.5" />
+            Registrar Cancelamento
+          </Button>
+        </div>
+      )}
+
+      <Dialog open={cancelOpen} onOpenChange={setCancelOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Registrar Cancelamento</DialogTitle>
+            <DialogDescription>
+              Descreva o motivo completo do cancelamento de {mentee.full_name}. Esta ação mudará o status para cancelado.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={async (e) => {
+            e.preventDefault()
+            if (cancelReason.trim().length < 10) {
+              toast.error('Descreva o motivo com mais detalhes (mínimo 10 caracteres)')
+              return
+            }
+            setCancelling(true)
+            const timestamp = new Date().toLocaleDateString('pt-BR')
+            const cancelNote = `[CANCELAMENTO ${timestamp}] ${cancelReason.trim()}`
+            const existingNotes = mentee.notes?.trim() || ''
+            const newNotes = existingNotes ? `${cancelNote}\n\n${existingNotes}` : cancelNote
+
+            const result = await updateMentee(mentee.id, {
+              status: 'cancelado',
+              notes: newNotes,
+            })
+            setCancelling(false)
+
+            if (result.error) {
+              toast.error(result.error)
+              return
+            }
+
+            toast.success('Cancelamento registrado')
+            setCancelOpen(false)
+            setCancelReason('')
+            if (onMenteeUpdated) {
+              onMenteeUpdated({ ...mentee, status: 'cancelado', notes: newNotes })
+            }
+          }} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="cancel-reason">Motivo do cancelamento *</Label>
+              <Textarea
+                id="cancel-reason"
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                required
+                minLength={10}
+                className="min-h-[120px] resize-y"
+                placeholder="Descreva detalhadamente o motivo do cancelamento..."
+              />
+              <p className="text-[10px] text-muted-foreground">Mínimo 10 caracteres. Será registrado nas observações do mentorado.</p>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => { setCancelOpen(false); setCancelReason('') }}>
+                Voltar
+              </Button>
+              <Button type="submit" variant="destructive" size="sm" disabled={cancelling || cancelReason.trim().length < 10}>
+                {cancelling ? 'Registrando...' : 'Confirmar Cancelamento'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
     </div>
   )

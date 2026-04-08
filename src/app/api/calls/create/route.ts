@@ -22,25 +22,34 @@ export async function POST(request: NextRequest) {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin
 
-  // Check for existing active call (unless forceNew)
+  // Auto-close stale calls (older than 2 hours — Daily rooms expire after 2h)
+  await supabase
+    .from('call_records')
+    .update({ ended_at: new Date().toISOString() })
+    .is('ended_at', null)
+    .lt('created_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
+
+  // Check for existing RECENT active call (unless forceNew) — max 30 min old
   if (!forceNew) {
+    const recentThreshold = new Date(Date.now() - 30 * 60 * 1000).toISOString()
     const { data: existingCall } = await supabase
       .from('call_records')
       .select('id, daily_room_name, daily_room_url, call_type, created_at')
       .eq('mentee_id', menteeId)
       .is('ended_at', null)
+      .gte('created_at', recentThreshold)
       .order('created_at', { ascending: false })
       .limit(1)
       .single()
 
     if (existingCall) {
-      console.log('[Calls/Create] Reusing existing call:', existingCall.daily_room_name)
+      console.log('[Calls/Create] Reusing recent call:', existingCall.daily_room_name)
       const token = await createMeetingToken(existingCall.daily_room_name, true)
       const menteeLink = `${appUrl}/call/${mentee.call_token}?room=${existingCall.daily_room_name}`
 
       return NextResponse.json({
         callId: existingCall.id,
-        roomUrl: existingCall.daily_room_url,
+        roomUrl: existingCall.daily_room_url || getRoomUrl(existingCall.daily_room_name),
         roomName: existingCall.daily_room_name,
         token,
         menteeLink,
@@ -48,14 +57,14 @@ export async function POST(request: NextRequest) {
         callType: existingCall.call_type || callType,
       })
     }
-  } else {
-    // End all existing active calls for this mentee
-    await supabase
-      .from('call_records')
-      .update({ ended_at: new Date().toISOString() })
-      .eq('mentee_id', menteeId)
-      .is('ended_at', null)
   }
+
+  // End all existing active calls for this mentee before creating new one
+  await supabase
+    .from('call_records')
+    .update({ ended_at: new Date().toISOString() })
+    .eq('mentee_id', menteeId)
+    .is('ended_at', null)
 
   // Get specialist name
   const { data: profile } = await supabase

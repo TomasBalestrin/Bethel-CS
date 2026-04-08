@@ -19,6 +19,14 @@ export async function GET(
     return NextResponse.json({ error: 'Link inválido' }, { status: 404 })
   }
 
+  // Auto-close stale calls (older than 2 hours)
+  await supabase
+    .from('call_records')
+    .update({ ended_at: new Date().toISOString() })
+    .eq('mentee_id', mentee.id)
+    .is('ended_at', null)
+    .lt('created_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString())
+
   // Find active call (no ended_at)
   const { data: call } = await supabase
     .from('call_records')

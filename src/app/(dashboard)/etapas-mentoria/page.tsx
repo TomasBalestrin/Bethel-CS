@@ -13,46 +13,68 @@ export default async function EtapasMentoriaPage() {
     userRole = profile?.role ?? 'especialista'
   }
 
-  const { data: stages } = await supabase
-    .from('kanban_stages')
-    .select('id, name, type, position, created_at')
-    .eq('type', 'mentorship')
-    .order('position')
+  // Fetch stages + mentees in parallel
+  const [{ data: stages }, menteesResult] = await Promise.all([
+    supabase
+      .from('kanban_stages')
+      .select('id, name, type, position, created_at')
+      .eq('type', 'mentorship')
+      .order('position'),
+    (() => {
+      let q = supabase
+        .from('mentees')
+        .select(MENTEE_SUMMARY_FIELDS)
+        .eq('kanban_type', 'mentorship')
+      if (userRole !== 'admin' && user) {
+        q = q.eq('created_by', user.id)
+      }
+      return q
+    })(),
+  ])
 
-  // Fetch mentees (filtered by specialist if not admin)
-  let menteesQuery = supabase
-    .from('mentees')
-    .select(MENTEE_SUMMARY_FIELDS)
-    .eq('kanban_type', 'mentorship')
-  if (userRole !== 'admin' && user) {
-    menteesQuery = menteesQuery.eq('created_by', user.id)
+  const mentees = menteesResult.data ?? []
+  const firstStageId = stages && stages.length > 0 ? stages[0].id : null
+
+  // Auto-fix mentees with null current_stage_id
+  if (firstStageId) {
+    const orphans = mentees.filter((m) => !m.current_stage_id)
+    if (orphans.length > 0) {
+      await supabase
+        .from('mentees')
+        .update({ current_stage_id: firstStageId })
+        .in('id', orphans.map((m) => m.id))
+      orphans.forEach((m) => { m.current_stage_id = firstStageId })
+    }
   }
-  const { data: mentees } = await menteesQuery
 
-  const { data: allMentees } = await supabase
-    .from('mentees')
-    .select('id, full_name')
-    .order('full_name')
+  const menteeIds = mentees.map((m) => m.id)
 
-  const { data: attendances } = await supabase
-    .from('attendances')
-    .select('mentee_id')
+  // Fetch all stats + specialists + allMentees in parallel
+  const [
+    { data: allMentees },
+    { data: attendances },
+    { data: indications },
+    { data: revenues },
+    { data: lastContacts },
+    { data: specialists },
+  ] = await Promise.all([
+    supabase.from('mentees').select('id, full_name').order('full_name'),
+    menteeIds.length > 0
+      ? supabase.from('attendances').select('mentee_id').in('mentee_id', menteeIds)
+      : Promise.resolve({ data: [] as { mentee_id: string }[] }),
+    menteeIds.length > 0
+      ? supabase.from('indications').select('mentee_id').in('mentee_id', menteeIds)
+      : Promise.resolve({ data: [] as { mentee_id: string; sale_value: number }[] }),
+    menteeIds.length > 0
+      ? supabase.from('revenue_records').select('mentee_id, sale_value').in('mentee_id', menteeIds)
+      : Promise.resolve({ data: [] as { mentee_id: string; sale_value: number }[] }),
+    menteeIds.length > 0
+      ? supabase.from('wpp_messages').select('mentee_id, sent_at').eq('direction', 'outgoing').in('mentee_id', menteeIds).order('sent_at', { ascending: false })
+      : Promise.resolve({ data: [] as { mentee_id: string; sent_at: string }[] }),
+    supabase.from('profiles').select('id, full_name').eq('role', 'especialista').order('full_name'),
+  ])
 
-  const { data: indications } = await supabase
-    .from('indications')
-    .select('mentee_id')
-
-  const { data: revenues } = await supabase
-    .from('revenue_records')
-    .select('mentee_id, sale_value')
-
-  // Fetch last contact dates
-  const { data: lastContacts } = await supabase
-    .from('wpp_messages')
-    .select('mentee_id, sent_at')
-    .eq('direction', 'outgoing')
-    .order('sent_at', { ascending: false })
-
+  // Build stats maps
   const lastContactMap = new Map<string, string>()
   lastContacts?.forEach((m) => {
     if (!lastContactMap.has(m.mentee_id)) lastContactMap.set(m.mentee_id, m.sent_at)
@@ -70,14 +92,11 @@ export default async function EtapasMentoriaPage() {
 
   const revenueMap = new Map<string, number>()
   revenues?.forEach((r) => {
-    revenueMap.set(
-      r.mentee_id,
-      (revenueMap.get(r.mentee_id) ?? 0) + Number(r.sale_value)
-    )
+    revenueMap.set(r.mentee_id, (revenueMap.get(r.mentee_id) ?? 0) + Number(r.sale_value))
   })
 
   const now = Date.now()
-  const menteesWithStats: MenteeWithStats[] = (mentees ?? []).map((m) => {
+  const menteesWithStats: MenteeWithStats[] = mentees.map((m) => {
     const lastContact = lastContactMap.get(m.id)
     const daysSince = lastContact ? Math.floor((now - new Date(lastContact).getTime()) / 86400000) : undefined
     return {
@@ -88,13 +107,6 @@ export default async function EtapasMentoriaPage() {
       days_since_contact: daysSince,
     }
   })
-
-  // Fetch specialists list for admin
-  const { data: specialists } = await supabase
-    .from('profiles')
-    .select('id, full_name')
-    .eq('role', 'especialista')
-    .order('full_name')
 
   return (
     <KanbanBoard

@@ -44,6 +44,8 @@ export function ActionPlanForm({ token, menteeName }: ActionPlanFormProps) {
   const [error, setError] = useState<string | null>(null)
 
   // New: contact
+  const [cpf, setCpf] = useState('')
+  const [birthDate, setBirthDate] = useState('')
   const [email, setEmail] = useState('')
   const [instagram, setInstagram] = useState('')
   const [cidade, setCidade] = useState('')
@@ -89,7 +91,7 @@ export function ActionPlanForm({ token, menteeName }: ActionPlanFormProps) {
 
   const filledCount = useMemo(() => {
     const fields = [
-      endereco, email || instagram || cidade || estado ? 'filled' : '', nomeEmpresa || nicho || numColaboradores ? 'filled' : '',
+      endereco, cpf || birthDate || email || instagram || cidade || estado ? 'filled' : '', nomeEmpresa || nicho || numColaboradores ? 'filled' : '',
       discovery.length > 0 ? 'filled' : '', motivacao, expectativas,
       atuacao, tempoAtuacao, produtos, funis, processoVenda,
       fatMes1 > 0 ? 'filled' : '',
@@ -98,7 +100,7 @@ export function ActionPlanForm({ token, menteeName }: ActionPlanFormProps) {
       objetivosUrgentes, visaoFuturo,
     ]
     return fields.filter((v) => typeof v === 'string' ? v.trim() !== '' : !!v).length
-  }, [endereco, email, instagram, cidade, estado, nomeEmpresa, nicho, numColaboradores, discovery, motivacao, expectativas, atuacao, tempoAtuacao, produtos, funis, processoVenda, fatMes1, resultadoFunis, erros, desafios, funisTestados, estruturaComercial, estruturaMarketing, entrega, gestao, equipe, momentoNegocio, objetivosUrgentes, visaoFuturo])
+  }, [endereco, cpf, birthDate, email, instagram, cidade, estado, nomeEmpresa, nicho, numColaboradores, discovery, motivacao, expectativas, atuacao, tempoAtuacao, produtos, funis, processoVenda, fatMes1, resultadoFunis, erros, desafios, funisTestados, estruturaComercial, estruturaMarketing, entrega, gestao, equipe, momentoNegocio, objetivosUrgentes, visaoFuturo])
 
   const progressPct = Math.round((filledCount / TOTAL_QUESTIONS) * 100)
 
@@ -113,6 +115,8 @@ export function ActionPlanForm({ token, menteeName }: ActionPlanFormProps) {
 
     const data = {
       endereco_completo: endereco,
+      cpf,
+      data_aniversario: birthDate,
       email,
       instagram,
       cidade,
@@ -191,6 +195,8 @@ export function ActionPlanForm({ token, menteeName }: ActionPlanFormProps) {
 
           <FormCard number={2} label="Informações de contato" hint="Esses dados serão sincronizados com sua ficha">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1"><label className="text-xs font-medium text-muted-foreground">CPF</label><Input value={cpf} onChange={(e) => setCpf(e.target.value)} placeholder="000.000.000-00" /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-muted-foreground">Data de aniversário</label><Input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)} /></div>
               <div className="space-y-1"><label className="text-xs font-medium text-muted-foreground">Email</label><Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="seu@email.com" /></div>
               <div className="space-y-1"><label className="text-xs font-medium text-muted-foreground">@Instagram</label><Input value={instagram} onChange={(e) => setInstagram(e.target.value)} placeholder="@seuinsta" /></div>
               <div className="space-y-1"><label className="text-xs font-medium text-muted-foreground">Cidade</label><Input value={cidade} onChange={(e) => setCidade(e.target.value)} placeholder="Sua cidade" /></div>

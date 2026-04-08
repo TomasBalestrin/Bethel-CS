@@ -748,6 +748,7 @@ export interface Database {
           recording_url: string | null
           recording_status: 'pending' | 'processing' | 'ready' | 'failed' | 'unavailable'
           call_type: 'voice' | 'video'
+          notes: string | null
           created_at: string
         }
         Insert: {
@@ -762,6 +763,7 @@ export interface Database {
           recording_url?: string | null
           recording_status?: 'pending' | 'processing' | 'ready' | 'failed' | 'unavailable'
           call_type?: 'voice' | 'video'
+          notes?: string | null
           created_at?: string
         }
         Update: {
@@ -775,6 +777,7 @@ export interface Database {
           recording_url?: string | null
           recording_status?: 'pending' | 'processing' | 'ready' | 'failed' | 'unavailable'
           call_type?: 'voice' | 'video'
+          notes?: string | null
         }
         Relationships: []
       }

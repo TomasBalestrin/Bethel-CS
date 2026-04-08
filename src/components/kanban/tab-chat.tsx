@@ -3,8 +3,9 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
-import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown, Sparkles, ChevronUp, BellOff } from 'lucide-react'
+import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown, Sparkles, ChevronUp, BellOff, Pencil, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,7 @@ import { toast } from 'sonner'
 import type { Database } from '@/types/database'
 
 type WppMessage = Database['public']['Tables']['wpp_messages']['Row']
-type CallRecord = Pick<Database['public']['Tables']['call_records']['Row'], 'id' | 'mentee_id' | 'duration_seconds' | 'recording_status' | 'recording_url' | 'created_at'>
+type CallRecord = Pick<Database['public']['Tables']['call_records']['Row'], 'id' | 'mentee_id' | 'duration_seconds' | 'recording_status' | 'recording_url' | 'notes' | 'created_at'>
 type AttendanceNote = Database['public']['Tables']['attendance_notes']['Row']
 
 interface TabChatProps {
@@ -83,6 +84,9 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const [callRecords, setCallRecords] = useState<CallRecord[]>([])
   const [callsModalOpen, setCallsModalOpen] = useState(false)
   const [playingRecording, setPlayingRecording] = useState<string | null>(null)
+  const [editingCallNote, setEditingCallNote] = useState<string | null>(null)
+  const [callNoteText, setCallNoteText] = useState('')
+  const [savingCallNote, setSavingCallNote] = useState(false)
 
   // Message windowing
   const [visibleLimit, setVisibleLimit] = useState(80)
@@ -138,7 +142,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         // Fetch call history
         const { data: calls } = await supabase
           .from('call_records')
-          .select('id, mentee_id, duration_seconds, recording_status, recording_url, created_at')
+          .select('id, mentee_id, duration_seconds, recording_status, recording_url, notes, created_at')
           .eq('mentee_id', menteeId)
           .order('created_at', { ascending: false })
           .limit(20)
@@ -942,6 +946,77 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                     {/* Transcription placeholder */}
                     <p className="text-xs text-muted-foreground mt-1">Transcrição:</p>
                     <p className="text-xs text-muted-foreground/60 italic">Em breve — disponível após upgrade do plano</p>
+
+                    {/* Call notes */}
+                    <div className="mt-2 pt-2 border-t border-border/50">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs text-muted-foreground font-medium">Anotações da ligação:</p>
+                        {editingCallNote !== call.id && (
+                          <button
+                            onClick={() => {
+                              setEditingCallNote(call.id)
+                              setCallNoteText(call.notes ?? '')
+                            }}
+                            className="flex items-center gap-1 text-[10px] text-accent hover:underline"
+                          >
+                            <Pencil className="h-3 w-3" />
+                            {call.notes ? 'Editar' : 'Adicionar'}
+                          </button>
+                        )}
+                      </div>
+                      {editingCallNote === call.id ? (
+                        <div className="space-y-2">
+                          <Textarea
+                            value={callNoteText}
+                            onChange={(e) => setCallNoteText(e.target.value)}
+                            placeholder="Registre o que foi conversado nesta ligação..."
+                            className="min-h-[80px] text-xs resize-y"
+                            autoFocus
+                          />
+                          <div className="flex justify-end gap-1.5">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-xs"
+                              onClick={() => { setEditingCallNote(null); setCallNoteText('') }}
+                            >
+                              Cancelar
+                            </Button>
+                            <Button
+                              size="sm"
+                              className="h-7 text-xs gap-1"
+                              disabled={savingCallNote}
+                              onClick={async () => {
+                                setSavingCallNote(true)
+                                const sb = createClient()
+                                const { error } = await sb
+                                  .from('call_records')
+                                  .update({ notes: callNoteText || null })
+                                  .eq('id', call.id)
+                                setSavingCallNote(false)
+                                if (error) {
+                                  toast.error('Erro ao salvar anotação')
+                                  return
+                                }
+                                setCallRecords((prev) =>
+                                  prev.map((c) => c.id === call.id ? { ...c, notes: callNoteText || null } : c)
+                                )
+                                setEditingCallNote(null)
+                                setCallNoteText('')
+                                toast.success('Anotação salva')
+                              }}
+                            >
+                              <Check className="h-3 w-3" />
+                              {savingCallNote ? 'Salvando...' : 'Salvar'}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : call.notes ? (
+                        <p className="text-xs text-foreground whitespace-pre-wrap bg-muted/30 rounded-md px-2.5 py-2 leading-relaxed">{call.notes}</p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground/50 italic">Nenhuma anotação registrada</p>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -13,49 +13,54 @@ export default async function EtapasIniciaisPage() {
     userRole = profile?.role ?? 'especialista'
   }
 
-  // Fetch stages first (needed for orphan repair)
-  const { data: stages } = await supabase
-    .from('kanban_stages')
-    .select('id, name, type, position, created_at')
-    .eq('type', 'initial')
-    .order('position')
-
-  const firstStageId = stages && stages.length > 0 ? stages[0].id : null
-
-  // Auto-repair orphan mentees: fix null current_stage_id and null kanban_type
-  if (firstStageId && userRole === 'admin') {
-    await Promise.all([
-      // Fix mentees with kanban_type='initial' but no stage
-      supabase
+  // Fetch ALL stages (both types) + initial mentees in parallel
+  const [{ data: allStages }, { data: initialStages }, menteesResult] = await Promise.all([
+    supabase.from('kanban_stages').select('id, type').order('position'),
+    supabase
+      .from('kanban_stages')
+      .select('id, name, type, position, created_at')
+      .eq('type', 'initial')
+      .order('position'),
+    (() => {
+      let q = supabase
         .from('mentees')
-        .update({ current_stage_id: firstStageId })
+        .select(MENTEE_SUMMARY_FIELDS)
         .eq('kanban_type', 'initial')
-        .is('current_stage_id', null),
-      // Fix mentees with no kanban_type at all → assign to initial + first stage
-      supabase
-        .from('mentees')
-        .update({ kanban_type: 'initial' as const, current_stage_id: firstStageId })
-        .is('kanban_type', null),
-      // Fix mentees with a kanban_type but null stage → assign to first initial stage
-      supabase
+      if (userRole !== 'admin' && user) {
+        q = q.eq('created_by', user.id)
+      }
+      return q
+    })(),
+  ])
+
+  const stages = initialStages ?? []
+  const firstStageId = stages.length > 0 ? stages[0].id : null
+  const validStageIds = new Set((allStages ?? []).map((s) => s.id))
+  const menteeList = menteesResult.data ?? []
+
+  // Auto-repair: fix mentees with null or invalid current_stage_id
+  if (firstStageId) {
+    const orphans = menteeList.filter(
+      (m) => !m.current_stage_id || !validStageIds.has(m.current_stage_id)
+    )
+    if (orphans.length > 0) {
+      await supabase
         .from('mentees')
         .update({ current_stage_id: firstStageId })
-        .is('current_stage_id', null)
-        .not('kanban_type', 'is', null),
-    ])
+        .in('id', orphans.map((m) => m.id))
+      // Update in-memory data
+      orphans.forEach((m) => { m.current_stage_id = firstStageId })
+    }
   }
 
-  // Fetch mentees
-  let menteesQuery = supabase
-    .from('mentees')
-    .select(MENTEE_SUMMARY_FIELDS)
-    .eq('kanban_type', 'initial')
-  if (userRole !== 'admin' && user) {
-    menteesQuery = menteesQuery.eq('created_by', user.id)
+  // Also fix mentees with null kanban_type (admin only, bulk repair)
+  if (firstStageId && userRole === 'admin') {
+    await supabase
+      .from('mentees')
+      .update({ kanban_type: 'initial' as const, current_stage_id: firstStageId })
+      .is('kanban_type', null)
   }
-  const { data: mentees } = await menteesQuery
 
-  const menteeList = mentees ?? []
   const menteeIds = menteeList.map((m) => m.id)
 
   // Fetch all stats + specialists + allMentees in parallel
@@ -104,7 +109,6 @@ export default async function EtapasIniciaisPage() {
     revenueMap.set(r.mentee_id, (revenueMap.get(r.mentee_id) ?? 0) + Number(r.sale_value))
   })
 
-  // Merge stats into mentees
   const now = Date.now()
   const menteesWithStats: MenteeWithStats[] = menteeList.map((m) => {
     const lastContact = lastContactMap.get(m.id)
@@ -122,7 +126,7 @@ export default async function EtapasIniciaisPage() {
     <KanbanBoard
       title="Etapas Iniciais"
       kanbanType="initial"
-      stages={stages ?? []}
+      stages={stages}
       initialMentees={menteesWithStats}
       existingMentees={allMentees ?? []}
       isAdmin={userRole === 'admin'}

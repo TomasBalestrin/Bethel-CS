@@ -452,7 +452,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         indicacao_intensivo: revByType.indicacao_intensivo,
         total: Object.values(revByType).reduce((s, v) => s + v, 0),
       }}
-      birthdayList={birthdayList}
+      birthdayMentees={birthdayList}
     />
   )
 }

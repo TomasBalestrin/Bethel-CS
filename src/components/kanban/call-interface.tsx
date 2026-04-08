@@ -124,8 +124,10 @@ export const CallInterface = memo(function CallInterface({
       if (!endedRef.current) doEnd()
     })
 
-    call.join({ url: roomUrl, token }).then(() => {
+    call.join({ url: roomUrl, token, startAudioOff: false, startVideoOff: true }).then(() => {
       console.log('[Call] join() resolved')
+      // Ensure microphone is on after joining
+      call.setLocalAudio(true)
     }).catch((err) => {
       console.error('[Call] join() failed:', err)
       setEnded(true)

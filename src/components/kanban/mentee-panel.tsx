@@ -1007,22 +1007,40 @@ function PersonalTagsCard({ menteeId, initialTags }: { menteeId: string; initial
   )
 }
 
-// ─── Notes Card ───
+// ─── Notes Card (tag-based, same layout as PersonalTagsCard) ───
 function NotesCard({ menteeId, initialNotes }: { menteeId: string; initialNotes: string }) {
-  const [notes, setNotes] = useState(initialNotes)
+  const parseNotes = (raw: string) => raw.split('\n').map((n) => n.trim()).filter(Boolean)
+  const [items, setItems] = useState<string[]>(parseNotes(initialNotes))
+  const [input, setInput] = useState('')
   const [saving, setSaving] = useState(false)
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const supabase = createClient()
 
-  function handleChange(value: string) {
-    setNotes(value)
-    // Auto-save with debounce
-    if (timeoutRef.current) clearTimeout(timeoutRef.current)
-    timeoutRef.current = setTimeout(async () => {
-      setSaving(true)
-      await supabase.from('mentees').update({ notes: value }).eq('id', menteeId)
-      setSaving(false)
-    }, 800)
+  async function saveNotes(newItems: string[]) {
+    setSaving(true)
+    await supabase.from('mentees').update({ notes: newItems.join('\n') }).eq('id', menteeId)
+    setSaving(false)
+  }
+
+  function handleAdd() {
+    const note = input.trim()
+    if (!note) return
+    const newItems = [...items, note]
+    setItems(newItems)
+    setInput('')
+    saveNotes(newItems)
+  }
+
+  function handleRemove(idx: number) {
+    const newItems = items.filter((_, i) => i !== idx)
+    setItems(newItems)
+    saveNotes(newItems)
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      handleAdd()
+    }
   }
 
   return (
@@ -1032,13 +1050,39 @@ function NotesCard({ menteeId, initialNotes }: { menteeId: string; initialNotes:
         <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Observações</h3>
         {saving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-auto" />}
       </div>
-      <div className="p-3">
-        <Textarea
-          value={notes}
-          onChange={(e) => handleChange(e.target.value)}
-          placeholder="Anotações sobre o mentorado..."
-          className="min-h-[80px] text-xs resize-none border-0 bg-transparent p-0 focus-visible:ring-0 shadow-none"
-        />
+      <div className="p-3 space-y-2.5">
+        <div className="flex flex-wrap gap-1.5 min-h-[32px]">
+          {items.map((note, idx) => (
+            <span
+              key={idx}
+              className="inline-flex items-center gap-1 rounded-full bg-accent/10 border border-accent/20 px-2.5 py-0.5 text-[11px] font-medium text-foreground"
+            >
+              {note}
+              <button
+                type="button"
+                onClick={() => handleRemove(idx)}
+                className="text-muted-foreground hover:text-destructive transition-colors ml-0.5"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+          {items.length === 0 && (
+            <p className="text-[11px] text-muted-foreground/40 italic">Adicione observações abaixo</p>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ex: Gosta de viajar, Meta: 100k/mês..."
+            className="h-7 text-xs"
+          />
+          <Button size="sm" variant="outline" className="h-7 px-2 shrink-0" onClick={handleAdd} disabled={!input.trim()}>
+            <Plus className="h-3 w-3" />
+          </Button>
+        </div>
       </div>
     </div>
   )

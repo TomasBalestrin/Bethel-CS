@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createMeetingToken } from '@/lib/daily'
+import { createMeetingToken, getRoomUrl } from '@/lib/daily'
 
 export async function GET(
   request: NextRequest,
@@ -52,10 +52,13 @@ export async function GET(
     return NextResponse.json({ error: 'Falha ao gerar token' }, { status: 500 })
   }
 
+  const roomUrl = call.daily_room_url || getRoomUrl(call.daily_room_name)
+  console.log('[MenteeToken] Returning room:', { roomName: call.daily_room_name, roomUrl, menteeId: mentee.id })
+
   return NextResponse.json({
     token,
     roomName: call.daily_room_name,
-    roomUrl: call.daily_room_url,
+    roomUrl,
     specialistName,
     callType: call.call_type || 'voice',
   })

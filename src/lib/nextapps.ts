@@ -64,7 +64,7 @@ async function doLogin(): Promise<string> {
   const access = data.accessToken || data.token || ''
   const refresh = data.refreshToken || ''
 
-  const accessExpiry = new Date(Date.now() + 23 * 60 * 60 * 1000) // 23h
+  const accessExpiry = new Date(Date.now() + 6 * 60 * 60 * 1000) // 6h
   const refreshExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7d
 
   await Promise.all([
@@ -94,8 +94,8 @@ async function doRefresh(refreshTokenValue: string): Promise<string> {
     const access = data.accessToken || data.token || ''
     const newRefresh = data.refreshToken || refreshTokenValue
 
-    const accessExpiry = new Date(Date.now() + 23 * 60 * 60 * 1000)
-    const refreshExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    const accessExpiry = new Date(Date.now() + 6 * 60 * 60 * 1000) // 6h
+    const refreshExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7d
 
     await Promise.all([
       saveToken('nextapps_access', access, accessExpiry),

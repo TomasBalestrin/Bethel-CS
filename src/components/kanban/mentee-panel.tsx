@@ -434,7 +434,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
           />
         </ErrorBoundary></TabsContent>
         <TabsContent value="action-plan"><ErrorBoundary><TabActionPlan mentee={mentee} /></ErrorBoundary></TabsContent>
-        <TabsContent value="acompanhamento"><ErrorBoundary><TabAcompanhamento menteeId={mentee.id} /></ErrorBoundary></TabsContent>
+        <TabsContent value="acompanhamento"><ErrorBoundary><TabAcompanhamento menteeId={mentee.id} mentee={mentee} /></ErrorBoundary></TabsContent>
         <TabsContent value="engajamento"><ErrorBoundary><TabEngajamento menteeId={mentee.id} mentee={mentee} /></ErrorBoundary></TabsContent>
         <TabsContent value="historico"><ErrorBoundary><TabHistorico menteeId={mentee.id} /></ErrorBoundary></TabsContent>
         <TabsContent value="intensivo"><ErrorBoundary><TabIntensivo menteeId={mentee.id} /></ErrorBoundary></TabsContent>
@@ -1392,7 +1392,7 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
 }
 
 // ─── Tab: Acompanhamento (unified grid) ───
-function TabAcompanhamento({ menteeId }: { menteeId: string }) {
+function TabAcompanhamento({ menteeId, mentee }: { menteeId: string; mentee: MenteeWithStats }) {
   const [stats, setStats] = useState({ indications: 0, converted: 0, convertedValue: 0, revenue: 0, testimonials: 0, sessions: 0, extras: 0 })
   const supabase = createClient()
 
@@ -1460,7 +1460,7 @@ function TabAcompanhamento({ menteeId }: { menteeId: string }) {
           <CardExtraDeliveries menteeId={menteeId} />
         </div>
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-          <TabTestimonials menteeId={menteeId} />
+          <TabTestimonials menteeId={menteeId} mentee={mentee} />
         </div>
       </div>
     </div>
@@ -2731,7 +2731,7 @@ const TESTIMONIAL_CATEGORIES: { value: TestimonialCategory; label: string }[] = 
   { value: 'encontro_elite_premium', label: 'Encontro Elite Premium' },
 ]
 
-function TabTestimonials({ menteeId }: { menteeId: string }) {
+function TabTestimonials({ menteeId, mentee }: { menteeId: string; mentee: MenteeWithStats }) {
   const [items, setItems] = useState<Testimonial[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -2745,6 +2745,7 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
   const [uploading, setUploading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [defaultEmployeeCount, setDefaultEmployeeCount] = useState('')
   const supabase = createClient()
 
   const fetchData = useCallback(() => {
@@ -2757,6 +2758,22 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
   }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { fetchData() }, [fetchData])
+
+  // Fetch num_colaboradores from action plan for auto-fill
+  useEffect(() => {
+    supabase
+      .from('action_plans')
+      .select('data')
+      .eq('mentee_id', menteeId)
+      .not('data', 'is', null)
+      .maybeSingle()
+      .then(({ data: ap }) => {
+        if (ap?.data) {
+          const d = ap.data as Record<string, unknown>
+          if (d.num_colaboradores) setDefaultEmployeeCount(String(d.num_colaboradores))
+        }
+      })
+  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function toggleCategory(cat: TestimonialCategory) {
     setCategories((prev) =>
@@ -2878,7 +2895,15 @@ function TabTestimonials({ menteeId }: { menteeId: string }) {
         <Badge variant="muted" className="text-[10px] ml-auto">{items.length}</Badge>
       </div>
       <div className="flex items-center justify-end">
-        <Button size="sm" variant="outline" onClick={() => { resetForm(); setShowForm(!showForm) }}>
+        <Button size="sm" variant="outline" onClick={() => {
+          resetForm()
+          if (!showForm) {
+            if (mentee.niche) setNiche(mentee.niche)
+            if (mentee.faturamento_atual != null) setRevenueRange(`R$ ${mentee.faturamento_atual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)
+            if (defaultEmployeeCount) setEmployeeCount(defaultEmployeeCount)
+          }
+          setShowForm(!showForm)
+        }}>
           <Plus className="mr-1 h-3 w-3" /> Registrar
         </Button>
       </div>

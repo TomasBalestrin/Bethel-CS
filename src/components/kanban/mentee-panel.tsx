@@ -1027,10 +1027,10 @@ function NotesCard({ menteeId, initialNotes }: { menteeId: string; initialNotes:
 
   return (
     <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-warning/5 to-transparent">
-        <Pencil className="h-3.5 w-3.5 text-warning" />
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
+        <Pencil className="h-3.5 w-3.5 text-accent" />
         <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Observações</h3>
-        <span className="text-[9px] text-muted-foreground/40 ml-auto">{saving ? 'Salvando...' : 'Auto-save'}</span>
+        {saving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-auto" />}
       </div>
       <div className="p-3">
         <Textarea

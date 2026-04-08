@@ -127,6 +127,32 @@ export default async function DashboardPage({ searchParams }: Props) {
   const closerOptions = Array.from(new Set(allMenteesForOptions.map((m) => m.closer_name).filter(Boolean))) as string[]
   const nichoOptions = Array.from(new Set(allMenteesForOptions.map((m) => m.niche).filter(Boolean))) as string[]
 
+  // Birthday mentees (today + next 3 days)
+  let birthdayQuery = supabase
+    .from('mentees')
+    .select('id, full_name, birth_date')
+    .eq('status', 'ativo')
+    .not('birth_date', 'is', null)
+  if (specialistId) birthdayQuery = birthdayQuery.eq('created_by', specialistId)
+  const { data: birthdayMentees } = await birthdayQuery
+
+  const today = new Date()
+  const birthdayList: { id: string; full_name: string; daysUntil: number }[] = []
+  birthdayMentees?.forEach((m) => {
+    if (!m.birth_date) return
+    const bd = new Date(m.birth_date)
+    const thisYear = new Date(today.getFullYear(), bd.getMonth(), bd.getDate())
+    // If birthday already passed this year, check next year
+    if (thisYear < new Date(today.getFullYear(), today.getMonth(), today.getDate())) {
+      thisYear.setFullYear(today.getFullYear() + 1)
+    }
+    const diff = Math.floor((thisYear.getTime() - new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()) / (1000 * 60 * 60 * 24))
+    if (diff <= 3) {
+      birthdayList.push({ id: m.id, full_name: m.full_name, daysUntil: diff })
+    }
+  })
+  birthdayList.sort((a, b) => a.daysUntil - b.daysUntil)
+
   // ─── Revenue (only needed fields) ───
   let revenueQuery = supabase.from('revenue_records').select('sale_value, revenue_type')
   if (startDate) revenueQuery = revenueQuery.gte('created_at', startDate)
@@ -386,6 +412,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         indicacao_encontro: revByType.indicacao_encontro,
         total: totalRevenue,
       }}
+      birthdayMentees={birthdayList}
     />
   )
 }

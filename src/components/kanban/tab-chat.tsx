@@ -394,7 +394,8 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
       if (!res.ok) {
         setMessages((prev) => prev.filter((m) => m.id !== optimistic.id))
-        toast.error('Erro ao enviar mensagem')
+        const errData = await res.json().catch(() => null)
+        toast.error(errData?.error || 'Erro ao enviar mensagem')
       }
     } catch {
       // Revert handled above

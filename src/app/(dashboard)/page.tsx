@@ -17,6 +17,8 @@ interface Props {
     numColaboradores?: string
     estado?: string
     nicho?: string
+    dataInicio?: string
+    dataTermino?: string
   }
 }
 
@@ -57,9 +59,11 @@ export default async function DashboardPage({ searchParams }: Props) {
   const numColaboradores = searchParams.numColaboradores || null
   const estado = searchParams.estado || null
   const nicho = searchParams.nicho || null
+  const dataInicio = searchParams.dataInicio || null
+  const dataTermino = searchParams.dataTermino || null
 
   // ─── Mentees (only fields needed for dashboard) ───
-  let menteesQuery = supabase.from('mentees').select('id, status, cliente_fit, priority_level, created_by, faturamento_atual, faturamento_antes_mentoria, funnel_origin, closer_name, birth_date, state, niche')
+  let menteesQuery = supabase.from('mentees').select('id, status, cliente_fit, priority_level, created_by, faturamento_atual, faturamento_antes_mentoria, funnel_origin, closer_name, birth_date, state, niche, start_date, end_date')
   if (fitFilter === 'true') menteesQuery = menteesQuery.eq('cliente_fit', true)
   if (fitFilter === 'false') menteesQuery = menteesQuery.eq('cliente_fit', false)
   if (specialistId) menteesQuery = menteesQuery.eq('created_by', specialistId)
@@ -69,6 +73,8 @@ export default async function DashboardPage({ searchParams }: Props) {
   if (closer) menteesQuery = menteesQuery.eq('closer_name', closer)
   if (estado) menteesQuery = menteesQuery.eq('state', estado)
   if (nicho) menteesQuery = menteesQuery.eq('niche', nicho)
+  if (dataInicio) menteesQuery = menteesQuery.gte('start_date', dataInicio)
+  if (dataTermino) menteesQuery = menteesQuery.lte('end_date', dataTermino)
 
   // Get mentee IDs for filtering related tables
   const { data: mentees } = await menteesQuery
@@ -468,6 +474,8 @@ export default async function DashboardPage({ searchParams }: Props) {
         numColaboradores: searchParams.numColaboradores ?? '',
         estado: searchParams.estado ?? '',
         nicho: searchParams.nicho ?? '',
+        dataInicio: searchParams.dataInicio ?? '',
+        dataTermino: searchParams.dataTermino ?? '',
       }}
       filterOptions={{
         funisOrigem: funisOrigemOptions.sort(),

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useDebounce } from '@/hooks/use-debounce'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -62,6 +62,7 @@ export function MentoradosList({
   colaboradoresMap = {},
 }: MentoradosListProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [menteeList, setMenteeList] = useState<MenteeWithStats[]>(initialMentees)
 
   // Sync with server data when props change (after router.refresh)
@@ -74,6 +75,18 @@ export function MentoradosList({
   const { unreadMap } = useUnreadCounts()
   const [selectedMentee, setSelectedMentee] = useState<MenteeWithStats | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
+
+  // Auto-open mentee panel from URL param (?open=menteeId)
+  useEffect(() => {
+    const openId = searchParams.get('open')
+    if (openId && initialMentees.length > 0) {
+      const mentee = initialMentees.find((m) => m.id === openId)
+      if (mentee) {
+        setSelectedMentee(mentee)
+        setPanelOpen(true)
+      }
+    }
+  }, [searchParams, initialMentees])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [selectedKanbanType, setSelectedKanbanType] = useState<KanbanType>('initial')
@@ -158,6 +171,18 @@ export function MentoradosList({
 
     // Nicho
     if (advFilters.nicho && m.niche !== advFilters.nicho) return false
+
+    // Data de início
+    if (advFilters.dataInicio && m.start_date) {
+      if (m.start_date < advFilters.dataInicio) return false
+    } else if (advFilters.dataInicio && !m.start_date) {
+      return false
+    }
+
+    // Data de término
+    if (advFilters.dataTermino && m.end_date) {
+      if (m.end_date > advFilters.dataTermino) return false
+    }
 
     return true
   })

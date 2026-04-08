@@ -25,7 +25,6 @@ import {
   CalendarCheck,
   Headphones,
   Database,
-  FileText,
   Cake,
   ChevronRight,
 } from 'lucide-react'
@@ -454,7 +453,6 @@ function MetricCard({
   value,
   color,
   bg,
-  source,
   note,
   highlight,
 }: {
@@ -463,7 +461,7 @@ function MetricCard({
   value: string | number
   color: string
   bg: string
-  source: string
+  source?: string
   note?: string
   highlight?: boolean
 }) {
@@ -476,10 +474,7 @@ function MetricCard({
         <div className="min-w-0 flex-1">
           <p className="text-[10px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wide leading-tight">{label}</p>
           <p className={`font-heading text-base sm:text-lg font-bold tabular leading-tight mt-0.5 ${highlight ? 'text-accent' : 'text-foreground'}`}>{value}</p>
-          {note && <p className="mt-0.5 text-[9px] text-muted-foreground/70 italic">{note}</p>}
-          <p className="mt-1 text-[8px] text-muted-foreground/40 flex items-center gap-0.5">
-            <FileText className="h-2 w-2" /> {source}
-          </p>
+          {note && <p className="mt-1 text-[10px] sm:text-xs text-muted-foreground">{note}</p>}
         </div>
       </div>
     </div>

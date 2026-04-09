@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo, memo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -186,6 +186,69 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
     router.push(`/?${params.toString()}`)
   }, [router, searchParams])
 
+  // ── Memoized expensive calculations ──
+
+  const growthDisplay = useMemo(() => {
+    const pct = props.section3.growthPct
+    return pct !== 0 ? `${pct > 0 ? '+' : ''}${pct}%` : '—'
+  }, [props.section3.growthPct])
+
+  const growthColor = useMemo(() => props.section3.growthPct > 0 ? 'text-success' : 'text-destructive', [props.section3.growthPct])
+  const growthBg = useMemo(() => props.section3.growthPct > 0 ? 'bg-success/10' : 'bg-destructive/10', [props.section3.growthPct])
+
+  const faturamentoFormatted = useMemo(() => formatBRL(props.section3.totalFaturamentoAtual), [props.section3.totalFaturamentoAtual])
+
+  const testimonialNote = useMemo(() => {
+    return props.section3.totalMentees > 0
+      ? `${Math.round((props.section3.totalTestimonials / props.section3.totalMentees) * 100)}% dos mentorados`
+      : ''
+  }, [props.section3.totalTestimonials, props.section3.totalMentees])
+
+  const menteesWithTestimonialNote = useMemo(() => {
+    return props.section3.totalMentees > 0
+      ? `${Math.round((props.section3.menteesWithTestimonial / props.section3.totalMentees) * 100)}% dos mentorados`
+      : ''
+  }, [props.section3.menteesWithTestimonial, props.section3.totalMentees])
+
+  const deliveryCards = useMemo(() => {
+    return [
+      { key: 'hotseat', label: 'Hotseat' },
+      { key: 'comercial', label: 'Comercial' },
+      { key: 'gestao', label: 'Gestão' },
+      { key: 'mkt', label: 'Mkt' },
+      { key: 'extras', label: 'Entregas Extras' },
+      { key: 'mentoria_individual', label: 'Mentoria Individual' },
+    ].map(({ key, label }) => {
+      const stat = props.engajamento.deliveryStats[key] ?? { delivered: 0, participated: 0 }
+      const rate = stat.delivered > 0 ? Math.round((stat.participated / stat.delivered) * 100) : 0
+      return { key, label, stat, rate }
+    })
+  }, [props.engajamento.deliveryStats])
+
+  const avgWaitFormatted = useMemo(
+    () => props.section4.avgWaitMinutes > 0 ? formatMinutes(props.section4.avgWaitMinutes) : '—',
+    [props.section4.avgWaitMinutes]
+  )
+  const avgManualAttFormatted = useMemo(
+    () => props.section4.avgManualAttendanceMinutes > 0 ? `${props.section4.avgManualAttendanceMinutes} min` : '—',
+    [props.section4.avgManualAttendanceMinutes]
+  )
+  const totalLigacaoDurationFormatted = useMemo(
+    () => formatMinutes(props.section4.totalLigacaoDuration),
+    [props.section4.totalLigacaoDuration]
+  )
+
+  const crossellFormatted = useMemo(() => formatBRL(props.section5.crossell), [props.section5.crossell])
+  const upsellFormatted = useMemo(() => formatBRL(props.section5.upsell), [props.section5.upsell])
+  const indicacaoPerpFormatted = useMemo(() => formatBRL(props.section5.indicacao_perpetuo), [props.section5.indicacao_perpetuo])
+  const indicacaoIntFormatted = useMemo(() => formatBRL(props.section5.indicacao_intensivo), [props.section5.indicacao_intensivo])
+  const totalGeralFormatted = useMemo(() => formatBRL(props.section5.total), [props.section5.total])
+
+  const atendimentosNote = useMemo(
+    () => `Mentorado: ${props.section4.atendimentosMentee} · CS: ${props.section4.atendimentosCS}`,
+    [props.section4.atendimentosMentee, props.section4.atendimentosCS]
+  )
+
   return (
     <div className="space-y-6">
       {/* Birthday Banner */}
@@ -357,11 +420,11 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
         </div>
         <div className="p-4">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-            <MetricCard icon={TrendingUp} label="Crescimento faturamento" value={props.section3.growthPct !== 0 ? `${props.section3.growthPct > 0 ? '+' : ''}${props.section3.growthPct}%` : '—'} color={props.section3.growthPct > 0 ? 'text-success' : 'text-destructive'} bg={props.section3.growthPct > 0 ? 'bg-success/10' : 'bg-destructive/10'} source={`${props.section3.growthCount}/${props.section3.growthTotal} cresceram`} />
-            <MetricCard icon={DollarSign} label="Faturamento total (Bethel Metrics)" value={formatBRL(props.section3.totalFaturamentoAtual)} color="text-success" bg="bg-success/10" source="soma faturamento_atual mentorados ativos" />
+            <MetricCard icon={TrendingUp} label="Crescimento faturamento" value={growthDisplay} color={growthColor} bg={growthBg} source={`${props.section3.growthCount}/${props.section3.growthTotal} cresceram`} />
+            <MetricCard icon={DollarSign} label="Faturamento total (Bethel Metrics)" value={faturamentoFormatted} color="text-success" bg="bg-success/10" source="soma faturamento_atual mentorados ativos" />
             <MetricCard icon={TrendingUp} label="Avanço nas etapas" value={`${props.section3.menteesAdvanced} mentorados`} color="text-info" bg="bg-info/10" source="mentorados distintos que avançaram" />
-            <MetricCard icon={MessageSquareQuote} label="Nº de depoimentos" value={props.section3.totalTestimonials} color="text-warning" bg="bg-warning/10" source="testimonials" note={props.section3.totalMentees > 0 ? `${Math.round((props.section3.totalTestimonials / props.section3.totalMentees) * 100)}% dos mentorados` : ''} />
-            <MetricCard icon={Users} label="Mentorados com depoimento" value={props.section3.menteesWithTestimonial} color="text-warning" bg="bg-warning/10" source="mentorados distintos com depoimento" note={props.section3.totalMentees > 0 ? `${Math.round((props.section3.menteesWithTestimonial / props.section3.totalMentees) * 100)}% dos mentorados` : ''} />
+            <MetricCard icon={MessageSquareQuote} label="Nº de depoimentos" value={props.section3.totalTestimonials} color="text-warning" bg="bg-warning/10" source="testimonials" note={testimonialNote} />
+            <MetricCard icon={Users} label="Mentorados com depoimento" value={props.section3.menteesWithTestimonial} color="text-warning" bg="bg-warning/10" source="mentorados distintos com depoimento" note={menteesWithTestimonialNote} />
           </div>
         </div>
       </section>
@@ -374,29 +437,18 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
         </div>
         <div className="p-4">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-            {[
-              { key: 'hotseat', label: 'Hotseat' },
-              { key: 'comercial', label: 'Comercial' },
-              { key: 'gestao', label: 'Gestão' },
-              { key: 'mkt', label: 'Mkt' },
-              { key: 'extras', label: 'Entregas Extras' },
-              { key: 'mentoria_individual', label: 'Mentoria Individual' },
-            ].map(({ key, label }) => {
-              const stat = props.engajamento.deliveryStats[key] ?? { delivered: 0, participated: 0 }
-              const rate = stat.delivered > 0 ? Math.round((stat.participated / stat.delivered) * 100) : 0
-              return (
-                <MetricCard
-                  key={key}
-                  icon={CalendarCheck}
-                  label={label}
-                  value={`${stat.participated}/${stat.delivered}`}
-                  color="text-info"
-                  bg="bg-info/10"
-                  source={`${rate}% taxa de participação`}
-                  note={`Entregues: ${stat.delivered} · Participou: ${stat.participated}`}
-                />
-              )
-            })}
+            {deliveryCards.map(({ key, label, stat, rate }) => (
+              <MetricCard
+                key={key}
+                icon={CalendarCheck}
+                label={label}
+                value={`${stat.participated}/${stat.delivered}`}
+                color="text-info"
+                bg="bg-info/10"
+                source={`${rate}% taxa de participação`}
+                note={`Entregues: ${stat.delivered} · Participou: ${stat.participated}`}
+              />
+            ))}
           </div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 mt-3">
             <MetricCard icon={CalendarCheck} label="Eventos" value={props.engajamento.eventos} color="text-warning" bg="bg-warning/10" source="engagement_records (evento)" />
@@ -414,13 +466,13 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
         </div>
         <div className="p-4">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-            <MetricCard icon={Headphones} label="Total de atendimentos" value={props.section4.totalAtendimentos} color="text-accent" bg="bg-accent/10" source="sessões de chat (gap configurável)" note={`Mentorado: ${props.section4.atendimentosMentee} · CS: ${props.section4.atendimentosCS}`} />
-            <MetricCard icon={Headphones} label="Tempo de espera" value={props.section4.avgWaitMinutes > 0 ? formatMinutes(props.section4.avgWaitMinutes) : '—'} color="text-warning" bg="bg-warning/10" source="tempo médio até CS responder" />
-            <MetricCard icon={Headphones} label="Tempo médio de atendimento" value={props.section4.avgManualAttendanceMinutes > 0 ? `${props.section4.avgManualAttendanceMinutes} min` : '—'} color="text-accent" bg="bg-accent/10" source="botão iniciar/finalizar no chat" />
+            <MetricCard icon={Headphones} label="Total de atendimentos" value={props.section4.totalAtendimentos} color="text-accent" bg="bg-accent/10" source="sessões de chat (gap configurável)" note={atendimentosNote} />
+            <MetricCard icon={Headphones} label="Tempo de espera" value={avgWaitFormatted} color="text-warning" bg="bg-warning/10" source="tempo médio até CS responder" />
+            <MetricCard icon={Headphones} label="Tempo médio de atendimento" value={avgManualAttFormatted} color="text-accent" bg="bg-accent/10" source="botão iniciar/finalizar no chat" />
           </div>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 mt-3">
             <MetricCard icon={Phone} label="Ligações realizadas" value={props.section4.totalLigacoes} color="text-warning" bg="bg-warning/10" source="call_records" />
-            <MetricCard icon={Phone} label="Tempo de ligações" value={formatMinutes(props.section4.totalLigacaoDuration)} color="text-warning" bg="bg-warning/10" source="call_records (duration)" />
+            <MetricCard icon={Phone} label="Tempo de ligações" value={totalLigacaoDurationFormatted} color="text-warning" bg="bg-warning/10" source="call_records (duration)" />
             <MetricCard icon={MessageCircle} label="Mensagens enviadas" value={props.section4.totalWhatsapp} color="text-success" bg="bg-success/10" source="wpp_messages (outgoing)" />
             <MetricCard icon={MessageCircle} label="Mensagens recebidas" value={props.section4.totalWhatsappIn} color="text-info" bg="bg-info/10" source="wpp_messages (incoming)" />
           </div>
@@ -435,11 +487,11 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
         </div>
         <div className="p-4">
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-            <MetricCard icon={DollarSign} label="Crossell" value={formatBRL(props.section5.crossell)} color="text-success" bg="bg-success/10" source="revenue_records (crossell)" />
-            <MetricCard icon={TrendingUp} label="Ascensão" value={formatBRL(props.section5.upsell)} color="text-accent" bg="bg-accent/10" source="revenue_records (upsell)" />
-            <MetricCard icon={UserPlus} label="Indicação que fechou" value={formatBRL(props.section5.indicacao_perpetuo)} color="text-info" bg="bg-info/10" source="revenue_records (indic_perpetuo)" />
-            <MetricCard icon={UserPlus} label="Indicação intensivo que fechou" value={formatBRL(props.section5.indicacao_intensivo)} color="text-warning" bg="bg-warning/10" source="revenue_records (indic_intensivo)" />
-            <MetricCard icon={DollarSign} label="Total geral" value={formatBRL(props.section5.total)} color="text-foreground" bg="bg-muted" source="revenue_records (soma)" highlight />
+            <MetricCard icon={DollarSign} label="Crossell" value={crossellFormatted} color="text-success" bg="bg-success/10" source="revenue_records (crossell)" />
+            <MetricCard icon={TrendingUp} label="Ascensão" value={upsellFormatted} color="text-accent" bg="bg-accent/10" source="revenue_records (upsell)" />
+            <MetricCard icon={UserPlus} label="Indicação que fechou" value={indicacaoPerpFormatted} color="text-info" bg="bg-info/10" source="revenue_records (indic_perpetuo)" />
+            <MetricCard icon={UserPlus} label="Indicação intensivo que fechou" value={indicacaoIntFormatted} color="text-warning" bg="bg-warning/10" source="revenue_records (indic_intensivo)" />
+            <MetricCard icon={DollarSign} label="Total geral" value={totalGeralFormatted} color="text-foreground" bg="bg-muted" source="revenue_records (soma)" highlight />
           </div>
         </div>
       </section>
@@ -447,7 +499,7 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
   )
 }
 
-function MetricCard({
+const MetricCard = memo(function MetricCard({
   icon: Icon,
   label,
   value,
@@ -479,4 +531,4 @@ function MetricCard({
       </div>
     </div>
   )
-}
+})

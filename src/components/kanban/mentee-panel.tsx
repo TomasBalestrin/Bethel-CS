@@ -580,7 +580,12 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
   }
 
   async function handleSave() {
-    setSaving(true)
+    // Optimistic: close form and update parent immediately
+    const updatedMentee = { ...mentee, ...form, email: form.email || null, instagram: form.instagram || null, city: form.city || null, state: form.state || null, birth_date: form.birth_date || null, end_date: form.end_date || null, cpf: form.cpf || null, partner_name: form.partner_name || null, seller_name: form.seller_name || null, funnel_origin: form.funnel_origin || null }
+    setEditing(false)
+    onMenteeUpdated?.(updatedMentee)
+    toast.success('Salvo')
+
     const result = await updateMentee(mentee.id, {
       full_name: form.full_name,
       phone: form.phone,
@@ -600,13 +605,11 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
       funnel_origin: form.funnel_origin || null,
       status: form.status,
     })
-    setSaving(false)
     if (result.error) {
+      // Revert on error: reopen form and restore original mentee data
       toast.error(result.error)
-    } else {
-      toast.success('Salvo')
-      setEditing(false)
-      onMenteeUpdated?.({ ...mentee, ...form, email: form.email || null, instagram: form.instagram || null, city: form.city || null, state: form.state || null, birth_date: form.birth_date || null, end_date: form.end_date || null, cpf: form.cpf || null, partner_name: form.partner_name || null, seller_name: form.seller_name || null, funnel_origin: form.funnel_origin || null })
+      setEditing(true)
+      onMenteeUpdated?.(mentee)
     }
   }
 
@@ -900,27 +903,24 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
               toast.error('Descreva o motivo com mais detalhes (mínimo 10 caracteres)')
               return
             }
-            setCancelling(true)
             const timestamp = new Date().toLocaleDateString('pt-BR')
             const cancelNote = `[SOLICITAÇÃO DE CANCELAMENTO ${timestamp}] ${cancelReason.trim()}`
             const existingNotes = mentee.notes?.trim() || ''
             const newNotes = existingNotes ? `${cancelNote}\n\n${existingNotes}` : cancelNote
 
-            const result = await updateMentee(mentee.id, {
-              notes: newNotes,
-            })
-            setCancelling(false)
-
-            if (result.error) {
-              toast.error(result.error)
-              return
-            }
-
+            // Optimistic: close dialog and update immediately
             toast.success('Solicitação de cancelamento registrada')
             setCancelOpen(false)
             setCancelReason('')
-            if (onMenteeUpdated) {
-              onMenteeUpdated({ ...mentee, notes: newNotes })
+            onMenteeUpdated?.({ ...mentee, notes: newNotes })
+
+            const result = await updateMentee(mentee.id, {
+              notes: newNotes,
+            })
+            if (result.error) {
+              // Revert on error
+              toast.error(result.error)
+              onMenteeUpdated?.(mentee)
             }
           }} className="space-y-4">
             <div className="space-y-2">
@@ -959,25 +959,34 @@ function PersonalTagsCard({ menteeId, initialTags }: { menteeId: string; initial
   const [saving, setSaving] = useState(false)
   const supabase = createClient()
 
-  async function saveTags(newTags: string[]) {
+  async function saveTags(newTags: string[], prevTags: string[]) {
     setSaving(true)
-    await supabase.from('mentees').update({ personal_tags: newTags }).eq('id', menteeId)
+    const { error } = await supabase.from('mentees').update({ personal_tags: newTags }).eq('id', menteeId)
     setSaving(false)
+    if (error) {
+      // Revert on error
+      setTags(prevTags)
+      toast.error('Erro ao salvar tag')
+    }
   }
 
   function handleAdd() {
     const tag = input.trim()
     if (!tag || tags.includes(tag)) return
+    const prevTags = tags
     const newTags = [...tags, tag]
+    // Optimistic: update UI immediately
     setTags(newTags)
     setInput('')
-    saveTags(newTags)
+    saveTags(newTags, prevTags)
   }
 
   function handleRemove(tag: string) {
+    const prevTags = tags
     const newTags = tags.filter((t) => t !== tag)
+    // Optimistic: update UI immediately
     setTags(newTags)
-    saveTags(newTags)
+    saveTags(newTags, prevTags)
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -1040,25 +1049,34 @@ function NotesCard({ menteeId, initialNotes }: { menteeId: string; initialNotes:
   const [saving, setSaving] = useState(false)
   const supabase = createClient()
 
-  async function saveNotes(newItems: string[]) {
+  async function saveNotes(newItems: string[], prevItems: string[]) {
     setSaving(true)
-    await supabase.from('mentees').update({ notes: newItems.join('\n') }).eq('id', menteeId)
+    const { error } = await supabase.from('mentees').update({ notes: newItems.join('\n') }).eq('id', menteeId)
     setSaving(false)
+    if (error) {
+      // Revert on error
+      setItems(prevItems)
+      toast.error('Erro ao salvar observação')
+    }
   }
 
   function handleAdd() {
     const note = input.trim()
     if (!note) return
+    const prevItems = items
     const newItems = [...items, note]
+    // Optimistic: update UI immediately
     setItems(newItems)
     setInput('')
-    saveNotes(newItems)
+    saveNotes(newItems, prevItems)
   }
 
   function handleRemove(idx: number) {
+    const prevItems = items
     const newItems = items.filter((_, i) => i !== idx)
+    // Optimistic: update UI immediately
     setItems(newItems)
-    saveNotes(newItems)
+    saveNotes(newItems, prevItems)
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -1129,21 +1147,25 @@ function EditField({ label, value, onChange, type = 'text' }: {
 
 function ClienteFitToggle({ menteeId, initialValue }: { menteeId: string; initialValue: boolean }) {
   const [fit, setFit] = useState(initialValue)
-  const [saving, setSaving] = useState(false)
 
   async function handleToggle() {
-    setSaving(true)
+    const prev = fit
     const newValue = !fit
+    // Optimistic: update UI immediately
     setFit(newValue)
-    await toggleClienteFit(menteeId, newValue)
-    setSaving(false)
+    try {
+      await toggleClienteFit(menteeId, newValue)
+    } catch {
+      // Revert on error
+      setFit(prev)
+      toast.error('Erro ao salvar cliente fit')
+    }
   }
 
   return (
     <button
       type="button"
       onClick={handleToggle}
-      disabled={saving}
       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${fit ? 'bg-warning' : 'bg-muted'}`}
     >
       <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${fit ? 'translate-x-6' : 'translate-x-1'}`} />
@@ -1791,9 +1813,29 @@ function CardIndividualSessions({ menteeId }: { menteeId: string }) {
   useEffect(() => { fetchData() }, [fetchData])
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault(); setLoading(true)
-    await addIndividualSession(menteeId, { session_date: sessionDate, duration_minutes: duration ? parseInt(duration) : undefined, specialist_name: specialist || undefined, notes: notes || undefined })
-    setSessionDate(''); setDuration(''); setSpecialist(''); setNotes(''); setShowForm(false); setLoading(false); fetchData()
+    e.preventDefault()
+    // Optimistic: add placeholder item and close form immediately
+    const optimisticItem = {
+      id: `temp-${Date.now()}`,
+      mentee_id: menteeId,
+      session_date: sessionDate,
+      duration_minutes: duration ? parseInt(duration) : null,
+      specialist_name: specialist || null,
+      notes: notes || null,
+      created_at: new Date().toISOString(),
+    } as Database['public']['Tables']['individual_sessions']['Row']
+    setItems((prev) => [optimisticItem, ...prev])
+    const savedDate = sessionDate; const savedDuration = duration; const savedSpecialist = specialist; const savedNotes = notes
+    setSessionDate(''); setDuration(''); setSpecialist(''); setNotes(''); setShowForm(false)
+
+    try {
+      await addIndividualSession(menteeId, { session_date: savedDate, duration_minutes: savedDuration ? parseInt(savedDuration) : undefined, specialist_name: savedSpecialist || undefined, notes: savedNotes || undefined })
+      fetchData()
+    } catch {
+      // Revert on error
+      setItems((prev) => prev.filter((i) => i.id !== optimisticItem.id))
+      toast.error('Erro ao registrar sessão')
+    }
   }
 
   return (
@@ -1855,9 +1897,28 @@ function CardExtraDeliveries({ menteeId }: { menteeId: string }) {
   useEffect(() => { fetchData() }, [fetchData])
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault(); setLoading(true)
-    await addExtraDelivery(menteeId, { delivery_date: deliveryDate, delivery_type: deliveryType, description: description || undefined })
-    setDeliveryDate(''); setDeliveryType('outro'); setDescription(''); setShowForm(false); setLoading(false); fetchData()
+    e.preventDefault()
+    // Optimistic: add placeholder item and close form immediately
+    const optimisticItem = {
+      id: `temp-${Date.now()}`,
+      mentee_id: menteeId,
+      delivery_date: deliveryDate,
+      delivery_type: deliveryType,
+      description: description || null,
+      created_at: new Date().toISOString(),
+    } as Database['public']['Tables']['extra_deliveries']['Row']
+    setItems((prev) => [optimisticItem, ...prev])
+    const savedDate = deliveryDate; const savedType = deliveryType; const savedDesc = description
+    setDeliveryDate(''); setDeliveryType('outro'); setDescription(''); setShowForm(false)
+
+    try {
+      await addExtraDelivery(menteeId, { delivery_date: savedDate, delivery_type: savedType, description: savedDesc || undefined })
+      fetchData()
+    } catch {
+      // Revert on error
+      setItems((prev) => prev.filter((i) => i.id !== optimisticItem.id))
+      toast.error('Erro ao registrar entrega')
+    }
   }
 
   const typeLabels: Record<string, string> = { call_individual: 'Call Individual', encontro_presencial: 'Encontro Presencial', outro: 'Outro' }
@@ -2386,15 +2447,48 @@ function TabIntensivo({ menteeId }: { menteeId: string }) {
   useEffect(() => { fetchData() }, [fetchData])
 
   async function handleAddIntensivo(e: React.FormEvent) {
-    e.preventDefault(); setIntLoading(true)
-    await addIntensivoRecord(menteeId, { participated: true, participation_date: intDate || undefined })
-    setIntDate(''); setShowIntForm(false); setIntLoading(false); fetchData()
+    e.preventDefault()
+    // Optimistic: add placeholder and close form immediately
+    const optimisticItem = {
+      id: `temp-${Date.now()}`,
+      mentee_id: menteeId,
+      participated: true,
+      participation_date: intDate || null,
+      created_at: new Date().toISOString(),
+    } as Database['public']['Tables']['intensivo_records']['Row']
+    setIntensivos((prev) => [optimisticItem, ...prev])
+    const savedDate = intDate
+    setIntDate(''); setShowIntForm(false)
+
+    try {
+      await addIntensivoRecord(menteeId, { participated: true, participation_date: savedDate || undefined })
+      fetchData()
+    } catch {
+      setIntensivos((prev) => prev.filter((i) => i.id !== optimisticItem.id))
+      toast.error('Erro ao registrar participação')
+    }
   }
 
   async function handleAddEncontro(e: React.FormEvent) {
-    e.preventDefault(); setEncLoading(true)
-    await supabase.from('presential_events').insert({ mentee_id: menteeId, event_date: encDate })
-    setEncDate(''); setShowEncForm(false); setEncLoading(false); fetchData()
+    e.preventDefault()
+    // Optimistic: add placeholder and close form immediately
+    const optimisticItem = {
+      id: `temp-${Date.now()}`,
+      mentee_id: menteeId,
+      event_date: encDate,
+      created_at: new Date().toISOString(),
+    } as { id: string; mentee_id: string; event_date: string; created_at: string }
+    setEncontros((prev) => [optimisticItem as typeof prev[number], ...prev])
+    const savedDate = encDate
+    setEncDate(''); setShowEncForm(false)
+
+    try {
+      await supabase.from('presential_events').insert({ mentee_id: menteeId, event_date: savedDate })
+      fetchData()
+    } catch {
+      setEncontros((prev) => prev.filter((i) => i.id !== optimisticItem.id))
+      toast.error('Erro ao registrar encontro')
+    }
   }
 
   async function handleDelete() {

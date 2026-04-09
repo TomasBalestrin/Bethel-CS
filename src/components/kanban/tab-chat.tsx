@@ -672,22 +672,37 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
             className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
             onClick={async (e) => {
               e.stopPropagation()
-              const supabase = createClient()
-              // Get latest incoming messages to mark as unread
-              const { data: incoming } = await supabase
-                .from('wpp_messages')
-                .select('id')
-                .eq('mentee_id', menteeId)
-                .eq('direction', 'incoming')
-                .order('created_at', { ascending: false })
-                .limit(1)
-              if (incoming && incoming.length > 0) {
-                await supabase
+              // Optimistic: update unread count immediately
+              onUnreadRef.current?.(1)
+              toast.success('Marcado como não lida')
+              try {
+                const supabase = createClient()
+                // Get latest incoming messages to mark as unread
+                const { data: incoming } = await supabase
                   .from('wpp_messages')
-                  .update({ is_read: false })
-                  .eq('id', incoming[0].id)
-                onUnreadRef.current?.(1)
-                toast.success('Marcado como não lida')
+                  .select('id')
+                  .eq('mentee_id', menteeId)
+                  .eq('direction', 'incoming')
+                  .order('created_at', { ascending: false })
+                  .limit(1)
+                if (incoming && incoming.length > 0) {
+                  const { error } = await supabase
+                    .from('wpp_messages')
+                    .update({ is_read: false })
+                    .eq('id', incoming[0].id)
+                  if (error) {
+                    // Revert on error
+                    onUnreadRef.current?.(0)
+                    toast.error('Erro ao marcar como não lida')
+                  }
+                } else {
+                  // No incoming messages to mark — revert
+                  onUnreadRef.current?.(0)
+                }
+              } catch {
+                // Revert on error
+                onUnreadRef.current?.(0)
+                toast.error('Erro ao marcar como não lida')
               }
             }}
             title="Marcar como não lida"

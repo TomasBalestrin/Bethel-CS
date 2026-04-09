@@ -248,7 +248,7 @@ export function KanbanBoard({
         <div className="relative">
           <div
             ref={scrollRef}
-            className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 scrollbar-none sm:scrollbar-thin px-0.5 snap-x snap-mandatory sm:snap-none"
+            className="flex gap-3 sm:gap-4 overflow-x-auto pb-4 scrollbar-none sm:scrollbar-thin px-0.5 snap-x sm:snap-none"
             style={{ WebkitOverflowScrolling: 'touch' }}
             onScroll={() => {
               const el = scrollRef.current

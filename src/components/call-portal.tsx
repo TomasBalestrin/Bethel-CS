@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useCallback } from 'react'
-import DailyIframe from '@daily-co/daily-js'
+import type DailyIframeType from '@daily-co/daily-js'
 import { useCallStore } from '@/store/call-store'
 import { CallInterface } from '@/components/kanban/call-interface'
 import { toast } from 'sonner'
@@ -47,7 +47,7 @@ function VideoCallPortal({ roomUrl, token, menteeName, menteeLink }: {
   menteeLink: string
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const callFrameRef = useRef<ReturnType<typeof DailyIframe.createFrame> | null>(null)
+  const callFrameRef = useRef<ReturnType<typeof DailyIframeType.createFrame> | null>(null)
   const joinedRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -63,82 +63,86 @@ function VideoCallPortal({ roomUrl, token, menteeName, menteeLink }: {
       callFrameRef.current = null
     }
 
-    const frame = DailyIframe.createFrame(containerRef.current, {
-      showLeaveButton: true,
-      showFullscreenButton: false,
-      iframeStyle: {
-        width: '100%',
-        height: '100%',
-        border: 'none',
-        borderRadius: '0 0 16px 16px',
-      },
-    })
+    const container = containerRef.current
 
-    callFrameRef.current = frame
+    import('@daily-co/daily-js').then(({ default: DailyIframe }) => {
+      const frame = DailyIframe.createFrame(container, {
+        showLeaveButton: true,
+        showFullscreenButton: false,
+        iframeStyle: {
+          width: '100%',
+          height: '100%',
+          border: 'none',
+          borderRadius: '0 0 16px 16px',
+        },
+      })
 
-    const iframe = containerRef.current.querySelector('iframe')
-    if (iframe) {
-      iframe.setAttribute('allow', 'camera; microphone; autoplay; display-capture')
-    }
+      callFrameRef.current = frame
 
-    frame.on('joined-meeting', () => {
-      console.log('[CallPortal/Video] Joined meeting — cloud recording enabled at room level')
-    })
+      const iframe = container.querySelector('iframe')
+      if (iframe) {
+        iframe.setAttribute('allow', 'camera; microphone; autoplay; display-capture')
+      }
 
-    frame.on('left-meeting', () => {
-      const cid = useCallStore.getState().callId
-      if (cid) {
-        fetch('/api/calls/end', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ callId: cid }),
-        }).catch(() => {})
+      frame.on('joined-meeting', () => {
+        console.log('[CallPortal/Video] Joined meeting — cloud recording enabled at room level')
+      })
 
-        let attempts = 0
-        const recordingPoll = setInterval(async () => {
-          attempts++
-          if (attempts > 40) {
-            clearInterval(recordingPoll)
-            // Mark as failed in DB
-            fetch('/api/calls/check-recording', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ callId: cid, markFailed: true }),
-            }).catch(() => {})
-            toast.error('Gravação não encontrada. Verifique no histórico de ligações.')
-            return
-          }
-          try {
-            const res = await fetch('/api/calls/check-recording', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ callId: cid }),
-            })
-            const data = await res.json()
-            if (data.status === 'ready') {
+      frame.on('left-meeting', () => {
+        const cid = useCallStore.getState().callId
+        if (cid) {
+          fetch('/api/calls/end', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ callId: cid }),
+          }).catch(() => {})
+
+          let attempts = 0
+          const recordingPoll = setInterval(async () => {
+            attempts++
+            if (attempts > 40) {
               clearInterval(recordingPoll)
-              toast.success('Gravação da ligação disponível')
-            } else if (data.status === 'failed') {
-              clearInterval(recordingPoll)
-              toast.error('Falha na gravação da ligação')
+              // Mark as failed in DB
+              fetch('/api/calls/check-recording', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ callId: cid, markFailed: true }),
+              }).catch(() => {})
+              toast.error('Gravação não encontrada. Verifique no histórico de ligações.')
+              return
             }
-          } catch { /* network error, retry */ }
-        }, 15000)
-      }
-      joinedRef.current = null
-      if (callFrameRef.current) {
-        try { callFrameRef.current.destroy() } catch { /* */ }
-        callFrameRef.current = null
-      }
-      useCallStore.getState().endCall()
-    })
+            try {
+              const res = await fetch('/api/calls/check-recording', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ callId: cid }),
+              })
+              const data = await res.json()
+              if (data.status === 'ready') {
+                clearInterval(recordingPoll)
+                toast.success('Gravação da ligação disponível')
+              } else if (data.status === 'failed') {
+                clearInterval(recordingPoll)
+                toast.error('Falha na gravação da ligação')
+              }
+            } catch { /* network error, retry */ }
+          }, 15000)
+        }
+        joinedRef.current = null
+        if (callFrameRef.current) {
+          try { callFrameRef.current.destroy() } catch { /* */ }
+          callFrameRef.current = null
+        }
+        useCallStore.getState().endCall()
+      })
 
-    frame.join({
-      url: roomUrl,
-      token,
-      startVideoOff: false,
-      startAudioOff: false,
-    })
+      frame.join({
+        url: roomUrl,
+        token,
+        startVideoOff: false,
+        startAudioOff: false,
+      })
+    }) // end dynamic import .then()
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomUrl, token])

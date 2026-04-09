@@ -1,16 +1,25 @@
 'use client'
 
+import { memo } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { Users, DollarSign, Star, Clock } from 'lucide-react'
 import type { MenteeWithStats } from '@/types/kanban'
 
 const LEVEL_COLORS: Record<number, string> = {
-  1: '#888780',
+  1: '#94928B',
   2: '#FFAA00',
   3: '#3B9FFF',
   4: '#2FC695',
   5: '#1F3A7D',
+}
+
+const LEVEL_LABELS: Record<number, string> = {
+  1: 'Baixa',
+  2: 'Normal',
+  3: 'Média',
+  4: 'Alta',
+  5: 'Urgente',
 }
 
 interface MenteeCardProps {
@@ -19,7 +28,7 @@ interface MenteeCardProps {
   onClick?: (mentee: MenteeWithStats) => void
 }
 
-export function MenteeCard({ mentee, unreadCount = 0, onClick }: MenteeCardProps) {
+export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, onClick }: MenteeCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: mentee.id,
@@ -47,10 +56,10 @@ export function MenteeCard({ mentee, unreadCount = 0, onClick }: MenteeCardProps
       {...listeners}
       {...attributes}
       onClick={handleClick}
-      className={`relative cursor-pointer rounded-lg border shadow-card transition-all hover:shadow-md active:cursor-grabbing animate-fade-in ${
+      className={`relative cursor-pointer rounded-lg border transition-colors hover:shadow-sm active:cursor-grabbing ${
         isInactive
-          ? 'border-destructive/50 bg-destructive/5 hover:border-destructive/70'
-          : 'border-border/50 bg-card hover:border-accent/30'
+          ? 'border-muted-foreground/30 bg-muted/60'
+          : 'border-border/60 bg-card hover:border-accent/30'
       }`}
     >
       {unreadCount > 0 && (
@@ -59,45 +68,46 @@ export function MenteeCard({ mentee, unreadCount = 0, onClick }: MenteeCardProps
         </span>
       )}
       <div className="flex">
-        {/* Color bar */}
+        {/* Priority color bar */}
         <div
-          className="w-1 shrink-0 rounded-l-lg"
+          className="w-1.5 shrink-0 rounded-l-lg"
           style={{ backgroundColor: color }}
         />
-        <div className="flex-1 px-3.5 py-3">
-          {/* Name + badge */}
+        <div className="flex-1 px-3 py-2.5">
+          {/* Name + priority */}
           <div className="flex items-start justify-between gap-2">
-            <h4 className="flex items-center gap-1 font-heading font-medium text-sm leading-tight text-foreground">
+            <h4 className="flex items-center gap-1 font-heading font-semibold text-[13px] leading-tight text-foreground truncate">
               {mentee.cliente_fit && <Star className="h-3.5 w-3.5 text-warning fill-warning shrink-0" />}
               {mentee.full_name}
             </h4>
             <span
-              className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-semibold"
+              className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
               style={{ backgroundColor: `${color}15`, color }}
+              title={LEVEL_LABELS[mentee.priority_level] ?? ''}
             >
               P{mentee.priority_level}
             </span>
           </div>
           {/* Product */}
           {mentee.product_name && (
-            <p className="text-xs text-muted-foreground mt-0.5">{mentee.product_name}</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{mentee.product_name}</p>
           )}
-          {/* Divider + metrics */}
-          <div className="mt-2 pt-2 border-t border-border/50 flex items-center gap-3 text-xs text-muted-foreground tabular">
-            <span className="flex items-center gap-1" title="Indicações">
-              <Users size={12} />
-              {mentee.indication_count} indic.
+          {/* Metrics */}
+          <div className="mt-2 pt-1.5 border-t border-border/40 flex items-center gap-2.5 text-[11px] text-muted-foreground tabular">
+            <span className="flex items-center gap-0.5" title="Indicações">
+              <Users size={11} className="shrink-0" />
+              {mentee.indication_count}
             </span>
-            <span className="flex items-center gap-1" title="Receita">
-              <DollarSign size={12} />
+            <span className="flex items-center gap-0.5" title="Receita">
+              <DollarSign size={11} className="shrink-0" />
               R$ {mentee.revenue_total.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </span>
             {mentee.days_since_contact != null && (
               <span
-                className={`flex items-center gap-1 ml-auto ${mentee.days_since_contact > 7 ? 'text-destructive' : mentee.days_since_contact > 3 ? 'text-warning' : 'text-muted-foreground'}`}
-                title="Dias sem contato"
+                className={`flex items-center gap-0.5 ml-auto ${mentee.days_since_contact > 7 ? 'text-destructive font-medium' : mentee.days_since_contact > 3 ? 'text-warning' : ''}`}
+                title={`${mentee.days_since_contact} dias sem contato`}
               >
-                <Clock size={12} />
+                <Clock size={11} className="shrink-0" />
                 {mentee.days_since_contact}d
               </span>
             )}
@@ -106,4 +116,4 @@ export function MenteeCard({ mentee, unreadCount = 0, onClick }: MenteeCardProps
       </div>
     </div>
   )
-}
+})

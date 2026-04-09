@@ -1,8 +1,10 @@
 import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import { Toaster } from 'sonner'
+import dynamic from 'next/dynamic'
 import { cn } from '@/lib/utils'
-import { CallPortal } from '@/components/call-portal'
+
+const CallPortal = dynamic(() => import('@/components/call-portal').then((m) => ({ default: m.CallPortal })), { ssr: false })
 import { WebVitals } from '@/components/web-vitals'
 import './globals.css'
 

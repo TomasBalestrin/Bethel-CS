@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import * as XLSX from 'xlsx'
+import type * as XLSXType from 'xlsx'
 import {
   Dialog,
   DialogContent,
@@ -210,7 +210,7 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
     onOpenChange(v)
   }
 
-  function processWorkbook(wb: XLSX.WorkBook) {
+  function processWorkbook(XLSX: typeof XLSXType, wb: XLSXType.WorkBook) {
     const sheet = wb.Sheets[wb.SheetNames[0]]
     const data = XLSX.utils.sheet_to_json<Record<string, string | number>>(sheet, { defval: '' })
     if (data.length === 0) return
@@ -224,10 +224,11 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
   function handleFile(file: File) {
     setFileName(file.name)
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
+      const XLSX = await import('xlsx')
       const data = new Uint8Array(e.target?.result as ArrayBuffer)
       const wb = XLSX.read(data, { type: 'array', cellDates: false })
-      processWorkbook(wb)
+      processWorkbook(XLSX, wb)
     }
     reader.readAsArrayBuffer(file)
   }

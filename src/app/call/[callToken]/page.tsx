@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
-import DailyIframe from '@daily-co/daily-js'
+import type DailyIframeType from '@daily-co/daily-js'
 import { Phone, Loader2, PhoneOff, Mic, MicOff } from 'lucide-react'
 import Image from 'next/image'
 import { destroyCall, getActiveCall, forceNewCall } from '@/lib/daily-call'
@@ -129,13 +129,15 @@ function MenteeVideoCall({ roomUrl, token, status, onStatusChange }: {
   onStatusChange: (s: 'joining' | 'active' | 'ended') => void
 }) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const callFrameRef = useRef<ReturnType<typeof DailyIframe.createFrame> | null>(null)
+  const callFrameRef = useRef<ReturnType<typeof DailyIframeType.createFrame> | null>(null)
 
   useEffect(() => {
     if (status !== 'joining' || !roomUrl || !token) return
 
-    const timer = setTimeout(() => {
+    const timer = setTimeout(async () => {
       if (!containerRef.current) return
+
+      const { default: DailyIframe } = await import('@daily-co/daily-js')
 
       const frame = DailyIframe.createFrame(containerRef.current, {
         showLeaveButton: true,

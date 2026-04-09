@@ -1,14 +1,18 @@
 'use client'
 
+import { useState, useMemo } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Plus } from 'lucide-react'
+import { Plus, ChevronDown } from 'lucide-react'
 import { MenteeCard } from './mentee-card'
 import { cn } from '@/lib/utils'
 import type { MenteeWithStats } from '@/types/kanban'
 import type { Database } from '@/types/database'
 
 type KanbanStage = Database['public']['Tables']['kanban_stages']['Row']
+
+const INITIAL_VISIBLE = 20
+const LOAD_MORE_COUNT = 20
 
 interface KanbanColumnProps {
   stage: KanbanStage
@@ -24,10 +28,14 @@ export function KanbanColumn({ stage, mentees, unreadMap, onCardClick, showAddBu
     id: stage.id,
   })
 
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE)
+  const visibleMentees = useMemo(() => mentees.slice(0, visibleCount), [mentees, visibleCount])
+  const hasMore = mentees.length > visibleCount
+
   return (
     <div
       className={cn(
-        'flex min-w-[260px] w-[calc(100vw-2rem)] sm:w-72 shrink-0 flex-col rounded-lg border border-border bg-muted/50 snap-start',
+        'flex min-w-[270px] w-[85vw] sm:w-72 shrink-0 flex-col rounded-lg border border-border bg-muted/50 snap-start',
         isOver && 'ring-2 ring-accent/50'
       )}
     >
@@ -44,7 +52,7 @@ export function KanbanColumn({ stage, mentees, unreadMap, onCardClick, showAddBu
           ref={setNodeRef}
           className="flex min-h-[200px] flex-col gap-2 p-2"
         >
-          {mentees.map((mentee) => (
+          {visibleMentees.map((mentee) => (
             <MenteeCard
               key={mentee.id}
               mentee={mentee}
@@ -52,6 +60,16 @@ export function KanbanColumn({ stage, mentees, unreadMap, onCardClick, showAddBu
               onClick={onCardClick}
             />
           ))}
+          {hasMore && (
+            <button
+              type="button"
+              onClick={() => setVisibleCount((c) => c + LOAD_MORE_COUNT)}
+              className="flex w-full items-center justify-center gap-1 rounded-md py-2 text-xs text-muted-foreground hover:bg-muted transition-colors"
+            >
+              <ChevronDown className="h-3.5 w-3.5" />
+              Mostrar mais ({mentees.length - visibleCount} restantes)
+            </button>
+          )}
           {showAddButton && (
             <button
               type="button"

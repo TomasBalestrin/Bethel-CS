@@ -89,7 +89,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const [playingRecording, setPlayingRecording] = useState<string | null>(null)
   const [editingCallNote, setEditingCallNote] = useState<string | null>(null)
   const [callNoteText, setCallNoteText] = useState('')
-  const [savingCallNote, setSavingCallNote] = useState(false)
+  const [savingCallNote] = useState(false)
 
   // Attendance session (start/stop)
   const [activeSession, setActiveSession] = useState<string | null>(null)
@@ -101,7 +101,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const [taskDesc, setTaskDesc] = useState('')
   const [taskDueDate, setTaskDueDate] = useState('')
   const [taskNotes, setTaskNotes] = useState('')
-  const [taskLoading, setTaskLoading] = useState(false)
+  const [taskLoading] = useState(false)
 
   // Message windowing
   const [visibleLimit, setVisibleLimit] = useState(80)
@@ -622,12 +622,22 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
               variant="destructive"
               className="h-8 gap-1.5 text-xs"
               onClick={async () => {
-                const sb = createClient()
-                await sb.from('attendance_sessions').update({ ended_at: new Date().toISOString() }).eq('id', activeSession)
+                // Optimistic: update UI immediately
+                const prevSession = activeSession
+                const prevStart = sessionStart
                 const dur = sessionStart ? Math.round((Date.now() - sessionStart.getTime()) / 60000) : 0
                 setActiveSession(null)
                 setSessionStart(null)
                 toast.success(`Atendimento finalizado (${dur} min)`)
+
+                const sb = createClient()
+                const { error } = await sb.from('attendance_sessions').update({ ended_at: new Date().toISOString() }).eq('id', prevSession)
+                if (error) {
+                  // Revert on error
+                  setActiveSession(prevSession)
+                  setSessionStart(prevStart)
+                  toast.error('Erro ao finalizar atendimento')
+                }
               }}
             >
               <TimerOff className="h-3 w-3" />
@@ -672,22 +682,37 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
             className="h-8 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
             onClick={async (e) => {
               e.stopPropagation()
-              const supabase = createClient()
-              // Get latest incoming messages to mark as unread
-              const { data: incoming } = await supabase
-                .from('wpp_messages')
-                .select('id')
-                .eq('mentee_id', menteeId)
-                .eq('direction', 'incoming')
-                .order('created_at', { ascending: false })
-                .limit(1)
-              if (incoming && incoming.length > 0) {
-                await supabase
+              // Optimistic: update unread count immediately
+              onUnreadRef.current?.(1)
+              toast.success('Marcado como não lida')
+              try {
+                const supabase = createClient()
+                // Get latest incoming messages to mark as unread
+                const { data: incoming } = await supabase
                   .from('wpp_messages')
-                  .update({ is_read: false })
-                  .eq('id', incoming[0].id)
-                onUnreadRef.current?.(1)
-                toast.success('Marcado como não lida')
+                  .select('id')
+                  .eq('mentee_id', menteeId)
+                  .eq('direction', 'incoming')
+                  .order('created_at', { ascending: false })
+                  .limit(1)
+                if (incoming && incoming.length > 0) {
+                  const { error } = await supabase
+                    .from('wpp_messages')
+                    .update({ is_read: false })
+                    .eq('id', incoming[0].id)
+                  if (error) {
+                    // Revert on error
+                    onUnreadRef.current?.(0)
+                    toast.error('Erro ao marcar como não lida')
+                  }
+                } else {
+                  // No incoming messages to mark — revert
+                  onUnreadRef.current?.(0)
+                }
+              } catch {
+                // Revert on error
+                onUnreadRef.current?.(0)
+                toast.error('Erro ao marcar como não lida')
               }
             }}
             title="Marcar como não lida"
@@ -1093,23 +1118,28 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                               className="h-7 text-xs gap-1"
                               disabled={savingCallNote}
                               onClick={async () => {
-                                setSavingCallNote(true)
-                                const sb = createClient()
-                                const { error } = await sb
-                                  .from('call_records')
-                                  .update({ notes: callNoteText || null })
-                                  .eq('id', call.id)
-                                setSavingCallNote(false)
-                                if (error) {
-                                  toast.error('Erro ao salvar anotação')
-                                  return
-                                }
+                                // Optimistic: update UI immediately
+                                const savedNote = callNoteText
+                                const prevNotes = call.notes
                                 setCallRecords((prev) =>
-                                  prev.map((c) => c.id === call.id ? { ...c, notes: callNoteText || null } : c)
+                                  prev.map((c) => c.id === call.id ? { ...c, notes: savedNote || null } : c)
                                 )
                                 setEditingCallNote(null)
                                 setCallNoteText('')
                                 toast.success('Anotação salva')
+
+                                const sb = createClient()
+                                const { error } = await sb
+                                  .from('call_records')
+                                  .update({ notes: savedNote || null })
+                                  .eq('id', call.id)
+                                if (error) {
+                                  // Revert on error
+                                  setCallRecords((prev) =>
+                                    prev.map((c) => c.id === call.id ? { ...c, notes: prevNotes } : c)
+                                  )
+                                  toast.error('Erro ao salvar anotação')
+                                }
                               }}
                             >
                               <Check className="h-3 w-3" />
@@ -1147,19 +1177,22 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           </DialogHeader>
           <form onSubmit={async (e) => {
             e.preventDefault()
-            setTaskLoading(true)
-            const res = await createTask({
-              title: taskTitle,
-              description: taskDesc || undefined,
-              notes: taskNotes || undefined,
-              due_date: taskDueDate || undefined,
-              mentee_id: menteeId,
-            })
-            setTaskLoading(false)
-            if (res.error) { toast.error(res.error); return }
-            toast.success('Tarefa criada')
+            // Optimistic: close dialog immediately
+            const savedTitle = taskTitle; const savedDesc = taskDesc; const savedNotes = taskNotes; const savedDueDate = taskDueDate
             setTaskFormOpen(false)
             setTaskTitle(''); setTaskDesc(''); setTaskDueDate(''); setTaskNotes('')
+            toast.success('Tarefa criada')
+
+            const res = await createTask({
+              title: savedTitle,
+              description: savedDesc || undefined,
+              notes: savedNotes || undefined,
+              due_date: savedDueDate || undefined,
+              mentee_id: menteeId,
+            })
+            if (res.error) {
+              toast.error(res.error)
+            }
           }} className="space-y-3">
             <div className="space-y-1">
               <Label>Título *</Label>

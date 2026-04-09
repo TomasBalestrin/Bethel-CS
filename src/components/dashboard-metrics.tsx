@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, memo } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -270,9 +271,9 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {props.birthdayMentees.map((m) => (
-                  <button
+                  <Link
                     key={m.id}
-                    onClick={() => router.push(`/mentorados?open=${m.id}`)}
+                    href={`/mentorados?open=${m.id}`}
                     className="inline-flex items-center gap-1.5 rounded-lg bg-card border border-border px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted transition-colors shadow-sm"
                   >
                     <Cake className="h-3.5 w-3.5 text-accent" />
@@ -283,7 +284,7 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
                       <span className="text-[10px] text-muted-foreground">em {m.daysUntil} dia{m.daysUntil !== 1 ? 's' : ''}</span>
                     )}
                     <ChevronRight className="h-3 w-3 text-muted-foreground" />
-                  </button>
+                  </Link>
                 ))}
               </div>
             </div>

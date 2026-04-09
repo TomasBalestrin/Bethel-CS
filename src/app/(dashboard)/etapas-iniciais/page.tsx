@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { KanbanBoard } from '@/components/kanban/kanban-board'
 import { MENTEE_SUMMARY_FIELDS, type MenteeWithStats } from '@/types/kanban'
+import { getCachedSpecialists, getCachedStages, getCachedAllStages } from '@/lib/cache'
 
 export default async function EtapasIniciaisPage() {
   const supabase = createClient()
@@ -13,14 +14,10 @@ export default async function EtapasIniciaisPage() {
     userRole = profile?.role ?? 'especialista'
   }
 
-  // Fetch ALL stages (both types) + initial mentees in parallel
-  const [{ data: allStages }, { data: initialStages }, menteesResult] = await Promise.all([
-    supabase.from('kanban_stages').select('id, type').order('position'),
-    supabase
-      .from('kanban_stages')
-      .select('id, name, type, position, created_at')
-      .eq('type', 'initial')
-      .order('position'),
+  // Fetch stages (cached) + mentees in parallel
+  const [allStages, initialStages, menteesResult] = await Promise.all([
+    getCachedAllStages(),
+    getCachedStages('initial'),
     (() => {
       let q = supabase
         .from('mentees')
@@ -33,9 +30,9 @@ export default async function EtapasIniciaisPage() {
     })(),
   ])
 
-  const stages = initialStages ?? []
+  const stages = initialStages
   const firstStageId = stages.length > 0 ? stages[0].id : null
-  const validStageIds = new Set((allStages ?? []).map((s) => s.id))
+  const validStageIds = new Set(allStages.map((s) => s.id))
   const menteeList = menteesResult.data ?? []
 
   // Auto-repair: fix mentees with null or invalid current_stage_id
@@ -63,14 +60,14 @@ export default async function EtapasIniciaisPage() {
 
   const menteeIds = menteeList.map((m) => m.id)
 
-  // Fetch all stats + specialists + allMentees in parallel
+  // Fetch stats + allMentees in parallel (specialists from cache)
   const [
     { data: allMentees },
     { data: attendances },
     { data: indications },
     { data: revenues },
     { data: lastContacts },
-    { data: specialists },
+    specialists,
   ] = await Promise.all([
     supabase.from('mentees').select('id, full_name').order('full_name'),
     menteeIds.length > 0
@@ -85,7 +82,7 @@ export default async function EtapasIniciaisPage() {
     menteeIds.length > 0
       ? supabase.from('wpp_messages').select('mentee_id, sent_at').eq('direction', 'outgoing').in('mentee_id', menteeIds).order('sent_at', { ascending: false })
       : Promise.resolve({ data: [] as { mentee_id: string; sent_at: string }[] }),
-    supabase.from('profiles').select('id, full_name').eq('role', 'especialista').order('full_name'),
+    getCachedSpecialists(),
   ])
 
   // Build stats maps
@@ -130,7 +127,7 @@ export default async function EtapasIniciaisPage() {
       initialMentees={menteesWithStats}
       existingMentees={allMentees ?? []}
       isAdmin={userRole === 'admin'}
-      specialists={specialists ?? []}
+      specialists={specialists}
     />
   )
 }

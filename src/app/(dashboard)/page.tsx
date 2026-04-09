@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { DashboardMetrics } from '@/components/dashboard-metrics'
+import { getCachedSpecialists } from '@/lib/cache'
 
 interface Props {
   searchParams: {
@@ -26,10 +27,10 @@ export default async function DashboardPage({ searchParams }: Props) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Parallel: profile + specialists + system settings
-  const [{ data: profile }, { data: specialists }, { data: gapSetting }] = await Promise.all([
+  // Parallel: profile + specialists (cached) + system settings
+  const [{ data: profile }, specialists, { data: gapSetting }] = await Promise.all([
     supabase.from('profiles').select('full_name, role').eq('id', user!.id).single(),
-    supabase.from('profiles').select('id, full_name').eq('role', 'especialista').order('full_name'),
+    getCachedSpecialists(),
     supabase.from('system_settings').select('value').eq('key', 'attendance_gap_minutes').single(),
   ])
 
@@ -397,7 +398,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   return (
     <DashboardMetrics
       userName={profile?.full_name ?? ''}
-      specialists={specialists ?? []}
+      specialists={specialists}
       isAdmin={isAdmin}
       filters={{ specialistId, startDate, endDate, fitFilter }}
       advancedFilters={{

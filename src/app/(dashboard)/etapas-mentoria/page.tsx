@@ -56,7 +56,6 @@ export default async function EtapasMentoriaPage() {
     { data: attendances },
     { data: indications },
     { data: revenues },
-    { data: lastContacts },
     specialists,
   ] = await Promise.all([
     supabase.from('mentees').select('id, full_name').order('full_name'),
@@ -69,16 +68,8 @@ export default async function EtapasMentoriaPage() {
     menteeIds.length > 0
       ? supabase.from('revenue_records').select('mentee_id, sale_value').in('mentee_id', menteeIds)
       : Promise.resolve({ data: [] as { mentee_id: string; sale_value: number }[] }),
-    menteeIds.length > 0
-      ? supabase.from('wpp_messages').select('mentee_id, sent_at').eq('direction', 'outgoing').in('mentee_id', menteeIds).order('sent_at', { ascending: false })
-      : Promise.resolve({ data: [] as { mentee_id: string; sent_at: string }[] }),
     getCachedSpecialists(),
   ])
-
-  const lastContactMap = new Map<string, string>()
-  lastContacts?.forEach((m) => {
-    if (!lastContactMap.has(m.mentee_id)) lastContactMap.set(m.mentee_id, m.sent_at)
-  })
 
   const attendanceMap = new Map<string, number>()
   attendances?.forEach((a) => {
@@ -95,18 +86,12 @@ export default async function EtapasMentoriaPage() {
     revenueMap.set(r.mentee_id, (revenueMap.get(r.mentee_id) ?? 0) + Number(r.sale_value))
   })
 
-  const now = Date.now()
-  const menteesWithStats: MenteeWithStats[] = menteeList.map((m) => {
-    const lastContact = lastContactMap.get(m.id)
-    const daysSince = lastContact ? Math.floor((now - new Date(lastContact).getTime()) / 86400000) : undefined
-    return {
-      ...m,
-      attendance_count: attendanceMap.get(m.id) ?? 0,
-      indication_count: indicationMap.get(m.id) ?? 0,
-      revenue_total: revenueMap.get(m.id) ?? 0,
-      days_since_contact: daysSince,
-    }
-  })
+  const menteesWithStats: MenteeWithStats[] = menteeList.map((m) => ({
+    ...m,
+    attendance_count: attendanceMap.get(m.id) ?? 0,
+    indication_count: indicationMap.get(m.id) ?? 0,
+    revenue_total: revenueMap.get(m.id) ?? 0,
+  }))
 
   return (
     <KanbanBoard

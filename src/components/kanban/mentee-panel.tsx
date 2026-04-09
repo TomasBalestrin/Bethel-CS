@@ -500,10 +500,8 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
   isAdmin: boolean
   onTransitionToMentorship?: (mentee: MenteeWithStats) => void
 }) {
-  const [saving, setSaving] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
-  const [cancelling, setCancelling] = useState(false)
 
   // Fetch action plan data for Empresa block
   const [empresaData, setEmpresaData] = useState<{
@@ -1803,7 +1801,6 @@ function CardIndividualSessions({ menteeId }: { menteeId: string }) {
   const [duration, setDuration] = useState('')
   const [specialist, setSpecialist] = useState('')
   const [notes, setNotes] = useState('')
-  const [loading, setLoading] = useState(false)
   const supabase = createClient()
 
   const fetchData = useCallback(() => {
@@ -1887,7 +1884,6 @@ function CardExtraDeliveries({ menteeId }: { menteeId: string }) {
   const [deliveryDate, setDeliveryDate] = useState('')
   const [deliveryType, setDeliveryType] = useState('outro')
   const [description, setDescription] = useState('')
-  const [loading, setLoading] = useState(false)
   const supabase = createClient()
 
   const fetchData = useCallback(() => {
@@ -1983,7 +1979,6 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
   const [customProductName, setCustomProductName] = useState('')
   const [saleCents, setSaleCents] = useState(0)
   const [entryCents, setEntryCents] = useState(0)
-  const [loading, setLoading] = useState(false)
   const [revenueType, setRevenueType] = useState<RevenueType>('crossell')
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const supabase = createClient()
@@ -2264,7 +2259,6 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
   const [qtyIndicated, setQtyIndicated] = useState('')
   const [qtyConfirmed, setQtyConfirmed] = useState('')
   const [revenueCents, setRevenueCents] = useState(0)
-  const [indLoading, setIndLoading] = useState(false)
   const [confirmDeleteInd, setConfirmDeleteInd] = useState<string | null>(null)
 
   const supabase = createClient()
@@ -2474,11 +2468,11 @@ function TabIntensivo({ menteeId }: { menteeId: string }) {
 
   const [showIntForm, setShowIntForm] = useState(false)
   const [intDate, setIntDate] = useState('')
-  const [intLoading, setIntLoading] = useState(false)
+  const [intLoading] = useState(false)
 
   const [showEncForm, setShowEncForm] = useState(false)
   const [encDate, setEncDate] = useState('')
-  const [encLoading, setEncLoading] = useState(false)
+  const [encLoading] = useState(false)
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<{ id: string; type: 'intensivo' | 'encontro' } | null>(null)
   const supabase = createClient()

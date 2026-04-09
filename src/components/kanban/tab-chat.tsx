@@ -89,7 +89,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const [playingRecording, setPlayingRecording] = useState<string | null>(null)
   const [editingCallNote, setEditingCallNote] = useState<string | null>(null)
   const [callNoteText, setCallNoteText] = useState('')
-  const [savingCallNote, setSavingCallNote] = useState(false)
+  const [savingCallNote] = useState(false)
 
   // Attendance session (start/stop)
   const [activeSession, setActiveSession] = useState<string | null>(null)
@@ -101,7 +101,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const [taskDesc, setTaskDesc] = useState('')
   const [taskDueDate, setTaskDueDate] = useState('')
   const [taskNotes, setTaskNotes] = useState('')
-  const [taskLoading, setTaskLoading] = useState(false)
+  const [taskLoading] = useState(false)
 
   // Message windowing
   const [visibleLimit, setVisibleLimit] = useState(80)

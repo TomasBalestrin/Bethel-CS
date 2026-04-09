@@ -13,6 +13,7 @@ export default async function EtapasIniciaisPage() {
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
     userRole = profile?.role ?? 'especialista'
   }
+  console.log('[EtapasIniciais] user:', user?.id, 'role:', userRole)
 
   // Fetch stages (cached) + mentees in parallel
   const [allStages, initialStages, menteesResult] = await Promise.all([
@@ -34,6 +35,7 @@ export default async function EtapasIniciaisPage() {
   const firstStageId = stages.length > 0 ? stages[0].id : null
   const validStageIds = new Set(allStages.map((s) => s.id))
   const menteeList = menteesResult.data ?? []
+  console.log('[EtapasIniciais] mentees fetched:', menteeList.length, 'error:', menteesResult.error?.message)
 
   // Auto-repair: fix mentees with null or invalid current_stage_id
   if (firstStageId) {

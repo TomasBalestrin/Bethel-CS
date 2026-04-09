@@ -2063,27 +2063,54 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!resolvedProductName) return
-    setLoading(true)
 
-    if (editingId) {
-      await updateRevenueRecord(editingId, {
-        product_name: resolvedProductName,
-        sale_value: centsToDecimal(saleCents),
-        entry_value: centsToDecimal(entryCents),
-        revenue_type: revenueType,
-      })
+    const savedProductName = resolvedProductName
+    const savedSaleCents = saleCents
+    const savedEntryCents = entryCents
+    const savedRevenueType = revenueType
+    const savedEditingId = editingId
+    const prevItems = [...items]
+
+    if (savedEditingId) {
+      // Optimistic: update item in list immediately
+      setItems((prev) => prev.map((i) => i.id === savedEditingId ? { ...i, product_name: savedProductName, sale_value: centsToDecimal(savedSaleCents), entry_value: centsToDecimal(savedEntryCents), revenue_type: savedRevenueType } : i))
     } else {
-      await addRevenueRecord(menteeId, {
-        product_name: resolvedProductName,
-        sale_value: centsToDecimal(saleCents),
-        entry_value: centsToDecimal(entryCents),
-        revenue_type: revenueType,
-      })
+      // Optimistic: add placeholder item immediately
+      const optimisticItem = {
+        id: `temp-${Date.now()}`,
+        mentee_id: menteeId,
+        product_name: savedProductName,
+        sale_value: centsToDecimal(savedSaleCents),
+        entry_value: centsToDecimal(savedEntryCents),
+        revenue_type: savedRevenueType,
+        created_at: new Date().toISOString(),
+      } as RevenueRecord
+      setItems((prev) => [optimisticItem, ...prev])
     }
-
-    setLoading(false)
     resetForm()
-    fetchData()
+
+    try {
+      if (savedEditingId) {
+        await updateRevenueRecord(savedEditingId, {
+          product_name: savedProductName,
+          sale_value: centsToDecimal(savedSaleCents),
+          entry_value: centsToDecimal(savedEntryCents),
+          revenue_type: savedRevenueType,
+        })
+      } else {
+        await addRevenueRecord(menteeId, {
+          product_name: savedProductName,
+          sale_value: centsToDecimal(savedSaleCents),
+          entry_value: centsToDecimal(savedEntryCents),
+          revenue_type: savedRevenueType,
+        })
+      }
+      fetchData()
+    } catch {
+      // Revert on error
+      setItems(prevItems)
+      toast.error('Erro ao salvar registro')
+    }
   }
 
   return (
@@ -2263,25 +2290,44 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
   }
 
   async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault(); setIndLoading(true)
+    e.preventDefault()
     const data = {
       indication_date: indDate,
       quantity_indicated: parseInt(qtyIndicated || '0', 10),
       quantity_confirmed: parseInt(qtyConfirmed || '0', 10),
       revenue_generated: revenueCents / 100,
     }
-    if (editingId) {
-      await updateIndication(editingId, data)
+    const savedEditingId = editingId
+    const prevIndications = [...indications]
+
+    if (savedEditingId) {
+      // Optimistic: update item in list immediately
+      setIndications((prev) => prev.map((i) => i.id === savedEditingId ? { ...i, ...data } : i))
+      resetForm(); setShowForm(false)
     } else {
-      await addIndication(menteeId, data)
-    }
-    setIndLoading(false); fetchAll()
-    // Keep form open for adding in series (reset fields but don't close)
-    if (!editingId) {
+      // Optimistic: add placeholder item immediately
+      const optimisticItem = {
+        id: `temp-${Date.now()}`,
+        mentee_id: menteeId,
+        ...data,
+        created_at: new Date().toISOString(),
+      } as Indication
+      setIndications((prev) => [optimisticItem, ...prev])
       resetForm()
       // Keep showForm true for "+" series flow
-    } else {
-      resetForm(); setShowForm(false)
+    }
+
+    try {
+      if (savedEditingId) {
+        await updateIndication(savedEditingId, data)
+      } else {
+        await addIndication(menteeId, data)
+      }
+      fetchAll()
+    } catch {
+      // Revert on error
+      setIndications(prevIndications)
+      toast.error('Erro ao salvar indicação')
     }
   }
 

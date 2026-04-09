@@ -6,32 +6,25 @@ import { getCachedSpecialists, getCachedStages, getCachedAllStages } from '@/lib
 export default async function EtapasMentoriaPage() {
   const supabase = createClient()
 
-  // Get current user role
-  const { data: { user } } = await supabase.auth.getUser()
+  // Get user + stages + mentees all in parallel
+  const [{ data: { user } }, allStages, stages, menteesResult] = await Promise.all([
+    supabase.auth.getUser(),
+    getCachedAllStages(),
+    getCachedStages('mentorship'),
+    supabase.from('mentees').select(MENTEE_SUMMARY_FIELDS).eq('kanban_type', 'mentorship'),
+  ])
+
   let userRole = 'especialista'
   if (user) {
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
     userRole = profile?.role ?? 'especialista'
   }
 
-  // Fetch stages (cached) + mentees in parallel
-  const [allStages, stages, menteesResult] = await Promise.all([
-    getCachedAllStages(),
-    getCachedStages('mentorship'),
-    (() => {
-      const q = supabase
-        .from('mentees')
-        .select(MENTEE_SUMMARY_FIELDS)
-        .eq('kanban_type', 'mentorship')
-      return q
-    })(),
-  ])
-
   const firstStageId = stages.length > 0 ? stages[0].id : null
   const validMentorshipStageIds = new Set(allStages.filter((s) => s.type === 'mentorship').map((s) => s.id))
   const menteeList = menteesResult.data ?? []
 
-  // Auto-repair: fix mentees with null or invalid current_stage_id
+  // Auto-repair: fix mentees whose stage doesn't match their kanban type
   if (firstStageId) {
     const orphans = menteeList.filter(
       (m) => !m.current_stage_id || !validMentorshipStageIds.has(m.current_stage_id)
@@ -47,15 +40,13 @@ export default async function EtapasMentoriaPage() {
 
   const menteeIds = menteeList.map((m) => m.id)
 
-  // Fetch stats + allMentees in parallel (specialists from cache)
+  // Fetch stats in parallel (specialists from cache helper)
   const [
-    { data: allMentees },
     { data: attendances },
     { data: indications },
     { data: revenues },
     specialists,
   ] = await Promise.all([
-    supabase.from('mentees').select('id, full_name').order('full_name'),
     menteeIds.length > 0
       ? supabase.from('attendances').select('mentee_id').in('mentee_id', menteeIds)
       : Promise.resolve({ data: [] as { mentee_id: string }[] }),
@@ -96,7 +87,7 @@ export default async function EtapasMentoriaPage() {
       kanbanType="mentorship"
       stages={stages}
       initialMentees={menteesWithStats}
-      existingMentees={allMentees ?? []}
+      existingMentees={menteeList.map((m) => ({ id: m.id, full_name: m.full_name }))}
       isAdmin={userRole === 'admin'}
       specialists={specialists}
     />

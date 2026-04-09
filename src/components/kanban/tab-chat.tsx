@@ -622,12 +622,22 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
               variant="destructive"
               className="h-8 gap-1.5 text-xs"
               onClick={async () => {
-                const sb = createClient()
-                await sb.from('attendance_sessions').update({ ended_at: new Date().toISOString() }).eq('id', activeSession)
+                // Optimistic: update UI immediately
+                const prevSession = activeSession
+                const prevStart = sessionStart
                 const dur = sessionStart ? Math.round((Date.now() - sessionStart.getTime()) / 60000) : 0
                 setActiveSession(null)
                 setSessionStart(null)
                 toast.success(`Atendimento finalizado (${dur} min)`)
+
+                const sb = createClient()
+                const { error } = await sb.from('attendance_sessions').update({ ended_at: new Date().toISOString() }).eq('id', prevSession)
+                if (error) {
+                  // Revert on error
+                  setActiveSession(prevSession)
+                  setSessionStart(prevStart)
+                  toast.error('Erro ao finalizar atendimento')
+                }
               }}
             >
               <TimerOff className="h-3 w-3" />
@@ -1108,23 +1118,28 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                               className="h-7 text-xs gap-1"
                               disabled={savingCallNote}
                               onClick={async () => {
-                                setSavingCallNote(true)
-                                const sb = createClient()
-                                const { error } = await sb
-                                  .from('call_records')
-                                  .update({ notes: callNoteText || null })
-                                  .eq('id', call.id)
-                                setSavingCallNote(false)
-                                if (error) {
-                                  toast.error('Erro ao salvar anotação')
-                                  return
-                                }
+                                // Optimistic: update UI immediately
+                                const savedNote = callNoteText
+                                const prevNotes = call.notes
                                 setCallRecords((prev) =>
-                                  prev.map((c) => c.id === call.id ? { ...c, notes: callNoteText || null } : c)
+                                  prev.map((c) => c.id === call.id ? { ...c, notes: savedNote || null } : c)
                                 )
                                 setEditingCallNote(null)
                                 setCallNoteText('')
                                 toast.success('Anotação salva')
+
+                                const sb = createClient()
+                                const { error } = await sb
+                                  .from('call_records')
+                                  .update({ notes: savedNote || null })
+                                  .eq('id', call.id)
+                                if (error) {
+                                  // Revert on error
+                                  setCallRecords((prev) =>
+                                    prev.map((c) => c.id === call.id ? { ...c, notes: prevNotes } : c)
+                                  )
+                                  toast.error('Erro ao salvar anotação')
+                                }
                               }}
                             >
                               <Check className="h-3 w-3" />
@@ -1162,19 +1177,22 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           </DialogHeader>
           <form onSubmit={async (e) => {
             e.preventDefault()
-            setTaskLoading(true)
-            const res = await createTask({
-              title: taskTitle,
-              description: taskDesc || undefined,
-              notes: taskNotes || undefined,
-              due_date: taskDueDate || undefined,
-              mentee_id: menteeId,
-            })
-            setTaskLoading(false)
-            if (res.error) { toast.error(res.error); return }
-            toast.success('Tarefa criada')
+            // Optimistic: close dialog immediately
+            const savedTitle = taskTitle; const savedDesc = taskDesc; const savedNotes = taskNotes; const savedDueDate = taskDueDate
             setTaskFormOpen(false)
             setTaskTitle(''); setTaskDesc(''); setTaskDueDate(''); setTaskNotes('')
+            toast.success('Tarefa criada')
+
+            const res = await createTask({
+              title: savedTitle,
+              description: savedDesc || undefined,
+              notes: savedNotes || undefined,
+              due_date: savedDueDate || undefined,
+              mentee_id: menteeId,
+            })
+            if (res.error) {
+              toast.error(res.error)
+            }
           }} className="space-y-3">
             <div className="space-y-1">
               <Label>Título *</Label>

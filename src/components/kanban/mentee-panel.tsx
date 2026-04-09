@@ -501,6 +501,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
   onTransitionToMentorship?: (mentee: MenteeWithStats) => void
 }) {
   const [saving] = useState(false)
+  const [cancelling] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
 
@@ -1802,6 +1803,7 @@ function CardIndividualSessions({ menteeId }: { menteeId: string }) {
   const [duration, setDuration] = useState('')
   const [specialist, setSpecialist] = useState('')
   const [notes, setNotes] = useState('')
+  const [loading] = useState(false)
   const supabase = createClient()
 
   const fetchData = useCallback(() => {
@@ -1885,6 +1887,7 @@ function CardExtraDeliveries({ menteeId }: { menteeId: string }) {
   const [deliveryDate, setDeliveryDate] = useState('')
   const [deliveryType, setDeliveryType] = useState('outro')
   const [description, setDescription] = useState('')
+  const [loading] = useState(false)
   const supabase = createClient()
 
   const fetchData = useCallback(() => {
@@ -1981,6 +1984,7 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
   const [saleCents, setSaleCents] = useState(0)
   const [entryCents, setEntryCents] = useState(0)
   const [revenueType, setRevenueType] = useState<RevenueType>('crossell')
+  const [loading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const supabase = createClient()
 
@@ -2260,6 +2264,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
   const [qtyIndicated, setQtyIndicated] = useState('')
   const [qtyConfirmed, setQtyConfirmed] = useState('')
   const [revenueCents, setRevenueCents] = useState(0)
+  const [indLoading] = useState(false)
   const [confirmDeleteInd, setConfirmDeleteInd] = useState<string | null>(null)
 
   const supabase = createClient()

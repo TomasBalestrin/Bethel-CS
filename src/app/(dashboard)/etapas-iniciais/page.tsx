@@ -33,14 +33,14 @@ export default async function EtapasIniciaisPage() {
 
   const stages = initialStages
   const firstStageId = stages.length > 0 ? stages[0].id : null
-  const validStageIds = new Set(allStages.map((s) => s.id))
+  const validInitialStageIds = new Set(allStages.filter((s) => s.type === 'initial').map((s) => s.id))
   const menteeList = menteesResult.data ?? []
   console.log('[EtapasIniciais] mentees fetched:', menteeList.length, 'error:', menteesResult.error?.message)
 
   // Auto-repair: fix mentees with null or invalid current_stage_id
   if (firstStageId) {
     const orphans = menteeList.filter(
-      (m) => !m.current_stage_id || !validStageIds.has(m.current_stage_id)
+      (m) => !m.current_stage_id || !validInitialStageIds.has(m.current_stage_id)
     )
     if (orphans.length > 0) {
       await supabase

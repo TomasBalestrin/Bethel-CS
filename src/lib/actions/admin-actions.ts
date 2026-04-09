@@ -28,38 +28,35 @@ export async function createUser(data: {
   full_name: string
   role: UserRole
 }) {
-  const { supabase, error: authError } = await verifyAdmin()
+  const { error: authError } = await verifyAdmin()
   if (authError) return { error: authError }
 
-  // Create auth user via admin API (uses service role if available)
-  // Since we may not have service role, we create via signup + profile update
-  const { data: newUser, error: signupError } = await supabase.auth.admin.createUser({
+  const adminClient = createAdminClient()
+
+  // Create auth user via admin API (service role key)
+  const { data: newUser, error: signupError } = await adminClient.auth.admin.createUser({
     email: data.email,
     password: data.password,
     email_confirm: true,
   })
 
   if (signupError) {
-    // Fallback: if admin API not available, try regular signup
-    const { data: fallbackUser, error: fallbackError } = await supabase.auth.signUp({
-      email: data.email,
-      password: data.password,
-    })
-    if (fallbackError) return { error: fallbackError.message }
+    return { error: `Erro ao criar usuário: ${signupError.message}` }
+  }
 
-    if (fallbackUser.user) {
-      await supabase.from('profiles').upsert({
-        id: fallbackUser.user.id,
-        full_name: data.full_name,
-        role: data.role,
-      })
-    }
-  } else if (newUser.user) {
-    await supabase.from('profiles').upsert({
-      id: newUser.user.id,
-      full_name: data.full_name,
-      role: data.role,
-    })
+  if (!newUser?.user) {
+    return { error: 'Erro ao criar usuário: resposta vazia' }
+  }
+
+  // Create profile
+  const { error: profileError } = await adminClient.from('profiles').upsert({
+    id: newUser.user.id,
+    full_name: data.full_name,
+    role: data.role,
+  })
+
+  if (profileError) {
+    return { error: `Usuário criado mas erro no perfil: ${profileError.message}` }
   }
 
   revalidatePath('/admin')
@@ -116,7 +113,12 @@ export async function deleteUser(userId: string) {
   if (error) return { error: error.message }
 
   // Also delete the auth user so they can't log in anymore
-  await supabase.auth.admin.deleteUser(userId)
+  try {
+    const adminClient = createAdminClient()
+    await adminClient.auth.admin.deleteUser(userId)
+  } catch {
+    // Profile already deleted, auth cleanup is best-effort
+  }
 
   revalidatePath('/admin')
   return { error: null }

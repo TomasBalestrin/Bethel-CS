@@ -31,13 +31,13 @@ export default async function EtapasMentoriaPage() {
   ])
 
   const firstStageId = stages.length > 0 ? stages[0].id : null
-  const validStageIds = new Set(allStages.map((s) => s.id))
+  const validMentorshipStageIds = new Set(allStages.filter((s) => s.type === 'mentorship').map((s) => s.id))
   const menteeList = menteesResult.data ?? []
 
   // Auto-repair: fix mentees with null or invalid current_stage_id
   if (firstStageId) {
     const orphans = menteeList.filter(
-      (m) => !m.current_stage_id || !validStageIds.has(m.current_stage_id)
+      (m) => !m.current_stage_id || !validMentorshipStageIds.has(m.current_stage_id)
     )
     if (orphans.length > 0) {
       await supabase

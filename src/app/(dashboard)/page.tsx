@@ -41,7 +41,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   const startDate = searchParams.start || null
   const endDate = searchParams.end || null
   const fitFilter = searchParams.fit || null
-  const specialistId = isAdmin ? (searchParams.specialist || null) : user!.id
+  const specialistId = searchParams.specialist || null
 
   // Advanced filters
   const fatInicialMin = searchParams.fatInicialMin || null

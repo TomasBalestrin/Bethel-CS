@@ -19,13 +19,10 @@ export default async function EtapasMentoriaPage() {
     getCachedAllStages(),
     getCachedStages('mentorship'),
     (() => {
-      let q = supabase
+      const q = supabase
         .from('mentees')
         .select(MENTEE_SUMMARY_FIELDS)
         .eq('kanban_type', 'mentorship')
-      if (userRole !== 'admin' && user) {
-        q = q.eq('created_by', user.id)
-      }
       return q
     })(),
   ])

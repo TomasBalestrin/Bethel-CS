@@ -18,10 +18,7 @@ export default async function TarefasPage() {
     .select('*')
     .order('position')
 
-  let tasksQuery = supabase.from('tasks').select('*').order('created_at', { ascending: false })
-  // Non-admin only sees their own tasks
-  if (!isAdmin) tasksQuery = tasksQuery.eq('created_by', user!.id)
-  const { data: tasks } = await tasksQuery
+  const { data: tasks } = await supabase.from('tasks').select('*').order('created_at', { ascending: false })
 
   const { data: mentees } = await supabase
     .from('mentees')

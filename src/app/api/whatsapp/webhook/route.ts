@@ -164,17 +164,18 @@ export async function POST(request: NextRequest) {
       const phoneDigits = normalizePhone(phone)
       console.log('[WPP Webhook] Phone:', phone, '→ last 8 digits:', phoneDigits, '→ LIKE %' + phoneDigits)
 
-      const { data: mentees, error: menteeErr } = await supabase
+      // Match by last 8 digits — fetch candidates and compare cleaned digits
+      const { data: allMentees, error: menteeErr } = await supabase
         .from('mentees')
         .select('id, phone, full_name')
-        .like('phone', `%${phoneDigits}`)
 
-      console.log('[WPP Webhook] Mentee search results:', mentees?.length ?? 0, menteeErr?.message || '')
-      if (mentees?.length) {
-        console.log('[WPP Webhook] Matched mentees:', mentees.map(m => `${m.full_name} (${m.phone})`).join(', '))
-      }
+      console.log('[WPP Webhook] Total mentees to search:', allMentees?.length ?? 0, menteeErr?.message || '')
 
-      const mentee = mentees?.[0]
+      const mentee = allMentees?.find((m) => {
+        if (!m.phone) return false
+        const cleanPhone = m.phone.replace(/\D/g, '')
+        return cleanPhone.endsWith(phoneDigits)
+      }) || null
       if (!mentee) {
         console.warn('[WPP Webhook] ABORT: Mentee not found for phone:', phone, '(digits:', phoneDigits, ')')
         return NextResponse.json({ ok: true })

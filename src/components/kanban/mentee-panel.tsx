@@ -500,6 +500,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
   isAdmin: boolean
   onTransitionToMentorship?: (mentee: MenteeWithStats) => void
 }) {
+  const [saving] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
 

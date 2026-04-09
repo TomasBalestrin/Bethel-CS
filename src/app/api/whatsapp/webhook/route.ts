@@ -123,8 +123,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
-      if (data.fromApi === true) {
-        console.log('[WPP Webhook] SKIP: fromApi=true (sent by our system)')
+      if (data.fromApi === true || data.fromMe === true) {
+        console.log('[WPP Webhook] SKIP: outgoing message (fromApi:', data.fromApi, 'fromMe:', data.fromMe, ')')
         return NextResponse.json({ ok: true })
       }
 

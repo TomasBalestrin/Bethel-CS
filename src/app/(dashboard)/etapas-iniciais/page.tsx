@@ -20,13 +20,10 @@ export default async function EtapasIniciaisPage() {
     getCachedAllStages(),
     getCachedStages('initial'),
     (() => {
-      let q = supabase
+      const q = supabase
         .from('mentees')
         .select(MENTEE_SUMMARY_FIELDS)
         .eq('kanban_type', 'initial')
-      if (userRole !== 'admin' && user) {
-        q = q.eq('created_by', user.id)
-      }
       return q
     })(),
   ])

@@ -88,7 +88,7 @@ Gere um resumo estruturado da ligação em português brasileiro.
 
 Responda EXATAMENTE neste formato JSON (sem markdown, sem backticks):
 {
-  "summary": "Resumo geral do que foi discutido (2-3 frases)",
+  "summary": "Resumo geral do que foi discutido na ligação (4-6 frases, incluindo os principais tópicos abordados e decisões tomadas)",
   "questions": "Principais dúvidas do mentorado (ou null se não houver)",
   "difficulties": "Dificuldades mencionadas pelo mentorado (ou null se não houver)",
   "next_steps": "Próximos passos combinados (ou null se não houver)"

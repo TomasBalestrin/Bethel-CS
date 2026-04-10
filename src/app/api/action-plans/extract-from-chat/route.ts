@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import OpenAI from 'openai'
+import type { Database } from '@/types/database'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' })
 
@@ -133,12 +134,12 @@ Mantenha as respostas na íntegra quando possível, não resuma excessivamente.`
       const mergedData = { ...existingData, ...planData }
       await supabase
         .from('action_plans')
-        .update({ data: mergedData, submitted_at: new Date().toISOString() })
+        .update({ data: mergedData as unknown as Database['public']['Tables']['action_plans']['Update']['data'], submitted_at: new Date().toISOString() })
         .eq('id', existing.id)
     } else {
       await supabase.from('action_plans').insert({
         mentee_id: menteeId,
-        data: planData,
+        data: planData as unknown as Database['public']['Tables']['action_plans']['Insert']['data'],
         submitted_at: new Date().toISOString(),
       })
     }

@@ -100,7 +100,7 @@ export function AdminUserList({ users, products, wppInstances, kanbanStages, set
 
         <TabsContent value="whatsapp">
           <WhatsAppSection
-            specialists={users.filter((u) => u.role === 'especialista')}
+            specialists={users}
             instances={wppInstances}
           />
         </TabsContent>

@@ -12,10 +12,12 @@ export default async function MentoradosPage() {
     userRole = profile?.role ?? 'especialista'
   }
 
-  const { data: mentees } = await supabase
-    .from('mentees')
-    .select(MENTEE_SUMMARY_FIELDS)
-    .order('full_name')
+  // Specialists only see their own mentees
+  let menteesQuery = supabase.from('mentees').select(MENTEE_SUMMARY_FIELDS).order('full_name')
+  if (userRole !== 'admin' && user) {
+    menteesQuery = menteesQuery.eq('created_by', user.id)
+  }
+  const { data: mentees } = await menteesQuery
 
   const allMenteesData = mentees ?? []
   const menteeIds = allMenteesData.map((m) => m.id)

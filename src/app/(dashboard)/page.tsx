@@ -59,9 +59,14 @@ export default async function DashboardPage({ searchParams }: Props) {
 
   // ─── Mentees (only fields needed for dashboard) ───
   let menteesQuery = supabase.from('mentees').select('id, status, cliente_fit, priority_level, created_by, faturamento_atual, faturamento_antes_mentoria, funnel_origin, closer_name, birth_date, state, niche, start_date, end_date')
+  // Specialists always see only their own mentees
+  if (!isAdmin && user) {
+    menteesQuery = menteesQuery.eq('created_by', user.id)
+  } else if (specialistId) {
+    menteesQuery = menteesQuery.eq('created_by', specialistId)
+  }
   if (fitFilter === 'true') menteesQuery = menteesQuery.eq('cliente_fit', true)
   if (fitFilter === 'false') menteesQuery = menteesQuery.eq('cliente_fit', false)
-  if (specialistId) menteesQuery = menteesQuery.eq('created_by', specialistId)
   if (funilOrigem) menteesQuery = menteesQuery.eq('funnel_origin', funilOrigem)
   if (closer) menteesQuery = menteesQuery.eq('closer_name', closer)
   if (estado) menteesQuery = menteesQuery.eq('state', estado)
@@ -75,7 +80,11 @@ export default async function DashboardPage({ searchParams }: Props) {
     .select('id, full_name, birth_date')
     .eq('status', 'ativo')
     .not('birth_date', 'is', null)
-  if (specialistId) birthdayQuery = birthdayQuery.eq('created_by', specialistId)
+  if (!isAdmin && user) {
+    birthdayQuery = birthdayQuery.eq('created_by', user.id)
+  } else if (specialistId) {
+    birthdayQuery = birthdayQuery.eq('created_by', specialistId)
+  }
 
   const [{ data: mentees }, { data: birthdayMentees }] = await Promise.all([
     menteesQuery,

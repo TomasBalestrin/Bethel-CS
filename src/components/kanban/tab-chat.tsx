@@ -251,6 +251,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
     if (error) {
       console.error('Upload error:', error)
+      toast.error('Erro no upload: ' + error.message)
       return null
     }
 

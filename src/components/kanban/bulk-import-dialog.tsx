@@ -71,40 +71,40 @@ const MENTEE_FIELDS: FieldDef[] = [
 // ─── Field Definitions: Action Plan ─────────────────────────────────────────
 
 const ACTION_PLAN_FIELDS: FieldDef[] = [
-  { key: '__match_value', label: 'Nome / Telefone (Identificação)', required: true, type: 'text', aliases: ['nome', 'nome completo', 'name', 'full name', 'telefone', 'whatsapp', 'phone', 'qual o seu nome completo', 'qual o seu whatsapp'] },
-  { key: 'has_partner', label: 'Sócio na mentoria', required: false, type: 'text', aliases: ['sociedade', 'socio', 'sócio', 'nome do seu socio', 'entrou na mentoria com sociedade'] },
-  { key: 'instagram', label: '@Instagram', required: false, type: 'text', aliases: ['instagram', '@instagram', '@ do instagram', 'insta', '@ do seu instagram'] },
-  { key: 'email', label: 'Email', required: false, type: 'text', aliases: ['email', 'e-mail', 'mail', 'endereco de e-mail', 'seu e-mail principal'] },
-  { key: '__match_phone', label: 'WhatsApp', required: false, type: 'text', aliases: ['whatsapp', 'qual o seu whatsapp', 'seu whatsapp', 'telefone', 'phone'] },
-  { key: 'cpf', label: 'CPF', required: false, type: 'text', aliases: ['cpf', 'qual seu cpf'] },
-  { key: 'endereco_completo', label: 'Endereço completo', required: false, type: 'text', aliases: ['endereco', 'endereço', 'endereço completo', 'endereco completo', 'address', 'qual o seu endereco completo'] },
-  { key: 'cidade', label: 'Cidade', required: false, type: 'text', aliases: ['cidade', 'cidade do negocio', 'city', 'qual cidade voce possui', 'cidade você possui o seu negocio'] },
-  { key: 'estado', label: 'Estado', required: false, type: 'text', aliases: ['estado', 'estado do negocio', 'uf', 'qual estado voce possui', 'estado você possui o seu negocio'] },
-  { key: 'data_aniversario', label: 'Data de nascimento', required: false, type: 'text', aliases: ['nascimento', 'data de nascimento', 'aniversario', 'qual sua data de nascimento'] },
-  { key: 'como_nos_conheceu', label: 'Como nos conheceu', required: false, type: 'text', aliases: ['como nos conheceu', 'como conheceu', 'origem', 'discovery', 'por onde voce nos conheceu'] },
-  { key: 'motivacao_elite_premium', label: 'Por que decidiu entrar', required: false, type: 'text', aliases: ['por que decidiu', 'motivacao', 'motivação', 'por que entrou', 'por que voce decidiu fazer parte', 'decidiu fazer parte da elite premium'] },
-  { key: 'expectativas_resultados', label: 'Expectativas de resultados', required: false, type: 'text', aliases: ['expectativas', 'o que espera', 'resultados esperados', 'o que voce espera de resultados', 'espera de resultados ao final'] },
-  { key: 'atuacao_profissional', label: 'Atuação profissional', required: false, type: 'text', aliases: ['o que faz', 'profissao', 'profissão', 'atuacao', 'atuação', 'o que voce faz hoje', 'profissionalmente falando'] },
-  { key: 'tempo_atuacao', label: 'Tempo de atuação', required: false, type: 'text', aliases: ['tempo atuacao', 'ha quanto tempo', 'tempo de atuação', 'ha quanto tempo voce atua'] },
-  { key: 'produtos_servicos', label: 'Produtos/Serviços', required: false, type: 'text', aliases: ['produtos', 'servicos', 'produtos/servicos', '4 principais produtos', 'quais sao os 4 principais'] },
-  { key: 'funis_venda', label: 'Funis de venda ativos', required: false, type: 'text', aliases: ['funis', 'como vende', 'funis de venda', 'funis ativos', 'como voce vende hoje', 'quais funis de venda'] },
-  { key: 'processo_venda', label: 'Processo de venda', required: false, type: 'text', aliases: ['como passa o preco', 'processo de venda', 'processo venda', 'percurso do lead', 'como voce passa o preco', 'primeira mensagem ate o fechamento'] },
-  { key: 'faturamento_medio', label: 'Faturamento médio (últimos 3 meses)', required: false, type: 'text', aliases: ['faturamento', 'media de faturamento', 'faturamento mensal', 'quanto voce faturou', 'qual a sua media de faturamento'] },
-  { key: 'resultado_funis', label: 'Resultado por funil', required: false, type: 'text', aliases: ['resultado funis', 'resultado por funil', 'quanto cada funil', 'quanto cada funil gerou'] },
-  { key: 'erros_identificados', label: 'Erros identificados', required: false, type: 'text', aliases: ['erros', 'erros identificados', 'quais erros', 'quais erros voce identifica'] },
-  { key: 'desafios_funis', label: 'Desafios nos funis', required: false, type: 'text', aliases: ['desafios', 'principais desafios', 'desafios funis', 'quais sao os principais desafios'] },
-  { key: 'funis_testados', label: 'Funis testados que não funcionaram', required: false, type: 'text', aliases: ['funis testados', 'nao funcionaram', 'novos funis', 'quais novos funis voce ja testou'] },
-  { key: 'estrutura_comercial', label: 'Estrutura comercial', required: false, type: 'text', aliases: ['estrutura comercial', 'vendedores', 'canais', 'qual e a sua estrutura comercial', 'quantos vendedores'] },
-  { key: 'estrutura_marketing', label: 'Estrutura de marketing', required: false, type: 'text', aliases: ['estrutura marketing', 'marketing', 'criacao', 'trafego', 'qual e a sua estrutura de marketing', 'quem cria e edita'] },
-  { key: 'entrega_produto', label: 'Entrega do produto/serviço', required: false, type: 'text', aliases: ['entrega', 'como funciona a entrega', 'entrega produto', 'como funciona a entrega do seu produto'] },
-  { key: 'estrutura_gestao', label: 'Estrutura de gestão', required: false, type: 'text', aliases: ['gestao', 'gestão', 'estrutura gestao', 'indicadores', 'crm', 'qual e a sua estrutura de gestao', 'planilhas os sistemas'] },
-  { key: 'equipe', label: 'Equipe', required: false, type: 'text', aliases: ['equipe', 'quantas pessoas', 'funcao de cada', 'quantas pessoas trabalham com voce'] },
-  { key: 'momento_negocio', label: 'Momento do negócio', required: false, type: 'text', aliases: ['momento', 'momento negocio', 'momento atual', 'qual o momento do seu negocio', 'na sua visao'] },
-  { key: 'objetivos_urgentes', label: 'Objetivos urgentes', required: false, type: 'text', aliases: ['objetivos', 'objetivos urgentes', 'mais urgentes', 'quais os objetivos mais urgentes'] },
-  { key: 'visao_futuro', label: 'Visão de futuro', required: false, type: 'text', aliases: ['visao', 'visão', '6 meses', '1 ano', '5 anos', 'onde voce ve', 'onde voce ve o seu negocio'] },
-  { key: 'nome_empresa', label: 'Nome da empresa', required: false, type: 'text', aliases: ['empresa', 'nome da empresa', 'nome empresa'] },
-  { key: 'nicho', label: 'Nicho', required: false, type: 'text', aliases: ['nicho', 'niche', 'segmento'] },
-  { key: 'num_colaboradores', label: 'Nº de colaboradores', required: false, type: 'text', aliases: ['colaboradores', 'numero de colaboradores', 'n colaboradores', 'funcionarios'] },
+  { key: '__match_value', label: 'Nome / Telefone (Identificação)', required: true, type: 'text', aliases: ['nome completo', 'qual o seu nome completo'] },
+  { key: 'has_partner', label: 'Sócio na mentoria', required: false, type: 'text', aliases: ['mentoria com sociedade', 'nome do seu socio na mentoria'] },
+  { key: 'instagram', label: '@Instagram', required: false, type: 'text', aliases: ['@ do seu instagram', 'qual o @ do seu instagram'] },
+  { key: 'email', label: 'Email', required: false, type: 'text', aliases: ['seu e-mail principal', 'qual o seu e-mail principal'] },
+  { key: '__match_phone', label: 'WhatsApp', required: false, type: 'text', aliases: ['qual o seu whatsapp', 'seu whatsapp'] },
+  { key: 'cpf', label: 'CPF', required: false, type: 'text', aliases: ['qual seu cpf', 'cpf sem pontos'] },
+  { key: 'endereco_completo', label: 'Endereço completo', required: false, type: 'text', aliases: ['endereco completo', 'qual o seu endereco completo'] },
+  { key: 'cidade', label: 'Cidade', required: false, type: 'text', aliases: ['qual cidade voce possui o seu negocio', 'cidade voce possui'] },
+  { key: 'estado', label: 'Estado', required: false, type: 'text', aliases: ['qual estado voce possui o seu negocio', 'estado voce possui'] },
+  { key: 'data_aniversario', label: 'Data de nascimento', required: false, type: 'text', aliases: ['data de nascimento completa', 'qual sua data de nascimento'] },
+  { key: 'como_nos_conheceu', label: 'Como nos conheceu', required: false, type: 'text', aliases: ['por onde voce nos conheceu', 'como nos conheceu'] },
+  { key: 'motivacao_elite_premium', label: 'Por que decidiu entrar', required: false, type: 'text', aliases: ['decidiu fazer parte da elite premium', 'por que voce decidiu fazer parte'] },
+  { key: 'expectativas_resultados', label: 'Expectativas de resultados', required: false, type: 'text', aliases: ['espera de resultados ao final', 'o que voce espera de resultados'] },
+  { key: 'atuacao_profissional', label: 'Atuação profissional', required: false, type: 'text', aliases: ['o que voce faz hoje profissionalmente', 'profissionalmente falando'] },
+  { key: 'tempo_atuacao', label: 'Tempo de atuação', required: false, type: 'text', aliases: ['ha quanto tempo voce atua com isso', 'quanto tempo voce atua'] },
+  { key: 'produtos_servicos', label: 'Produtos/Serviços', required: false, type: 'text', aliases: ['4 principais produtos/servicos', 'quais sao os 4 principais produtos'] },
+  { key: 'funis_venda', label: 'Funis de venda ativos', required: false, type: 'text', aliases: ['como voce vende hoje quais funis', 'quais funis de venda estao ativos'] },
+  { key: 'processo_venda', label: 'Processo de venda', required: false, type: 'text', aliases: ['como voce passa o preco para o seu cliente', 'primeira mensagem ate o fechamento'] },
+  { key: 'faturamento_medio', label: 'Faturamento médio (últimos 3 meses)', required: false, type: 'text', aliases: ['media de faturamento mensal', 'qual a sua media de faturamento'] },
+  { key: 'resultado_funis', label: 'Resultado por funil', required: false, type: 'text', aliases: ['quanto cada funil gerou de resultado', 'cada funil gerou de resultado em r'] },
+  { key: 'erros_identificados', label: 'Erros identificados', required: false, type: 'text', aliases: ['quais erros voce identifica em cada', 'erros identifica em cada um dos seus funis'] },
+  { key: 'desafios_funis', label: 'Desafios nos funis', required: false, type: 'text', aliases: ['principais desafios que voce encontra', 'quais sao os principais desafios'] },
+  { key: 'funis_testados', label: 'Funis testados que não funcionaram', required: false, type: 'text', aliases: ['quais novos funis voce ja testou', 'novos funis voce ja testou e nao funcionaram'] },
+  { key: 'estrutura_comercial', label: 'Estrutura comercial', required: false, type: 'text', aliases: ['qual e a sua estrutura comercial hoje', 'sua estrutura comercial hoje'] },
+  { key: 'estrutura_marketing', label: 'Estrutura de marketing', required: false, type: 'text', aliases: ['qual e a sua estrutura de marketing', 'sua estrutura de marketing'] },
+  { key: 'entrega_produto', label: 'Entrega do produto/serviço', required: false, type: 'text', aliases: ['como funciona a entrega do seu produto', 'entrega do seu produto/servico'] },
+  { key: 'estrutura_gestao', label: 'Estrutura de gestão', required: false, type: 'text', aliases: ['qual e a sua estrutura de gestao hoje', 'sua estrutura de gestao hoje'] },
+  { key: 'equipe', label: 'Equipe', required: false, type: 'text', aliases: ['quantas pessoas trabalham com voce', 'qual a funcao de cada uma'] },
+  { key: 'momento_negocio', label: 'Momento do negócio', required: false, type: 'text', aliases: ['na sua visao qual o momento do seu negocio', 'qual o momento do seu negocio hoje'] },
+  { key: 'objetivos_urgentes', label: 'Objetivos urgentes', required: false, type: 'text', aliases: ['objetivos mais urgentes para atingir', 'quais os objetivos mais urgentes'] },
+  { key: 'visao_futuro', label: 'Visão de futuro', required: false, type: 'text', aliases: ['onde voce ve o seu negocio em 6 meses', 'negocio em 6 meses 1 ano e 5 anos'] },
+  { key: 'nome_empresa', label: 'Nome da empresa', required: false, type: 'text', aliases: ['nome da empresa'] },
+  { key: 'nicho', label: 'Nicho', required: false, type: 'text', aliases: ['nicho', 'segmento'] },
+  { key: 'num_colaboradores', label: 'Nº de colaboradores', required: false, type: 'text', aliases: ['numero de colaboradores', 'n de colaboradores'] },
 ]
 
 // ─── Field Definitions: Stages ──────────────────────────────────────────────
@@ -141,14 +141,29 @@ function normalizeHeader(h: string): string {
 
 function autoDetectMapping(headers: string[], fields: FieldDef[]): Record<string, string> {
   const mapping: Record<string, string> = {}
+  // First pass: try exact matches and long alias includes (>15 chars)
   for (const header of headers) {
     const norm = normalizeHeader(header)
+    let bestMatch: string | null = null
+    let bestLen = 0
     for (const field of fields) {
-      if (field.aliases.some((alias) => normalizeHeader(alias) === norm || norm.includes(normalizeHeader(alias)))) {
-        if (!mapping[header]) mapping[header] = field.key
+      for (const alias of field.aliases) {
+        const normAlias = normalizeHeader(alias)
+        if (normAlias === norm) {
+          // Exact match — highest priority
+          bestMatch = field.key
+          bestLen = 999
+          break
+        }
+        // Only use includes for aliases with 10+ chars (avoids false positives with short words)
+        if (normAlias.length >= 10 && norm.includes(normAlias) && normAlias.length > bestLen) {
+          bestMatch = field.key
+          bestLen = normAlias.length
+        }
       }
+      if (bestLen === 999) break
     }
-    if (!mapping[header]) mapping[header] = SKIP_VALUE
+    mapping[header] = bestMatch || SKIP_VALUE
   }
   return mapping
 }

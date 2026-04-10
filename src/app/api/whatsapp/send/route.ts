@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { menteeId, message, type, imageUrl, fileName, mimeType, channel = 'principal', signatureName } = body
+    const { menteeId, message, type, imageUrl, fileName, mimeType, channel = 'principal', signatureName, quotedMessageId } = body
 
     if (!menteeId || (!message && !imageUrl)) {
       return NextResponse.json({ error: 'menteeId e message/imageUrl são obrigatórios' }, { status: 400 })
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     let result: { success: boolean; error?: string }
 
     if (!type || type === 'text') {
-      result = await sendTextMessage(phone, signedMessage, nextrackUUID)
+      result = await sendTextMessage(phone, signedMessage, nextrackUUID, quotedMessageId || undefined)
     } else {
       result = await sendMediaMessage(
         phone,
@@ -94,7 +94,8 @@ export async function POST(request: NextRequest) {
         signedMessage || undefined,
         fileName || undefined,
         mimeType || undefined,
-        nextrackUUID
+        nextrackUUID,
+        quotedMessageId || undefined
       )
     }
 
@@ -117,6 +118,7 @@ export async function POST(request: NextRequest) {
       is_read: true,
       sent_at: new Date().toISOString(),
       channel,
+      quoted_message_id: quotedMessageId || null,
     })
 
     return NextResponse.json({ success: true })

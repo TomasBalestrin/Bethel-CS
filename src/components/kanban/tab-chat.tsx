@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
-import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown, Sparkles, ChevronUp, BellOff, Pencil, Check, ClipboardCheck, Timer, TimerOff } from 'lucide-react'
+import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown, Sparkles, ChevronUp, BellOff, Pencil, Check, ClipboardCheck, Timer, TimerOff, CheckSquare, ClipboardList, Reply } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
@@ -120,6 +120,14 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Reply/quote
+  const [replyingTo, setReplyingTo] = useState<WppMessage | null>(null)
+
+  // Message selection for converting to action plan
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [convertingToPlan, setConvertingToPlan] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -294,6 +302,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           is_read: true,
           sent_at: new Date().toISOString(),
           channel,
+          quoted_message_id: null,
           created_at: new Date().toISOString(),
         }
         setMessages((prev) => [...prev, optimistic])
@@ -347,6 +356,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           is_read: true,
           sent_at: new Date().toISOString(),
           channel,
+          quoted_message_id: null,
           created_at: new Date().toISOString(),
         }
         setMessages((prev) => [...prev, optimistic])
@@ -381,6 +391,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
       setInput('')
 
+      const quotedId = replyingTo?.message_id || null
       const optimistic: WppMessage = {
         id: `temp-${Date.now()}`,
         mentee_id: menteeId,
@@ -395,14 +406,16 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         is_read: true,
         sent_at: new Date().toISOString(),
         channel,
+        quoted_message_id: quotedId,
         created_at: new Date().toISOString(),
       }
       setMessages((prev) => [...prev, optimistic])
+      setReplyingTo(null)
 
       const res = await fetch('/api/whatsapp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ menteeId, message: text, channel, signatureName }),
+        body: JSON.stringify({ menteeId, message: text, channel, signatureName, quotedMessageId: quotedId }),
       })
 
       if (!res.ok) {
@@ -538,6 +551,54 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
+    }
+  }
+
+  // Convert selected messages to action plan
+  async function handleConvertToPlan() {
+    if (selectedIds.size === 0) return
+    setConvertingToPlan(true)
+    try {
+      const selectedMsgs = messages
+        .filter((m) => selectedIds.has(m.id) && m.content)
+        .map((m) => ({ content: m.content || '', direction: m.direction, sent_at: m.sent_at }))
+
+      const res = await fetch('/api/action-plans/extract-from-chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ menteeId, messages: selectedMsgs }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        toast.success(`Plano de ação criado — ${data.fieldCount} campos extraídos`)
+      } else {
+        const err = await res.json()
+        toast.error(err.error || 'Erro ao converter mensagens')
+      }
+    } catch {
+      toast.error('Erro de conexão')
+    } finally {
+      setConvertingToPlan(false)
+      setSelectMode(false)
+      setSelectedIds(new Set())
+    }
+  }
+
+  // Paste image from clipboard (Ctrl+V with screenshot)
+  function handlePaste(e: React.ClipboardEvent) {
+    const items = e.clipboardData.items
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.startsWith('image/')) {
+        e.preventDefault()
+        const blob = items[i].getAsFile()
+        if (blob) {
+          const file = new File([blob], `screenshot_${Date.now()}.png`, { type: blob.type })
+          setAttachedFile(file)
+          toast.success('Imagem colada — clique enviar')
+        }
+        return
+      }
     }
   }
 
@@ -790,6 +851,15 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
             {summarizing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
             {summarizing ? 'Gerando...' : 'Gerar resumo'}
           </Button>
+          <Button
+            size="sm"
+            variant={selectMode ? 'default' : 'outline'}
+            className="h-7 gap-1.5 text-[11px] shrink-0"
+            onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()) }}
+          >
+            <CheckSquare className="h-3 w-3" />
+            {selectMode ? 'Cancelar' : 'Selecionar'}
+          </Button>
         </div>
 
         {/* Expanded summary */}
@@ -879,7 +949,20 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                 </div>
               )}
 
-              <div className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} ${sameSenderAsPrev ? 'mt-0.5' : 'mt-3'}`}>
+              <div className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} ${sameSenderAsPrev ? 'mt-0.5' : 'mt-3'} ${selectMode ? 'gap-2 items-start' : ''}`}>
+                {selectMode && (
+                  <button
+                    onClick={() => setSelectedIds((prev) => {
+                      const next = new Set(prev)
+                      if (next.has(msg.id)) next.delete(msg.id)
+                      else next.add(msg.id)
+                      return next
+                    })}
+                    className={`shrink-0 mt-2 h-5 w-5 rounded border-2 flex items-center justify-center transition-colors ${selectedIds.has(msg.id) ? 'bg-accent border-accent text-white' : 'border-border hover:border-accent/50'}`}
+                  >
+                    {selectedIds.has(msg.id) && <Check className="h-3 w-3" />}
+                  </button>
+                )}
                 <div className={`${isOutgoing ? 'max-w-[70%]' : 'max-w-[70%]'}`}>
                   {/* Sender name — first in group only */}
                   {showSenderName && (
@@ -888,12 +971,35 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                     </p>
                   )}
 
-                  <div className={`px-3 py-2 text-sm shadow-sm ${getBubbleRadius()} ${
-                    isOutgoing
-                      ? 'bg-accent/15 text-foreground'
-                      : 'bg-muted text-foreground'
-                  }`}>
-                    <MessageContent msg={msg} menteeName={menteeName} />
+                  <div className="group/msg relative">
+                    {/* Quoted message preview */}
+                    {msg.quoted_message_id && (() => {
+                      const quoted = messages.find((m) => m.message_id === msg.quoted_message_id || m.id === msg.quoted_message_id)
+                      if (!quoted) return null
+                      return (
+                        <div className={`mb-1 rounded-lg px-2.5 py-1.5 text-[11px] border-l-2 border-accent ${isOutgoing ? 'bg-accent/10' : 'bg-background'}`}>
+                          <p className="font-medium text-accent text-[10px]">{quoted.direction === 'outgoing' ? 'Você' : (quoted.sender_name || menteeName)}</p>
+                          <p className="text-muted-foreground truncate">{quoted.content || (quoted.message_type !== 'text' ? `[${quoted.message_type}]` : '')}</p>
+                        </div>
+                      )
+                    })()}
+                    <div className={`px-3 py-2 text-sm shadow-sm ${getBubbleRadius()} ${
+                      isOutgoing
+                        ? 'bg-accent/15 text-foreground'
+                        : 'bg-muted text-foreground'
+                    }`}>
+                      <MessageContent msg={msg} menteeName={menteeName} />
+                    </div>
+                    {/* Reply button on hover */}
+                    {!selectMode && (
+                      <button
+                        onClick={() => { setReplyingTo(msg); textareaRef.current?.focus() }}
+                        className={`absolute top-1 ${isOutgoing ? '-left-8' : '-right-8'} opacity-0 group-hover/msg:opacity-100 transition-opacity rounded-full p-1 hover:bg-muted`}
+                        title="Responder"
+                      >
+                        <Reply className="h-3.5 w-3.5 text-muted-foreground" />
+                      </button>
+                    )}
                   </div>
 
                   {/* Time — last in same-time group only */}
@@ -910,10 +1016,39 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Selection action bar */}
+      {selectMode && selectedIds.size > 0 && (
+        <div className="border-t border-accent/20 bg-accent/5 px-3 py-2 flex items-center justify-between shrink-0">
+          <span className="text-xs text-foreground font-medium">
+            {selectedIds.size} mensagem{selectedIds.size !== 1 ? 'ns' : ''} selecionada{selectedIds.size !== 1 ? 's' : ''}
+          </span>
+          <Button
+            size="sm"
+            className="h-7 gap-1.5 text-[11px]"
+            onClick={handleConvertToPlan}
+            disabled={convertingToPlan}
+          >
+            {convertingToPlan ? <Loader2 className="h-3 w-3 animate-spin" /> : <ClipboardList className="h-3 w-3" />}
+            {convertingToPlan ? 'Processando...' : 'Converter em Plano de Ação'}
+          </Button>
+        </div>
+      )}
+
       {/* Input area — fixed bottom */}
       <div className="border-t border-border px-3 py-2 shrink-0 bg-background" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0.5rem)' }}>
         {inputDisabledReason && (
           <p className="text-[10px] text-destructive mb-1.5">{inputDisabledReason}</p>
+        )}
+
+        {/* Reply preview */}
+        {replyingTo && (
+          <div className="flex items-center gap-2 mb-2 rounded-lg border-l-2 border-accent bg-accent/5 px-3 py-2 text-sm">
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-medium text-accent">{replyingTo.direction === 'outgoing' ? 'Você' : (replyingTo.sender_name || menteeName)}</p>
+              <p className="text-xs text-muted-foreground truncate">{replyingTo.content || `[${replyingTo.message_type}]`}</p>
+            </div>
+            <button onClick={() => setReplyingTo(null)} aria-label="Cancelar resposta"><X className="h-4 w-4 text-muted-foreground hover:text-foreground" /></button>
+          </div>
         )}
 
         {/* File preview */}
@@ -991,6 +1126,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               placeholder={canSend ? 'Mensagem...' : inputDisabledReason || ''}
               disabled={!canSend || uploading}
               rows={1}

@@ -190,16 +190,19 @@ export function getMediaUrl(urlField: string | null | undefined): string | null 
 export async function sendTextMessage(
   phone: string,
   message: string,
-  overrideInstanceUUID?: string
+  overrideInstanceUUID?: string,
+  quotedMsg?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const instanceUUID = overrideInstanceUUID || getInstanceUUID()
     if (!instanceUUID) return { success: false, error: 'Instância WhatsApp não configurada' }
 
     const url = `${BASE_URL}/api/chats/instances/${instanceUUID}/send-text`
+    const body: Record<string, unknown> = { phone, message }
+    if (quotedMsg) body.quotedMsg = quotedMsg
     const res = await authFetch(url, {
       method: 'POST',
-      body: JSON.stringify({ phone, message }),
+      body: JSON.stringify(body),
     })
 
     if (!res.ok) {
@@ -223,7 +226,8 @@ export async function sendMediaMessage(
   caption?: string,
   fileName?: string,
   mimeType?: string,
-  overrideInstanceUUID?: string
+  overrideInstanceUUID?: string,
+  quotedMsg?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const instanceUUID = overrideInstanceUUID || getInstanceUUID()
@@ -252,6 +256,7 @@ export async function sendMediaMessage(
     if (caption) body.message = caption
     if (fileName) body.fileName = fileName
     if (mimeType) body.mimeType = mimeType
+    if (quotedMsg) body.quotedMsg = quotedMsg
 
     console.log('[NextTrack] sendMediaMessage →', { phone, type, mediaUrl: mediaUrl.slice(0, 80), mimeType, instanceUUID })
 

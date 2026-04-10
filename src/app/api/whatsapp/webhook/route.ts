@@ -231,6 +231,9 @@ export async function POST(request: NextRequest) {
       }
       console.log('[WPP Webhook] Detected channel:', channel)
 
+      // Extract quoted message reference
+      const quotedMsgId = (data.quotedMsg as string) || (data.quotedMsgId as string) || (data.quotedMessageId as string) || null
+
       // 6. Insert message
       const { error: insertErr } = await supabase.from('wpp_messages').insert({
         mentee_id: mentee.id,
@@ -242,6 +245,7 @@ export async function POST(request: NextRequest) {
         content,
         media_url: mediaUrl,
         sender_name: senderName,
+        quoted_message_id: quotedMsgId,
         is_read: data.fromMe ? true : false,
         sent_at: sentAt,
         channel,

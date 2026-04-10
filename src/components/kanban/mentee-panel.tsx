@@ -60,6 +60,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
+import { moveMentee } from '@/lib/actions/mentee-actions'
 import {
   addIndication,
   updateIndication,
@@ -498,6 +499,63 @@ function MetricBox({ label, value, highlight }: { label: string; value: string |
   )
 }
 
+// ─── Stage Mover — inline stage selector ───
+function StageMover({ menteeId, currentStageId, kanbanType, onMoved }: {
+  menteeId: string
+  currentStageId: string | null
+  kanbanType: string
+  onMoved?: (newStageId: string, stageName: string) => void
+}) {
+  const [stages, setStages] = useState<{ id: string; name: string }[]>([])
+  const [moving, setMoving] = useState(false)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('kanban_stages')
+      .select('id, name')
+      .eq('type', kanbanType)
+      .order('position')
+      .then(({ data }) => { if (data) setStages(data) })
+  }, [kanbanType])
+
+  async function handleMove(newStageId: string) {
+    if (newStageId === currentStageId || moving) return
+    setMoving(true)
+    const result = await moveMentee(menteeId, newStageId)
+    setMoving(false)
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      const stageName = stages.find((s) => s.id === newStageId)?.name || ''
+      toast.success(`Movido para "${stageName}"`)
+      onMoved?.(newStageId, stageName)
+    }
+  }
+
+  if (stages.length === 0) return null
+
+  const currentName = stages.find((s) => s.id === currentStageId)?.name
+
+  return (
+    <div className="px-3 pb-2">
+      <p className="text-[9px] text-muted-foreground/70 mb-1">Etapa atual</p>
+      <Select value={currentStageId || ''} onValueChange={handleMove} disabled={moving}>
+        <SelectTrigger className="h-8 text-xs">
+          <SelectValue placeholder={currentName || 'Sem etapa'} />
+        </SelectTrigger>
+        <SelectContent>
+          {stages.map((s) => (
+            <SelectItem key={s.id} value={s.id}>
+              {s.name} {s.id === currentStageId ? '(atual)' : ''}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
+
 // ─── Format BRL currency ───
 function formatBRL(v: number) {
   return `R$ ${v.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
@@ -850,6 +908,18 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
                   <p className="text-[11px] text-muted-foreground/50">Sem dados adicionais</p>
                 </div>
               )}
+            </div>
+            <div className="border-t border-border">
+              <StageMover
+                menteeId={mentee.id}
+                currentStageId={mentee.current_stage_id}
+                kanbanType={mentee.kanban_type}
+                onMoved={(newStageId) => {
+                  if (onMenteeUpdated) {
+                    onMenteeUpdated({ ...mentee, current_stage_id: newStageId })
+                  }
+                }}
+              />
             </div>
           </div>
 

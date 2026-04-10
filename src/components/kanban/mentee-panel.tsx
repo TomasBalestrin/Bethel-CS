@@ -60,7 +60,6 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import { moveMentee } from '@/lib/actions/mentee-actions'
 import {
   addIndication,
   updateIndication,

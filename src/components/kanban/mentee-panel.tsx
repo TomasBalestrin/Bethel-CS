@@ -507,6 +507,7 @@ function StageMoverInline({ menteeId, currentStageId, kanbanType, onMoved }: {
 }) {
   const [initialStages, setInitialStages] = useState<{ id: string; name: string }[]>([])
   const [mentorshipStages, setMentorshipStages] = useState<{ id: string; name: string }[]>([])
+  const [exitStages, setExitStages] = useState<{ id: string; name: string }[]>([])
   const [moving, setMoving] = useState(false)
 
   useEffect(() => {
@@ -519,11 +520,12 @@ function StageMoverInline({ menteeId, currentStageId, kanbanType, onMoved }: {
         if (data) {
           setInitialStages(data.filter((s) => s.type === 'initial'))
           setMentorshipStages(data.filter((s) => s.type === 'mentorship'))
+          setExitStages(data.filter((s) => s.type === 'exit'))
         }
       })
   }, [])
 
-  const allStages = [...initialStages, ...mentorshipStages]
+  const allStages = [...initialStages, ...mentorshipStages, ...exitStages]
 
   async function handleMove(newStageId: string) {
     if (newStageId === currentStageId || moving) return
@@ -531,7 +533,8 @@ function StageMoverInline({ menteeId, currentStageId, kanbanType, onMoved }: {
 
     // Determine if switching kanban type
     const isInitialStage = initialStages.some((s) => s.id === newStageId)
-    const newKanbanType: KanbanType = isInitialStage ? 'initial' : 'mentorship'
+    const isExitStage = exitStages.some((s) => s.id === newStageId)
+    const newKanbanType: KanbanType = isInitialStage ? 'initial' : isExitStage ? 'exit' : 'mentorship'
     const switchingType = newKanbanType !== kanbanType
 
     // Update stage (and kanban_type if switching between funnels)
@@ -591,6 +594,16 @@ function StageMoverInline({ menteeId, currentStageId, kanbanType, onMoved }: {
           <>
             <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-t border-border mt-1 pt-1.5">Etapas Mentoria</div>
             {mentorshipStages.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.name} {s.id === currentStageId ? '(atual)' : ''}
+              </SelectItem>
+            ))}
+          </>
+        )}
+        {exitStages.length > 0 && (
+          <>
+            <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-t border-border mt-1 pt-1.5">Gestão de Saídas</div>
+            {exitStages.map((s) => (
               <SelectItem key={s.id} value={s.id}>
                 {s.name} {s.id === currentStageId ? '(atual)' : ''}
               </SelectItem>

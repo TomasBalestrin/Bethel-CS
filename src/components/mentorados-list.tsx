@@ -172,16 +172,20 @@ export function MentoradosList({
     // Nicho
     if (advFilters.nicho && m.niche !== advFilters.nicho) return false
 
-    // Data de início
-    if (advFilters.dataInicio && m.start_date) {
-      if (m.start_date < advFilters.dataInicio) return false
-    } else if (advFilters.dataInicio && !m.start_date) {
-      return false
+    // Período de início: filtra pelo mês da data selecionada
+    if (advFilters.dataInicio) {
+      if (!m.start_date) return false
+      const filterMonth = advFilters.dataInicio.substring(0, 7) // YYYY-MM
+      const menteeMonth = m.start_date.substring(0, 7)
+      if (menteeMonth !== filterMonth) return false
     }
 
-    // Data de término
-    if (advFilters.dataTermino && m.end_date) {
-      if (m.end_date > advFilters.dataTermino) return false
+    // Período de término: filtra pelo mês da data selecionada
+    if (advFilters.dataTermino) {
+      if (!m.end_date) return false
+      const filterMonth = advFilters.dataTermino.substring(0, 7) // YYYY-MM
+      const menteeMonth = m.end_date.substring(0, 7)
+      if (menteeMonth !== filterMonth) return false
     }
 
     return true

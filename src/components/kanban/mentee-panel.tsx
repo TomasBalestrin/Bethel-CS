@@ -506,34 +506,70 @@ function StageMoverInline({ menteeId, currentStageId, kanbanType, onMoved }: {
   kanbanType: KanbanType
   onMoved?: (newStageId: string, stageName: string) => void
 }) {
-  const [stages, setStages] = useState<{ id: string; name: string }[]>([])
+  const [initialStages, setInitialStages] = useState<{ id: string; name: string }[]>([])
+  const [mentorshipStages, setMentorshipStages] = useState<{ id: string; name: string }[]>([])
   const [moving, setMoving] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
     supabase
       .from('kanban_stages')
-      .select('id, name')
-      .eq('type', kanbanType)
+      .select('id, name, type')
       .order('position')
-      .then(({ data }) => { if (data) setStages(data) })
-  }, [kanbanType])
+      .then(({ data }) => {
+        if (data) {
+          setInitialStages(data.filter((s) => s.type === 'initial'))
+          setMentorshipStages(data.filter((s) => s.type === 'mentorship'))
+        }
+      })
+  }, [])
+
+  const allStages = [...initialStages, ...mentorshipStages]
 
   async function handleMove(newStageId: string) {
     if (newStageId === currentStageId || moving) return
     setMoving(true)
-    const result = await moveMentee(menteeId, newStageId)
+
+    // Determine if switching kanban type
+    const isInitialStage = initialStages.some((s) => s.id === newStageId)
+    const newKanbanType: KanbanType = isInitialStage ? 'initial' : 'mentorship'
+    const switchingType = newKanbanType !== kanbanType
+
+    // Update stage (and kanban_type if switching between funnels)
+    const supabase = createClient()
+    const updates: Record<string, unknown> = {
+      current_stage_id: newStageId,
+      updated_at: new Date().toISOString(),
+    }
+    if (switchingType) {
+      updates.kanban_type = newKanbanType
+    }
+
+    const { error } = await supabase.from('mentees').update(updates).eq('id', menteeId)
+
+    // Also log stage change
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      await supabase.from('stage_changes' as never).insert({
+        mentee_id: menteeId,
+        from_stage_id: currentStageId,
+        to_stage_id: newStageId,
+        changed_by: user.id,
+      } as never)
+    }
+
     setMoving(false)
-    if (result.error) {
-      toast.error(result.error)
+    if (error) {
+      toast.error(error.message)
     } else {
-      const stageName = stages.find((s) => s.id === newStageId)?.name || ''
-      toast.success(`Movido para "${stageName}"`)
+      const stageName = allStages.find((s) => s.id === newStageId)?.name || ''
+      const typeLabel = switchingType ? (newKanbanType === 'mentorship' ? ' (Mentoria)' : ' (Iniciais)') : ''
+      toast.success(`Movido para "${stageName}"${typeLabel}`)
       onMoved?.(newStageId, stageName)
     }
   }
 
-  if (stages.length === 0) return null
+  if (allStages.length === 0) return null
 
   return (
     <Select value={currentStageId || ''} onValueChange={handleMove} disabled={moving}>
@@ -542,11 +578,26 @@ function StageMoverInline({ menteeId, currentStageId, kanbanType, onMoved }: {
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {stages.map((s) => (
-          <SelectItem key={s.id} value={s.id}>
-            {s.name} {s.id === currentStageId ? '(atual)' : ''}
-          </SelectItem>
-        ))}
+        {initialStages.length > 0 && (
+          <>
+            <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Etapas Iniciais</div>
+            {initialStages.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.name} {s.id === currentStageId ? '(atual)' : ''}
+              </SelectItem>
+            ))}
+          </>
+        )}
+        {mentorshipStages.length > 0 && (
+          <>
+            <div className="px-2 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider border-t border-border mt-1 pt-1.5">Etapas Mentoria</div>
+            {mentorshipStages.map((s) => (
+              <SelectItem key={s.id} value={s.id}>
+                {s.name} {s.id === currentStageId ? '(atual)' : ''}
+              </SelectItem>
+            ))}
+          </>
+        )}
       </SelectContent>
     </Select>
   )

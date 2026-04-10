@@ -124,7 +124,7 @@ export const CallInterface = memo(function CallInterface({
       // Attach remote audio track when available
       if (ev?.participant && !ev.participant.local && ev.participant.tracks?.audio?.persistentTrack) {
         const track = ev.participant.tracks.audio.persistentTrack
-        if (audioRef.current && audioRef.current.srcObject !== track.mediaStream) {
+        if (audioRef.current) {
           const stream = new MediaStream([track])
           audioRef.current.srcObject = stream
           audioRef.current.play().catch(() => {})

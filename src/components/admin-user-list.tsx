@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Shield, User, Plus, Pencil, Trash2, Package, MessageSquare, Wifi, WifiOff, Webhook, Settings } from 'lucide-react'
+import { Shield, User, Plus, Pencil, Trash2, Package, MessageSquare, Wifi, WifiOff, Webhook, Settings, Building2 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 const WebhooksSection = dynamic(
@@ -50,16 +50,23 @@ interface KanbanStage {
   type: string
 }
 
+interface DeptAssignment {
+  id: string
+  user_id: string
+  department: string
+}
+
 interface AdminUserListProps {
   users: Profile[]
   products: Product[]
   wppInstances: WppInstance[]
   kanbanStages: KanbanStage[]
   settings: SystemSetting[]
+  departmentAssignments: DeptAssignment[]
   currentUserId: string
 }
 
-export function AdminUserList({ users, products, wppInstances, kanbanStages, settings, currentUserId }: AdminUserListProps) {
+export function AdminUserList({ users, products, wppInstances, kanbanStages, settings, departmentAssignments, currentUserId }: AdminUserListProps) {
   return (
     <div>
       <h1 className="font-heading text-2xl font-bold text-foreground">Admin</h1>
@@ -74,12 +81,17 @@ export function AdminUserList({ users, products, wppInstances, kanbanStages, set
             <TabsTrigger value="products"><Package className="h-4 w-4 mr-1.5" />Produtos</TabsTrigger>
             <TabsTrigger value="whatsapp"><MessageSquare className="h-4 w-4 mr-1.5" />WhatsApp</TabsTrigger>
             <TabsTrigger value="webhooks"><Webhook className="h-4 w-4 mr-1.5" />Webhooks</TabsTrigger>
+            <TabsTrigger value="departments"><Building2 className="h-4 w-4 mr-1.5" />Departamentos</TabsTrigger>
             <TabsTrigger value="settings"><Settings className="h-4 w-4 mr-1.5" />Configurações</TabsTrigger>
           </TabsList>
         </div>
 
         <TabsContent value="users">
           <UsersSection users={users} currentUserId={currentUserId} />
+        </TabsContent>
+
+        <TabsContent value="departments">
+          <DepartmentsSection users={users} assignments={departmentAssignments} />
         </TabsContent>
 
         <TabsContent value="products">
@@ -871,6 +883,86 @@ function WhatsAppSection({ specialists, instances }: { specialists: Profile[]; i
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════
+// DEPARTMENTS SECTION
+// ═══════════════════════════════════════
+
+const DEPARTMENTS = [
+  { key: 'comercial', label: 'Comercial' },
+  { key: 'marketing', label: 'Marketing' },
+  { key: 'gestao', label: 'Gestão' },
+] as const
+
+function DepartmentsSection({ users, assignments }: { users: Profile[]; assignments: DeptAssignment[] }) {
+  const router = useRouter()
+  const [saving, setSaving] = useState<string | null>(null)
+
+  const assignmentMap = new Map<string, string>()
+  const assignmentIdMap = new Map<string, string>()
+  assignments.forEach((a) => {
+    assignmentMap.set(a.department, a.user_id)
+    assignmentIdMap.set(a.department, a.id)
+  })
+
+  async function handleAssign(department: string, userId: string) {
+    setSaving(department)
+    const supabase = (await import('@/lib/supabase/client')).createClient()
+    const existingId = assignmentIdMap.get(department)
+
+    if (userId === '__none__') {
+      if (existingId) await supabase.from('department_assignments').delete().eq('id', existingId)
+    } else if (existingId) {
+      await supabase.from('department_assignments').update({ user_id: userId }).eq('id', existingId)
+    } else {
+      await supabase.from('department_assignments').insert({ user_id: userId, department: department as 'comercial' | 'marketing' | 'gestao' })
+    }
+
+    setSaving(null)
+    router.refresh()
+  }
+
+  return (
+    <div className="mt-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Building2 className="h-5 w-5 text-muted-foreground" />
+        <h2 className="font-heading text-xl font-semibold text-foreground">Departamentos</h2>
+      </div>
+      <p className="text-sm text-muted-foreground mb-4">
+        Vincule um usuário responsável por cada departamento. Quando um mentorado for encaminhado, o responsável será notificado.
+      </p>
+
+      <div className="space-y-3">
+        {DEPARTMENTS.map((dept) => {
+          const assignedUserId = assignmentMap.get(dept.key) || '__none__'
+          const assignedUser = users.find((u) => u.id === assignedUserId)
+
+          return (
+            <div key={dept.key} className="flex items-center justify-between rounded-lg border border-border bg-card p-4 shadow-card">
+              <div>
+                <p className="text-sm font-medium text-foreground">{dept.label}</p>
+                <p className="text-xs text-muted-foreground">
+                  {assignedUser ? `Responsável: ${assignedUser.full_name}` : 'Nenhum responsável definido'}
+                </p>
+              </div>
+              <Select value={assignedUserId} onValueChange={(v) => handleAssign(dept.key, v)} disabled={saving === dept.key}>
+                <SelectTrigger className="w-48 h-9 text-xs">
+                  <SelectValue placeholder="Selecionar..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— Nenhum —</SelectItem>
+                  {users.map((u) => (
+                    <SelectItem key={u.id} value={u.id}>{u.full_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }

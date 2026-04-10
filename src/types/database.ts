@@ -1249,6 +1249,55 @@ export interface Database {
         }
         Relationships: []
       }
+      department_assignments: {
+        Row: {
+          id: string
+          user_id: string
+          department: 'comercial' | 'marketing' | 'gestao'
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          department: 'comercial' | 'marketing' | 'gestao'
+          created_at?: string
+        }
+        Update: {
+          user_id?: string
+          department?: 'comercial' | 'marketing' | 'gestao'
+        }
+        Relationships: []
+      }
+      forwarding_notifications: {
+        Row: {
+          id: string
+          recipient_id: string
+          mentee_id: string
+          department: string
+          description: string
+          mentee_name: string
+          mentee_phone: string
+          sent_by: string | null
+          is_read: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          recipient_id: string
+          mentee_id: string
+          department: string
+          description: string
+          mentee_name: string
+          mentee_phone: string
+          sent_by?: string | null
+          is_read?: boolean
+          created_at?: string
+        }
+        Update: {
+          is_read?: boolean
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

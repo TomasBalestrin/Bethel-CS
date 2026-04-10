@@ -499,8 +499,8 @@ function MetricBox({ label, value, highlight }: { label: string; value: string |
   )
 }
 
-// ─── Stage Mover — inline stage selector ───
-function StageMover({ menteeId, currentStageId, kanbanType, onMoved }: {
+// ─── Stage Mover — compact inline selector for status bar ───
+function StageMoverInline({ menteeId, currentStageId, kanbanType, onMoved }: {
   menteeId: string
   currentStageId: string | null
   kanbanType: KanbanType
@@ -535,24 +535,20 @@ function StageMover({ menteeId, currentStageId, kanbanType, onMoved }: {
 
   if (stages.length === 0) return null
 
-  const currentName = stages.find((s) => s.id === currentStageId)?.name
-
   return (
-    <div className="px-3 pb-2">
-      <p className="text-[9px] text-muted-foreground/70 mb-1">Etapa atual</p>
-      <Select value={currentStageId || ''} onValueChange={handleMove} disabled={moving}>
-        <SelectTrigger className="h-8 text-xs">
-          <SelectValue placeholder={currentName || 'Sem etapa'} />
-        </SelectTrigger>
-        <SelectContent>
-          {stages.map((s) => (
-            <SelectItem key={s.id} value={s.id}>
-              {s.name} {s.id === currentStageId ? '(atual)' : ''}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+    <Select value={currentStageId || ''} onValueChange={handleMove} disabled={moving}>
+      <SelectTrigger className="h-7 w-auto min-w-[140px] max-w-[220px] text-[11px] rounded-full border-accent/30 bg-accent/5 text-accent gap-1 px-2.5">
+        <ChevronRight className="h-3 w-3 shrink-0" />
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {stages.map((s) => (
+          <SelectItem key={s.id} value={s.id}>
+            {s.name} {s.id === currentStageId ? '(atual)' : ''}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   )
 }
 
@@ -772,6 +768,16 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
         <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-2.5 py-0.5 text-[11px] text-muted-foreground">
           <Star className="h-3 w-3" /> Fit <ClienteFitToggle menteeId={mentee.id} initialValue={mentee.cliente_fit} />
         </span>
+        <StageMoverInline
+          menteeId={mentee.id}
+          currentStageId={mentee.current_stage_id}
+          kanbanType={mentee.kanban_type}
+          onMoved={(newStageId) => {
+            if (onMenteeUpdated) {
+              onMenteeUpdated({ ...mentee, current_stage_id: newStageId })
+            }
+          }}
+        />
         {mentee.contract_validity && (
           <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-0.5 text-[11px] text-muted-foreground">
             <Clock className="h-3 w-3" /> {mentee.contract_validity}
@@ -908,18 +914,6 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
                   <p className="text-[11px] text-muted-foreground/50">Sem dados adicionais</p>
                 </div>
               )}
-            </div>
-            <div className="border-t border-border">
-              <StageMover
-                menteeId={mentee.id}
-                currentStageId={mentee.current_stage_id}
-                kanbanType={mentee.kanban_type}
-                onMoved={(newStageId) => {
-                  if (onMenteeUpdated) {
-                    onMenteeUpdated({ ...mentee, current_stage_id: newStageId })
-                  }
-                }}
-              />
             </div>
           </div>
 

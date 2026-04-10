@@ -637,6 +637,9 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                   setActiveSession(prevSession)
                   setSessionStart(prevStart)
                   toast.error('Erro ao finalizar atendimento')
+                } else {
+                  // Auto-generate summary after ending session
+                  handleSummarize()
                 }
               }}
             >

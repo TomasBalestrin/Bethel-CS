@@ -1275,7 +1275,7 @@ export interface Database {
         Row: {
           id: string
           recipient_id: string
-          mentee_id: string
+          mentee_id: string | null
           department: string
           description: string
           mentee_name: string
@@ -1287,7 +1287,7 @@ export interface Database {
         Insert: {
           id?: string
           recipient_id: string
-          mentee_id: string
+          mentee_id?: string | null
           department: string
           description: string
           mentee_name: string

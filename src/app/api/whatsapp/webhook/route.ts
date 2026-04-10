@@ -212,7 +212,25 @@ export async function POST(request: NextRequest) {
 
       console.log('[WPP Webhook] INSERT → mentee:', mentee.full_name, '| direction:', direction, '| type:', messageType, '| content:', content?.slice(0, 50), '| mediaUrl:', mediaUrl?.slice(0, 60), '| sentAt:', sentAt)
 
-      // 5. Insert message
+      // 5. Detect channel: find the last outgoing message within 4h window
+      let channel = 'principal'
+      const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+      const { data: lastOutgoing } = await supabase
+        .from('wpp_messages')
+        .select('channel')
+        .eq('mentee_id', mentee.id)
+        .eq('direction', 'outgoing')
+        .gte('sent_at', fourHoursAgo)
+        .order('sent_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (lastOutgoing?.channel) {
+        channel = lastOutgoing.channel
+      }
+      console.log('[WPP Webhook] Detected channel:', channel)
+
+      // 6. Insert message
       const { error: insertErr } = await supabase.from('wpp_messages').insert({
         mentee_id: mentee.id,
         specialist_id: instance.specialist_id,
@@ -225,6 +243,7 @@ export async function POST(request: NextRequest) {
         sender_name: senderName,
         is_read: data.fromMe ? true : false,
         sent_at: sentAt,
+        channel,
       })
 
       if (insertErr) {

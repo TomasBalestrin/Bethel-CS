@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { menteeId, message, type, imageUrl, fileName, mimeType } = body
+    const { menteeId, message, type, imageUrl, fileName, mimeType, channel = 'principal', signatureName } = body
 
     if (!menteeId || (!message && !imageUrl)) {
       return NextResponse.json({ error: 'menteeId e message/imageUrl são obrigatórios' }, { status: 400 })
@@ -30,11 +30,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Mentorado não encontrado' }, { status: 404 })
     }
 
-    // 3. Find the correct WPP instance:
-    //    Priority: mentee's specialist (created_by) → logged-in user → any connected
+    // 3. Find the correct WPP instance
     const specialistId = mentee.created_by || user.id
-
-    // Try specialist's instance first
     let instance: { instance_id: string; specialist_id: string } | null = null
 
     const { data: specialistInstance } = await supabase
@@ -48,7 +45,6 @@ export async function POST(request: NextRequest) {
     if (specialistInstance) {
       instance = specialistInstance
     } else if (specialistId !== user.id) {
-      // Try logged-in user's instance (admin sending on behalf)
       const { data: userInstance } = await supabase
         .from('wpp_instances')
         .select('instance_id, specialist_id')
@@ -59,7 +55,6 @@ export async function POST(request: NextRequest) {
       instance = userInstance
     }
 
-    // Fallback: any connected instance
     if (!instance) {
       const { data: anyInstance } = await supabase
         .from('wpp_instances')
@@ -74,27 +69,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Nenhuma instância WhatsApp conectada' }, { status: 404 })
     }
 
-    // 4. Use DB instance_id directly as NextTrack instance identifier
-    //    Each specialist has their own instance in wpp_instances table
     const nextrackUUID = instance.instance_id
 
-    // 5. Format phone
+    // 4. Format phone
     let phone = mentee.phone.replace(/\D/g, '')
-    if (!phone.startsWith('55')) {
-      phone = '55' + phone
+    if (!phone.startsWith('55')) phone = '55' + phone
+
+    // 5. Build signed message with channel signature
+    let signedMessage = message || ''
+    if (signedMessage && signatureName) {
+      signedMessage = `*${signatureName}*: ${signedMessage}`
     }
 
-    // 6. Send via NextTrack API using the correct instance
+    // 6. Send via NextTrack API
     let result: { success: boolean; error?: string }
 
     if (!type || type === 'text') {
-      result = await sendTextMessage(phone, message, nextrackUUID)
+      result = await sendTextMessage(phone, signedMessage, nextrackUUID)
     } else {
       result = await sendMediaMessage(
         phone,
         type as 'image' | 'audio' | 'video' | 'document',
         imageUrl || '',
-        message || undefined,
+        signedMessage || undefined,
         fileName || undefined,
         mimeType || undefined,
         nextrackUUID
@@ -102,21 +99,22 @@ export async function POST(request: NextRequest) {
     }
 
     if (!result.success) {
-      console.error('[WPP Send] NextTrack error:', result.error, { menteeId, instanceId: nextrackUUID, phone })
+      console.error('[WPP Send] NextTrack error:', result.error, { menteeId, instanceId: nextrackUUID, phone, channel })
       return NextResponse.json({ error: result.error || 'Falha ao enviar via WhatsApp' }, { status: 502 })
     }
 
-    // 7. Save message with correct specialist + instance
+    // 7. Save message with channel
     await supabase.from('wpp_messages').insert({
       mentee_id: menteeId,
       specialist_id: instance.specialist_id || user.id,
       instance_id: instance.instance_id,
       direction: 'outgoing',
       message_type: type || 'text',
-      content: message || null,
+      content: message || null, // Save original message without signature (signature is for WPP only)
       media_url: imageUrl || null,
       is_read: true,
       sent_at: new Date().toISOString(),
+      channel,
     })
 
     return NextResponse.json({ success: true })

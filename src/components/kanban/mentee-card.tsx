@@ -3,7 +3,7 @@
 import { memo } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { Users, DollarSign, Star, Clock } from 'lucide-react'
+import { Users, DollarSign, Star, Clock, Calendar } from 'lucide-react'
 import type { MenteeWithStats } from '@/types/kanban'
 
 const LEVEL_COLORS: Record<number, string> = {
@@ -88,10 +88,18 @@ export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, on
               P{mentee.priority_level}
             </span>
           </div>
-          {/* Product */}
-          {mentee.product_name && (
-            <p className="text-[11px] text-muted-foreground mt-0.5 truncate">{mentee.product_name}</p>
-          )}
+          {/* Product + start date */}
+          <div className="flex items-center gap-1.5 mt-0.5">
+            {mentee.product_name && (
+              <p className="text-[11px] text-muted-foreground truncate">{mentee.product_name}</p>
+            )}
+            {mentee.start_date && (
+              <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/70 shrink-0 ml-auto" title="Data de início">
+                <Calendar size={9} />
+                {new Date(mentee.start_date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+              </span>
+            )}
+          </div>
           {/* Metrics */}
           <div className="mt-2 pt-1.5 border-t border-border/40 flex items-center gap-2.5 text-[11px] text-muted-foreground tabular">
             <span className="flex items-center gap-0.5" title="Indicações">

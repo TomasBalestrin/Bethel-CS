@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  const { menteeId } = await request.json()
+  const { menteeId, channel } = await request.json()
   if (!menteeId) return NextResponse.json({ error: 'menteeId obrigatório' }, { status: 400 })
 
   if (!process.env.OPENAI_API_KEY) {
@@ -25,13 +25,15 @@ export async function POST(request: NextRequest) {
 
   if (!mentee) return NextResponse.json({ error: 'Mentorado não encontrado' }, { status: 404 })
 
-  // Get last 100 text messages
-  const { data: messages } = await supabase
+  // Get last 100 text messages for this channel
+  let msgQuery = supabase
     .from('wpp_messages')
     .select('direction, content, sender_name, sent_at, message_type')
     .eq('mentee_id', menteeId)
     .order('sent_at', { ascending: false })
     .limit(100)
+  if (channel) msgQuery = msgQuery.eq('channel' as string, channel)
+  const { data: messages } = await msgQuery
 
   if (!messages || messages.length === 0) {
     return NextResponse.json({ error: 'Sem mensagens para resumir' }, { status: 400 })

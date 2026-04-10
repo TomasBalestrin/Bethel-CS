@@ -459,7 +459,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
       const res = await fetch('/api/chat/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ menteeId }),
+        body: JSON.stringify({ menteeId, channel }),
       })
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))

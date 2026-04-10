@@ -192,7 +192,7 @@ export async function sendTextMessage(
   message: string,
   overrideInstanceUUID?: string,
   quotedMsg?: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
   try {
     const instanceUUID = overrideInstanceUUID || getInstanceUUID()
     if (!instanceUUID) return { success: false, error: 'Instância WhatsApp não configurada' }
@@ -235,7 +235,7 @@ export async function sendMediaMessage(
   mimeType?: string,
   overrideInstanceUUID?: string,
   quotedMsg?: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
   try {
     const instanceUUID = overrideInstanceUUID || getInstanceUUID()
     if (!instanceUUID) return { success: false, error: 'Instância WhatsApp não configurada' }

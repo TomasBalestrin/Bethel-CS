@@ -241,26 +241,32 @@ export function MenteeFilters({ filters, onFilterChange, onClearAll, options }: 
               </Select>
             </div>
 
-            {/* Data de início */}
-            <div className="space-y-1">
-              <Label className="text-xs">Data de início</Label>
-              <Input
-                type="date"
-                className="text-xs h-9"
-                value={filters.dataInicio}
-                onChange={(e) => onFilterChange('dataInicio', e.target.value)}
-              />
-            </div>
-
-            {/* Data de término */}
-            <div className="space-y-1">
-              <Label className="text-xs">Data de término</Label>
-              <Input
-                type="date"
-                className="text-xs h-9"
-                value={filters.dataTermino}
-                onChange={(e) => onFilterChange('dataTermino', e.target.value)}
-              />
+            {/* Período da mentoria */}
+            <div className="space-y-1 sm:col-span-2">
+              <Label className="text-xs">Período da mentoria</Label>
+              <div className="flex gap-1.5 items-center">
+                <div className="flex-1">
+                  <Input
+                    type="date"
+                    className="text-xs h-9"
+                    value={filters.dataInicio}
+                    onChange={(e) => onFilterChange('dataInicio', e.target.value)}
+                    title="Início a partir de"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Início a partir de</p>
+                </div>
+                <span className="text-xs text-muted-foreground shrink-0 pb-4">até</span>
+                <div className="flex-1">
+                  <Input
+                    type="date"
+                    className="text-xs h-9"
+                    value={filters.dataTermino}
+                    onChange={(e) => onFilterChange('dataTermino', e.target.value)}
+                    title="Término até"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Término até</p>
+                </div>
+              </div>
             </div>
           </div>
 

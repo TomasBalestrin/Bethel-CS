@@ -19,8 +19,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Upload, FileText, CheckCircle2, XCircle, AlertCircle, ArrowRight, Users, ClipboardList, GitBranch, CalendarCheck, UserCheck, Sparkles, Loader2 } from 'lucide-react'
-import { bulkCreateMentees, bulkImportActionPlans, bulkImportStages, bulkImportDeliveryEvents, bulkImportDeliveryParticipations } from '@/lib/actions/mentee-actions'
+import { Upload, FileText, CheckCircle2, XCircle, AlertCircle, ArrowRight, Users, ClipboardList, GitBranch, CalendarCheck, UserCheck, Sparkles, Loader2, RefreshCw } from 'lucide-react'
+import { bulkCreateMentees, bulkUpdateMentees, bulkImportActionPlans, bulkImportStages, bulkImportDeliveryEvents, bulkImportDeliveryParticipations } from '@/lib/actions/mentee-actions'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -32,7 +32,7 @@ interface FieldDef {
   aliases: string[]
 }
 
-type ImportTab = 'mentees' | 'action_plan' | 'stages' | 'delivery_events' | 'delivery_participations'
+type ImportTab = 'mentees' | 'update_mentees' | 'action_plan' | 'stages' | 'delivery_events' | 'delivery_participations'
 type ImportStep = 'upload' | 'mapping' | 'preview' | 'importing' | 'done'
 
 interface ImportResult {
@@ -179,6 +179,7 @@ function autoDetectMapping(headers: string[], fields: FieldDef[]): Record<string
 
 const TABS: { key: ImportTab; label: string; icon: typeof Users; description: string }[] = [
   { key: 'mentees', label: 'Mentorados', icon: Users, description: 'Criar novos mentorados a partir de CSV/Excel' },
+  { key: 'update_mentees', label: 'Atualizar', icon: RefreshCw, description: 'Atualizar dados de mentorados existentes (identifica pelo telefone). Ideal para corrigir datas, nomes, etc.' },
   { key: 'action_plan', label: 'Plano de Ação', icon: ClipboardList, description: 'Importar respostas do formulário para mentorados existentes' },
   { key: 'stages', label: 'Etapas', icon: GitBranch, description: 'Atualizar a etapa do funil de mentorados existentes' },
   { key: 'delivery_events', label: 'Entregas', icon: CalendarCheck, description: 'Importar datas das entregas da mentoria (Hotseat, Comercial, etc.)' },
@@ -212,6 +213,7 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
   const [aiError, setAiError] = useState<string | null>(null)
 
   const currentFields = activeTab === 'mentees' ? MENTEE_FIELDS
+    : activeTab === 'update_mentees' ? MENTEE_FIELDS
     : activeTab === 'action_plan' ? ACTION_PLAN_FIELDS
     : activeTab === 'stages' ? STAGE_FIELDS
     : activeTab === 'delivery_events' ? DELIVERY_EVENT_FIELDS
@@ -280,7 +282,10 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
   }
 
   const previewRows = rows.slice(0, 5).map(getMappedRow)
-  const requiredFields = currentFields.filter((f) => f.required)
+  // For update mode, only phone is required (to match existing mentees)
+  const requiredFields = activeTab === 'update_mentees'
+    ? currentFields.filter((f) => f.key === 'phone')
+    : currentFields.filter((f) => f.required)
   const mappedFieldKeys = Object.values(mapping).filter((v) => v !== SKIP_VALUE)
   const missingRequired = requiredFields.filter((f) => !mappedFieldKeys.includes(f.key))
 
@@ -291,6 +296,9 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
     if (activeTab === 'mentees') {
       const mapped = rows.map(getMappedRow)
       res = await bulkCreateMentees({ rows: mapped, defaultSpecialistId: defaultSpecialistId || undefined })
+    } else if (activeTab === 'update_mentees') {
+      const mapped = rows.map(getMappedRow)
+      res = await bulkUpdateMentees({ rows: mapped })
     } else if (activeTab === 'action_plan') {
       const mapped = rows.map((raw) => {
         const out = getMappedRow(raw)
@@ -360,6 +368,7 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
 
   const tabLabels: Record<ImportTab, { importing: string; button: string; success: string }> = {
     mentees: { importing: 'Importando mentorados...', button: `Importar ${rows.length} mentorados`, success: 'importados' },
+    update_mentees: { importing: 'Atualizando mentorados...', button: `Atualizar ${rows.length} mentorados`, success: 'atualizados' },
     action_plan: { importing: 'Importando planos de ação...', button: `Importar ${rows.length} planos`, success: 'vinculados' },
     stages: { importing: 'Atualizando etapas...', button: `Atualizar ${rows.length} etapas`, success: 'atualizados' },
     delivery_events: { importing: 'Importando entregas...', button: `Importar ${rows.length} entregas`, success: 'importadas' },
@@ -428,7 +437,7 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
                 />
               </div>
 
-              {activeTab !== 'mentees' && activeTab !== 'delivery_events' && activeTab !== 'delivery_participations' && (
+              {activeTab !== 'mentees' && activeTab !== 'update_mentees' && activeTab !== 'delivery_events' && activeTab !== 'delivery_participations' && (
                 <div className="rounded-lg border border-border/50 p-3 space-y-2">
                   <p className="text-sm font-medium">Identificar mentorado por:</p>
                   <Select value={matchField} onValueChange={(v) => setMatchField(v as typeof matchField)}>

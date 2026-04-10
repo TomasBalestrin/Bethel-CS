@@ -461,6 +461,136 @@ export async function bulkAssignSpecialist(menteeIds: string[], specialistId: st
   return { error: null }
 }
 
+// ─── Bulk Update: Existing Mentees ──────────────────────────────────────────
+
+export async function bulkUpdateMentees(input: BulkImportInput): Promise<BulkImportResult> {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { total: input.rows.length, created: 0, errors: [{ row: 0, name: '', error: 'Não autenticado' }] }
+
+  // Load all mentees for matching by phone
+  const { data: mentees } = await supabase.from('mentees').select('id, full_name, phone')
+  if (!mentees) return { total: input.rows.length, created: 0, errors: [{ row: 0, name: '', error: 'Erro ao carregar mentorados' }] }
+
+  const phoneMap = new Map<string, { id: string; full_name: string }>()
+  mentees.forEach((m) => {
+    phoneMap.set(m.phone.replace(/\D/g, ''), { id: m.id, full_name: m.full_name })
+  })
+
+  const errors: BulkImportResult['errors'] = []
+  let created = 0 // actually "updated" count
+
+  for (let i = 0; i < input.rows.length; i++) {
+    const raw = input.rows[i]
+    const rowNum = i + 2
+    const name = String(raw.full_name ?? '').trim()
+    const phone = String(raw.phone ?? '').trim().replace(/\D/g, '')
+
+    if (!phone) { errors.push({ row: rowNum, name, error: 'Telefone obrigatório para identificar o mentorado' }); continue }
+
+    const match = phoneMap.get(phone)
+    if (!match) { errors.push({ row: rowNum, name, error: 'Mentorado não encontrado com esse telefone' }); continue }
+
+    try {
+      // Build update object from only the fields that are present and non-empty
+      const updates: Record<string, unknown> = {}
+
+      if (raw.start_date !== undefined && raw.start_date !== '') {
+        const d = parseDateServer(raw.start_date)
+        if (d) updates.start_date = d
+      }
+      if (raw.end_date !== undefined && raw.end_date !== '') {
+        const d = parseDateServer(raw.end_date)
+        if (d) updates.end_date = d
+      }
+      if (raw.birth_date !== undefined && raw.birth_date !== '') {
+        const d = parseDateServer(raw.birth_date)
+        if (d) updates.birth_date = d
+      }
+      if (raw.product_name !== undefined && String(raw.product_name).trim()) {
+        updates.product_name = String(raw.product_name).trim()
+      }
+      if (raw.email !== undefined && String(raw.email).trim()) {
+        updates.email = String(raw.email).trim()
+      }
+      if (raw.instagram !== undefined && String(raw.instagram).trim()) {
+        updates.instagram = String(raw.instagram).trim()
+      }
+      if (raw.city !== undefined && String(raw.city).trim()) {
+        updates.city = String(raw.city).trim()
+      }
+      if (raw.state !== undefined && String(raw.state).trim()) {
+        updates.state = String(raw.state).trim().toUpperCase().slice(0, 2)
+      }
+      if (raw.cpf !== undefined && String(raw.cpf).trim()) {
+        updates.cpf = String(raw.cpf).trim()
+      }
+      if (raw.niche !== undefined && String(raw.niche).trim()) {
+        updates.niche = String(raw.niche).trim()
+      }
+      if (raw.status !== undefined && String(raw.status).trim()) {
+        updates.status = parseStatusServer(raw.status as string)
+      }
+      if (raw.faturamento_antes_mentoria !== undefined && raw.faturamento_antes_mentoria !== '') {
+        const v = parseNumberServer(raw.faturamento_antes_mentoria)
+        if (v != null) updates.faturamento_antes_mentoria = v
+      }
+      if (raw.faturamento_atual !== undefined && raw.faturamento_atual !== '') {
+        const v = parseNumberServer(raw.faturamento_atual)
+        if (v != null) updates.faturamento_atual = v
+      }
+      if (raw.faturamento_mes_anterior !== undefined && raw.faturamento_mes_anterior !== '') {
+        const v = parseNumberServer(raw.faturamento_mes_anterior)
+        if (v != null) updates.faturamento_mes_anterior = v
+      }
+      if (raw.closer_name !== undefined && String(raw.closer_name).trim()) {
+        updates.closer_name = String(raw.closer_name).trim()
+      }
+      if (raw.contract_validity !== undefined && String(raw.contract_validity).trim()) {
+        updates.contract_validity = String(raw.contract_validity).trim()
+      }
+      if (raw.notes !== undefined && String(raw.notes).trim()) {
+        updates.notes = String(raw.notes).trim()
+      }
+      if (raw.nome_empresa !== undefined && String(raw.nome_empresa).trim()) {
+        updates.nome_empresa = String(raw.nome_empresa).trim()
+      }
+      if (raw.seller_name !== undefined && String(raw.seller_name).trim()) {
+        updates.seller_name = String(raw.seller_name).trim()
+      }
+      if (raw.source !== undefined && String(raw.source).trim()) {
+        updates.source = String(raw.source).trim()
+      }
+
+      if (Object.keys(updates).length === 0) {
+        errors.push({ row: rowNum, name: match.full_name, error: 'Nenhum campo para atualizar' })
+        continue
+      }
+
+      updates.updated_at = new Date().toISOString()
+
+      const { error: updateError } = await supabase
+        .from('mentees')
+        .update(updates)
+        .eq('id', match.id)
+
+      if (updateError) {
+        errors.push({ row: rowNum, name: match.full_name, error: updateError.message })
+        continue
+      }
+
+      created++
+    } catch (err) {
+      errors.push({ row: rowNum, name: name || match.full_name, error: String(err) })
+    }
+  }
+
+  revalidatePath('/mentorados')
+  revalidatePath('/etapas-iniciais')
+  revalidatePath('/etapas-mentoria')
+  return { total: input.rows.length, created, errors }
+}
+
 // ─── Bulk Import: Action Plans ───────────────────────────────────────────────
 
 interface BulkActionPlanInput {

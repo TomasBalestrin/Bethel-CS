@@ -233,8 +233,22 @@ export async function sendMediaMessage(
     const body: Record<string, unknown> = {
       phone,
       type,
-      imageUrl: mediaUrl, // API uses imageUrl for ALL media types
     }
+
+    // Use the correct URL field based on media type
+    if (type === 'audio') {
+      body.audioUrl = mediaUrl
+      body.ptt = true // push-to-talk (voice note)
+    } else if (type === 'image') {
+      body.imageUrl = mediaUrl
+    } else if (type === 'video') {
+      body.videoUrl = mediaUrl
+    } else if (type === 'document') {
+      body.documentUrl = mediaUrl
+    } else {
+      body.imageUrl = mediaUrl // fallback
+    }
+
     if (caption) body.message = caption
     if (fileName) body.fileName = fileName
     if (mimeType) body.mimeType = mimeType

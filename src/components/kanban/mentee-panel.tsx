@@ -88,7 +88,7 @@ const TabChat = dynamic(
   () => import('./tab-chat').then((mod) => ({ default: mod.TabChat })),
   { ssr: false, loading: () => <div className="flex items-center justify-center h-full"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div> }
 )
-import type { Database, TestimonialCategory, RevenueType } from '@/types/database'
+import type { Database, TestimonialCategory, RevenueType, KanbanType } from '@/types/database'
 
 type Indication = Database['public']['Tables']['indications']['Row']
 type IntensivoRecord = Database['public']['Tables']['intensivo_records']['Row']
@@ -503,7 +503,7 @@ function MetricBox({ label, value, highlight }: { label: string; value: string |
 function StageMover({ menteeId, currentStageId, kanbanType, onMoved }: {
   menteeId: string
   currentStageId: string | null
-  kanbanType: string
+  kanbanType: KanbanType
   onMoved?: (newStageId: string, stageName: string) => void
 }) {
   const [stages, setStages] = useState<{ id: string; name: string }[]>([])

@@ -401,7 +401,8 @@ export async function bulkDeleteMentees(menteeIds: string[]) {
     'attendances', 'action_plans', 'indications', 'intensivo_records',
     'revenue_records', 'objectives', 'testimonials', 'engagement_records',
     'cs_activities', 'chat_metrics', 'wpp_messages', 'cancellations',
-    'push_subscriptions', 'attendance_notes',
+    'push_subscriptions', 'attendance_notes', 'call_records',
+    'attendance_sessions', 'tasks',
   ] as const
 
   // Clear referrals

@@ -48,8 +48,9 @@ interface DeliveryEvent {
   id: string
   delivery_type: string
   delivery_date: string
-  description: string | null
-  reference_month: string | null
+  description?: string | null
+  notes?: string | null
+  reference_month?: string | null
   created_at: string
   participation_count: number
 }

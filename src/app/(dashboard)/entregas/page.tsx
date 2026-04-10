@@ -22,6 +22,8 @@ export default async function EntregasPage() {
 
   const enriched = (events ?? []).map((e) => ({
     ...e,
+    description: (e as Record<string, unknown>).description as string | null ?? e.notes,
+    reference_month: (e as Record<string, unknown>).reference_month as string | null ?? null,
     participation_count: participationCounts.get(e.id) ?? 0,
   }))
 

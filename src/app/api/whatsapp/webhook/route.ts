@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
       const fourHoursAgo = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
       const { data: lastOutgoing } = await supabase
         .from('wpp_messages')
-        .select('channel')
+        .select('*')
         .eq('mentee_id', mentee.id)
         .eq('direction', 'outgoing')
         .gte('sent_at', fourHoursAgo)
@@ -225,8 +225,8 @@ export async function POST(request: NextRequest) {
         .limit(1)
         .single()
 
-      if (lastOutgoing?.channel) {
-        channel = lastOutgoing.channel
+      if (lastOutgoing && (lastOutgoing as Record<string, unknown>).channel) {
+        channel = String((lastOutgoing as Record<string, unknown>).channel)
       }
       console.log('[WPP Webhook] Detected channel:', channel)
 

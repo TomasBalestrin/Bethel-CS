@@ -1182,6 +1182,7 @@ export interface Database {
           sender_name: string | null
           is_read: boolean
           sent_at: string
+          channel: string
           created_at: string
         }
         Insert: {
@@ -1197,6 +1198,7 @@ export interface Database {
           sender_name?: string | null
           is_read?: boolean
           sent_at: string
+          channel?: string
           created_at?: string
         }
         Update: {

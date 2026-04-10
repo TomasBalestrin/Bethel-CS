@@ -62,6 +62,10 @@ export async function deleteMentee(menteeId: string) {
     'wpp_messages',
     'cancellations',
     'push_subscriptions',
+    'attendance_notes',
+    'call_records',
+    'attendance_sessions',
+    'tasks',
   ] as const
 
   for (const table of tables) {

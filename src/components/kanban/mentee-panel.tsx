@@ -1800,7 +1800,6 @@ function CardIndividualSessions({ menteeId }: { menteeId: string }) {
   const [items, setItems] = useState<Database['public']['Tables']['individual_sessions']['Row'][]>([])
   const [showForm, setShowForm] = useState(false)
   const [sessionDate, setSessionDate] = useState('')
-  const [duration, setDuration] = useState('')
   const [specialist, setSpecialist] = useState('')
   const [notes, setNotes] = useState('')
   const [loading] = useState(false)
@@ -1819,17 +1818,17 @@ function CardIndividualSessions({ menteeId }: { menteeId: string }) {
       id: `temp-${Date.now()}`,
       mentee_id: menteeId,
       session_date: sessionDate,
-      duration_minutes: duration ? parseInt(duration) : null,
+      duration_minutes: null,
       specialist_name: specialist || null,
       notes: notes || null,
       created_at: new Date().toISOString(),
     } as Database['public']['Tables']['individual_sessions']['Row']
     setItems((prev) => [optimisticItem, ...prev])
-    const savedDate = sessionDate; const savedDuration = duration; const savedSpecialist = specialist; const savedNotes = notes
-    setSessionDate(''); setDuration(''); setSpecialist(''); setNotes(''); setShowForm(false)
+    const savedDate = sessionDate; const savedSpecialist = specialist; const savedNotes = notes
+    setSessionDate(''); setSpecialist(''); setNotes(''); setShowForm(false)
 
     try {
-      await addIndividualSession(menteeId, { session_date: savedDate, duration_minutes: savedDuration ? parseInt(savedDuration) : undefined, specialist_name: savedSpecialist || undefined, notes: savedNotes || undefined })
+      await addIndividualSession(menteeId, { session_date: savedDate, specialist_name: savedSpecialist || undefined, notes: savedNotes || undefined })
       fetchData()
     } catch {
       // Revert on error
@@ -1852,7 +1851,6 @@ function CardIndividualSessions({ menteeId }: { menteeId: string }) {
         <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-border bg-muted/50 p-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1"><Label>Data *</Label><Input type="date" value={sessionDate} onChange={(e) => setSessionDate(e.target.value)} required /></div>
-            <div className="space-y-1"><Label>Duração (min)</Label><Input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} /></div>
           </div>
           <div className="space-y-1"><Label>Especialista</Label><Input value={specialist} onChange={(e) => setSpecialist(e.target.value)} placeholder="Ex: Ericles" /></div>
           <div className="space-y-1"><Label>Observações</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
@@ -1870,7 +1868,6 @@ function CardIndividualSessions({ menteeId }: { menteeId: string }) {
         <div key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">{formatDateBR(item.session_date)}</span>
-            {item.duration_minutes && <Badge variant="info" className="text-[10px]">{item.duration_minutes}min</Badge>}
           </div>
           {item.specialist_name && <p className="mt-1 text-foreground">{item.specialist_name}</p>}
           {item.notes && <p className="text-xs text-muted-foreground mt-0.5">{item.notes}</p>}
@@ -2264,6 +2261,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
   const [qtyIndicated, setQtyIndicated] = useState('')
   const [qtyConfirmed, setQtyConfirmed] = useState('')
   const [revenueCents, setRevenueCents] = useState(0)
+  const [entryCents, setEntryCents] = useState(0)
   const [indLoading] = useState(false)
   const [confirmDeleteInd, setConfirmDeleteInd] = useState<string | null>(null)
 
@@ -2277,7 +2275,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
   useEffect(() => { fetchAll() }, [fetchAll])
 
   function resetForm() {
-    setEditingId(null); setIndDate(''); setQtyIndicated(''); setQtyConfirmed(''); setRevenueCents(0)
+    setEditingId(null); setIndDate(''); setQtyIndicated(''); setQtyConfirmed(''); setRevenueCents(0); setEntryCents(0)
   }
 
   function openEdit(ind: Indication) {
@@ -2286,6 +2284,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
     setQtyIndicated(String(ind.quantity_indicated ?? 0))
     setQtyConfirmed(String(ind.quantity_confirmed ?? 0))
     setRevenueCents(Math.round((ind.revenue_generated ?? 0) * 100))
+    setEntryCents(Math.round(((ind as Record<string, unknown>).entry_value as number ?? 0) * 100))
     setShowForm(true)
   }
 
@@ -2296,6 +2295,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
       quantity_indicated: parseInt(qtyIndicated || '0', 10),
       quantity_confirmed: parseInt(qtyConfirmed || '0', 10),
       revenue_generated: revenueCents / 100,
+      entry_value: entryCents / 100,
     }
     const savedEditingId = editingId
     const prevIndications = [...indications]
@@ -2309,6 +2309,8 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
       const optimisticItem = {
         id: `temp-${Date.now()}`,
         mentee_id: menteeId,
+        indicated_name: '', indicated_phone: '', notes: null,
+        converted: false, converted_name: null, converted_value: null, converted_at: null,
         ...data,
         created_at: new Date().toISOString(),
       } as Indication
@@ -2350,7 +2352,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
         <h3 className="font-heading font-semibold text-sm">Indicações</h3>
         <div className="flex items-center gap-1.5 ml-auto">
           {totalConfirmed > 0 && (
-            <span className="text-[10px] text-success font-medium">{totalConfirmed} confirmadas</span>
+            <span className="text-[10px] text-success font-medium">{totalConfirmed} vendas</span>
           )}
           <Badge variant="muted" className="text-[10px]">{totalIndicated} indicados</Badge>
         </div>
@@ -2364,7 +2366,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
             <p className="font-bold text-sm tabular">{totalIndicated}</p>
           </div>
           <div className="rounded-md border border-border bg-card p-2">
-            <p className="text-[10px] text-muted-foreground">Confirmados</p>
+            <p className="text-[10px] text-muted-foreground">Vendas</p>
             <p className="font-bold text-sm tabular text-success">{totalConfirmed}</p>
           </div>
           <div className="rounded-md border border-border bg-card p-2">
@@ -2398,7 +2400,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
               <Input id="ind-qty" type="number" min="0" value={qtyIndicated} onChange={(e) => setQtyIndicated(e.target.value)} required />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="ind-confirmed">Qtd. confirmados</Label>
+              <Label htmlFor="ind-confirmed">Qtd. vendas</Label>
               <Input id="ind-confirmed" type="number" min="0" value={qtyConfirmed} onChange={(e) => setQtyConfirmed(e.target.value)} />
             </div>
             <div className="space-y-1">
@@ -2409,6 +2411,16 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
                 value={revenueCents > 0 ? `R$ ${fmtCurrencyInd(revenueCents)}` : ''}
                 placeholder="R$ 0,00"
                 onChange={(e) => setRevenueCents(parseCurrencyInd(e.target.value))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="ind-entry">Valor de entrada</Label>
+              <Input
+                id="ind-entry"
+                inputMode="numeric"
+                value={entryCents > 0 ? `R$ ${fmtCurrencyInd(entryCents)}` : ''}
+                placeholder="R$ 0,00"
+                onChange={(e) => setEntryCents(parseCurrencyInd(e.target.value))}
               />
             </div>
           </div>
@@ -2440,7 +2452,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
               </p>
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <span>{item.quantity_indicated ?? 0} indicados</span>
-                <span className="text-success">{item.quantity_confirmed ?? 0} confirmados</span>
+                <span className="text-success">{item.quantity_confirmed ?? 0} vendas</span>
                 {Number(item.revenue_generated) > 0 && (
                   <span className="text-success font-medium">R$ {Number(item.revenue_generated).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                 )}
@@ -3019,6 +3031,10 @@ const TESTIMONIAL_CATEGORIES: { value: TestimonialCategory; label: string }[] = 
   { value: 'atendimento', label: 'Atendimento' },
   { value: 'intensivo', label: 'Intensivo' },
   { value: 'encontro_elite_premium', label: 'Encontro Elite Premium' },
+  { value: 'mentoria_comercial', label: 'Mentoria Comercial' },
+  { value: 'mentoria_marketing', label: 'Mentoria de Marketing' },
+  { value: 'mentoria_gestao', label: 'Mentoria de Gestão' },
+  { value: 'hotseat', label: 'Hotseat' },
 ]
 
 function TabTestimonials({ menteeId, mentee }: { menteeId: string; mentee: MenteeWithStats }) {
@@ -3035,6 +3051,7 @@ function TabTestimonials({ menteeId, mentee }: { menteeId: string; mentee: Mente
   const [uploading, setUploading] = useState(false)
   const [loading, setLoading] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [viewingItem, setViewingItem] = useState<Testimonial | null>(null)
   const [defaultEmployeeCount, setDefaultEmployeeCount] = useState('')
   const supabase = createClient()
 
@@ -3274,12 +3291,48 @@ function TabTestimonials({ menteeId, mentee }: { menteeId: string; mentee: Mente
           </div>
         </form>
       )}
+      {/* Detail modal */}
+      <Dialog open={!!viewingItem} onOpenChange={(open) => { if (!open) setViewingItem(null) }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Depoimento</DialogTitle>
+            <DialogDescription>
+              {viewingItem?.testimonial_date ? formatDateBR(viewingItem.testimonial_date) : ''}
+              {viewingItem?.niche ? ` · ${viewingItem.niche}` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-foreground whitespace-pre-line">{viewingItem?.description}</p>
+            {viewingItem?.attachment_url && (
+              <div>
+                {viewingItem.attachment_type === 'video' ? (
+                  <video src={viewingItem.attachment_url} controls className="rounded-lg w-full max-h-[400px] object-contain bg-black" />
+                ) : (
+                  <Image src={viewingItem.attachment_url} alt="Depoimento" width={600} height={400} className="rounded-lg w-full object-contain" unoptimized />
+                )}
+              </div>
+            )}
+            {viewingItem?.categories && viewingItem.categories.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {viewingItem.categories.map((cat) => (
+                  <Badge key={cat} variant="info" className="text-[10px]">
+                    {TESTIMONIAL_CATEGORIES.find((c) => c.value === cat)?.label ?? cat}
+                  </Badge>
+                ))}
+              </div>
+            )}
+            {viewingItem?.revenue_range && <p className="text-xs text-muted-foreground">Faturamento: {viewingItem.revenue_range}</p>}
+            {viewingItem?.employee_count && <p className="text-xs text-muted-foreground">Colaboradores: {viewingItem.employee_count}</p>}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {items.map((item) => (
-        <div key={item.id} className="relative rounded-lg border border-border bg-card p-3 text-sm group">
-          <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div key={item.id} className="relative rounded-lg border border-border bg-card p-3 text-sm group cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => setViewingItem(item)}>
+          <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
             <button
               type="button"
-              onClick={() => handleEdit(item)}
+              onClick={(e) => { e.stopPropagation(); handleEdit(item) }}
               className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
               title="Editar"
             >
@@ -3287,7 +3340,7 @@ function TabTestimonials({ menteeId, mentee }: { menteeId: string; mentee: Mente
             </button>
             <button
               type="button"
-              onClick={() => setConfirmDeleteId(item.id)}
+              onClick={(e) => { e.stopPropagation(); setConfirmDeleteId(item.id) }}
               className="rounded p-1 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
               title="Excluir"
             >
@@ -3295,15 +3348,11 @@ function TabTestimonials({ menteeId, mentee }: { menteeId: string; mentee: Mente
             </button>
           </div>
           {confirmDeleteId === item.id && (
-            <div className="mb-2 rounded-md bg-destructive/10 border border-destructive/20 p-2 flex items-center justify-between">
-              <p className="text-xs text-destructive">Tem certeza que deseja excluir este depoimento?</p>
+            <div className="mb-2 rounded-md bg-destructive/10 border border-destructive/20 p-2 flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
+              <p className="text-xs text-destructive">Excluir este depoimento?</p>
               <div className="flex items-center gap-1">
-                <Button size="sm" variant="destructive" className="h-6 text-xs px-2" onClick={() => handleDelete(item.id)} disabled={loading}>
-                  Excluir
-                </Button>
-                <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => setConfirmDeleteId(null)}>
-                  Cancelar
-                </Button>
+                <Button size="sm" variant="destructive" className="h-6 text-xs px-2" onClick={() => handleDelete(item.id)} disabled={loading}>Excluir</Button>
+                <Button size="sm" variant="ghost" className="h-6 text-xs px-2" onClick={() => setConfirmDeleteId(null)}>Cancelar</Button>
               </div>
             </div>
           )}
@@ -3311,30 +3360,14 @@ function TabTestimonials({ menteeId, mentee }: { menteeId: string; mentee: Mente
             <p className="text-xs text-muted-foreground">{formatDateBR(item.testimonial_date)}</p>
             {item.niche && <Badge variant="outline" className="text-[10px]">{item.niche}</Badge>}
           </div>
-          <p className="mt-1 text-foreground">{item.description}</p>
+          <p className="mt-1 text-foreground line-clamp-2">{item.description}</p>
           {item.attachment_url && (
-            <div className="mt-2">
-              {item.attachment_type === 'video' ? (
-                <video
-                  src={item.attachment_url}
-                  controls
-                  className="rounded-md max-h-48 w-full object-contain bg-black"
-                />
-              ) : (
-                <Image
-                  src={item.attachment_url}
-                  alt="Depoimento"
-                  width={400}
-                  height={192}
-                  className="rounded-md max-h-48 w-full object-contain cursor-pointer hover:opacity-90 transition-opacity"
-                  onClick={() => window.open(item.attachment_url!, '_blank')}
-                  unoptimized={!item.attachment_url.includes('supabase')}
-                />
-              )}
+            <div className="mt-1.5 flex items-center gap-1 text-[10px] text-accent">
+              {item.attachment_type === 'video' ? '🎥 Vídeo anexado' : '📷 Imagem anexada'}
             </div>
           )}
           {item.categories && item.categories.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
+            <div className="mt-1.5 flex flex-wrap gap-1">
               {item.categories.map((cat) => (
                 <Badge key={cat} variant="info" className="text-[10px]">
                   {TESTIMONIAL_CATEGORIES.find((c) => c.value === cat)?.label ?? cat}

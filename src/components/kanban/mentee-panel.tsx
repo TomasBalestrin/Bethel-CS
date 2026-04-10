@@ -2309,6 +2309,8 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
       const optimisticItem = {
         id: `temp-${Date.now()}`,
         mentee_id: menteeId,
+        indicated_name: null, indicated_phone: null, notes: null,
+        converted: false, converted_name: null, converted_value: null, converted_at: null,
         ...data,
         created_at: new Date().toISOString(),
       } as Indication

@@ -2264,6 +2264,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
   const [qtyIndicated, setQtyIndicated] = useState('')
   const [qtyConfirmed, setQtyConfirmed] = useState('')
   const [revenueCents, setRevenueCents] = useState(0)
+  const [entryCents, setEntryCents] = useState(0)
   const [indLoading] = useState(false)
   const [confirmDeleteInd, setConfirmDeleteInd] = useState<string | null>(null)
 
@@ -2277,7 +2278,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
   useEffect(() => { fetchAll() }, [fetchAll])
 
   function resetForm() {
-    setEditingId(null); setIndDate(''); setQtyIndicated(''); setQtyConfirmed(''); setRevenueCents(0)
+    setEditingId(null); setIndDate(''); setQtyIndicated(''); setQtyConfirmed(''); setRevenueCents(0); setEntryCents(0)
   }
 
   function openEdit(ind: Indication) {
@@ -2286,6 +2287,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
     setQtyIndicated(String(ind.quantity_indicated ?? 0))
     setQtyConfirmed(String(ind.quantity_confirmed ?? 0))
     setRevenueCents(Math.round((ind.revenue_generated ?? 0) * 100))
+    setEntryCents(Math.round(((ind as Record<string, unknown>).entry_value as number ?? 0) * 100))
     setShowForm(true)
   }
 
@@ -2296,6 +2298,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
       quantity_indicated: parseInt(qtyIndicated || '0', 10),
       quantity_confirmed: parseInt(qtyConfirmed || '0', 10),
       revenue_generated: revenueCents / 100,
+      entry_value: entryCents / 100,
     }
     const savedEditingId = editingId
     const prevIndications = [...indications]
@@ -2350,7 +2353,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
         <h3 className="font-heading font-semibold text-sm">Indicações</h3>
         <div className="flex items-center gap-1.5 ml-auto">
           {totalConfirmed > 0 && (
-            <span className="text-[10px] text-success font-medium">{totalConfirmed} confirmadas</span>
+            <span className="text-[10px] text-success font-medium">{totalConfirmed} vendas</span>
           )}
           <Badge variant="muted" className="text-[10px]">{totalIndicated} indicados</Badge>
         </div>
@@ -2364,7 +2367,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
             <p className="font-bold text-sm tabular">{totalIndicated}</p>
           </div>
           <div className="rounded-md border border-border bg-card p-2">
-            <p className="text-[10px] text-muted-foreground">Confirmados</p>
+            <p className="text-[10px] text-muted-foreground">Vendas</p>
             <p className="font-bold text-sm tabular text-success">{totalConfirmed}</p>
           </div>
           <div className="rounded-md border border-border bg-card p-2">
@@ -2398,7 +2401,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
               <Input id="ind-qty" type="number" min="0" value={qtyIndicated} onChange={(e) => setQtyIndicated(e.target.value)} required />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="ind-confirmed">Qtd. confirmados</Label>
+              <Label htmlFor="ind-confirmed">Qtd. vendas</Label>
               <Input id="ind-confirmed" type="number" min="0" value={qtyConfirmed} onChange={(e) => setQtyConfirmed(e.target.value)} />
             </div>
             <div className="space-y-1">
@@ -2409,6 +2412,16 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
                 value={revenueCents > 0 ? `R$ ${fmtCurrencyInd(revenueCents)}` : ''}
                 placeholder="R$ 0,00"
                 onChange={(e) => setRevenueCents(parseCurrencyInd(e.target.value))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="ind-entry">Valor de entrada</Label>
+              <Input
+                id="ind-entry"
+                inputMode="numeric"
+                value={entryCents > 0 ? `R$ ${fmtCurrencyInd(entryCents)}` : ''}
+                placeholder="R$ 0,00"
+                onChange={(e) => setEntryCents(parseCurrencyInd(e.target.value))}
               />
             </div>
           </div>
@@ -2440,7 +2453,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
               </p>
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
                 <span>{item.quantity_indicated ?? 0} indicados</span>
-                <span className="text-success">{item.quantity_confirmed ?? 0} confirmados</span>
+                <span className="text-success">{item.quantity_confirmed ?? 0} vendas</span>
                 {Number(item.revenue_generated) > 0 && (
                   <span className="text-success font-medium">R$ {Number(item.revenue_generated).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                 )}

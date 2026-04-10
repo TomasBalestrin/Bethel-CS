@@ -597,7 +597,8 @@ function WhatsAppSection({ specialists, instances }: { specialists: Profile[]; i
   const [configInstanceId, setConfigInstanceId] = useState('')
   const [configPhone, setConfigPhone] = useState('')
   const [configSaving, setConfigSaving] = useState(false)
-  const [editingInstance, setEditingInstance] = useState(false) // true = edit existing, false = new
+  const [editingInstance, setEditingInstance] = useState(false)
+  const [showAddNew, setShowAddNew] = useState(false)
 
   const instanceMap = new Map(instances.map((i) => [i.specialist_id, i]))
 
@@ -645,6 +646,7 @@ function WhatsAppSection({ specialists, instances }: { specialists: Profile[]; i
       }
 
       setConfigSpecialist(null)
+      setShowAddNew(false)
       router.refresh()
     } catch (err) {
       console.error('Save instance error:', err)
@@ -701,9 +703,21 @@ function WhatsAppSection({ specialists, instances }: { specialists: Profile[]; i
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-4">
-        <MessageSquare className="h-5 w-5 text-green-600" />
-        <h2 className="font-heading text-xl font-semibold text-foreground">WhatsApp</h2>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="h-5 w-5 text-green-600" />
+          <h2 className="font-heading text-xl font-semibold text-foreground">WhatsApp</h2>
+        </div>
+        <Button size="sm" onClick={() => {
+          setConfigInstanceId('')
+          setConfigPhone('')
+          setEditingInstance(false)
+          setConfigSpecialist(specialists[0] || null)
+          setShowAddNew(true)
+        }}>
+          <Plus className="mr-2 h-4 w-4" />
+          Adicionar número
+        </Button>
       </div>
 
       <div className="space-y-3">
@@ -772,13 +786,29 @@ function WhatsAppSection({ specialists, instances }: { specialists: Profile[]; i
       </div>
 
       {/* Configure/Edit Instance Modal */}
-      <Dialog open={!!configSpecialist} onOpenChange={(open) => { if (!open) setConfigSpecialist(null) }}>
+      <Dialog open={!!configSpecialist || showAddNew} onOpenChange={(open) => { if (!open) { setConfigSpecialist(null); setShowAddNew(false) } }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>{editingInstance ? 'Editar' : 'Configurar'} WhatsApp — {configSpecialist?.full_name}</DialogTitle>
-            <DialogDescription>Vincule uma instância do Next Apps a este especialista.</DialogDescription>
+            <DialogTitle>{showAddNew ? 'Adicionar número' : editingInstance ? 'Editar' : 'Configurar'} WhatsApp{!showAddNew ? ` — ${configSpecialist?.full_name}` : ''}</DialogTitle>
+            <DialogDescription>Vincule uma instância do Next Apps a um especialista.</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveConfig} className="space-y-3">
+            {showAddNew && (
+              <div className="space-y-1">
+                <Label>Especialista *</Label>
+                <Select value={configSpecialist?.id || ''} onValueChange={(v) => {
+                  const s = specialists.find((sp) => sp.id === v)
+                  if (s) setConfigSpecialist(s)
+                }}>
+                  <SelectTrigger className="text-sm"><SelectValue placeholder="Selecione..." /></SelectTrigger>
+                  <SelectContent>
+                    {specialists.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-1">
               <Label htmlFor="wpp-instance-id">Instance ID *</Label>
               <Input

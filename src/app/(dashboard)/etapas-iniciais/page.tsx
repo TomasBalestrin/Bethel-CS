@@ -6,19 +6,26 @@ import { getCachedSpecialists, getCachedStages, getCachedAllStages } from '@/lib
 export default async function EtapasIniciaisPage() {
   const supabase = createClient()
 
-  // Get current user + stages + mentees all in parallel
-  const [{ data: { user } }, allStages, stages, menteesResult] = await Promise.all([
-    supabase.auth.getUser(),
-    getCachedAllStages(),
-    getCachedStages('initial'),
-    supabase.from('mentees').select(MENTEE_SUMMARY_FIELDS).eq('kanban_type', 'initial'),
-  ])
-
+  // Get current user first to determine role
+  const { data: { user } } = await supabase.auth.getUser()
   let userRole = 'especialista'
   if (user) {
     const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
     userRole = profile?.role ?? 'especialista'
   }
+
+  // Build mentees query — specialists only see their own mentees
+  let menteesQuery = supabase.from('mentees').select(MENTEE_SUMMARY_FIELDS).eq('kanban_type', 'initial')
+  if (userRole !== 'admin' && user) {
+    menteesQuery = menteesQuery.eq('created_by', user.id)
+  }
+
+  // Get stages + mentees in parallel
+  const [allStages, stages, menteesResult] = await Promise.all([
+    getCachedAllStages(),
+    getCachedStages('initial'),
+    menteesQuery,
+  ])
 
   const firstStageId = stages.length > 0 ? stages[0].id : null
   const validInitialStageIds = new Set(allStages.filter((s) => s.type === 'initial').map((s) => s.id))

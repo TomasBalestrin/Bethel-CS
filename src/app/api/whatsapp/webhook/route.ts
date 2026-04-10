@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ─── Message received ───
-    if (event === 'message_received') {
+    if (event === 'message_received' || event === 'messages.upsert' || event === 'message' || event === 'new_message') {
       const phone = data.phone as string
       if (!phone) {
         console.log('[WPP Webhook] SKIP: no phone in data')

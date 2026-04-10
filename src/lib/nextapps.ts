@@ -241,26 +241,28 @@ export async function sendMediaMessage(
     if (!instanceUUID) return { success: false, error: 'Instância WhatsApp não configurada' }
 
     const url = `${BASE_URL}/api/chats/instances/${instanceUUID}/send`
-    const body: Record<string, unknown> = {
-      phone,
-      type,
-      // Send URL in multiple fields — NextTrack docs are unclear on which field is used
-      imageUrl: mediaUrl,
-      mediaUrl: mediaUrl,
-      url: mediaUrl,
-    }
+    const body: Record<string, unknown> = { phone, type }
 
-    // Type-specific fields
+    // Set media URL based on type — use ONLY the correct field per type
     if (type === 'audio') {
+      body.audio = mediaUrl
       body.audioUrl = mediaUrl
-      body.ptt = true // push-to-talk (voice note)
+      body.ptt = true
+    } else if (type === 'image') {
+      body.image = mediaUrl
+      body.imageUrl = mediaUrl
     } else if (type === 'video') {
+      body.video = mediaUrl
       body.videoUrl = mediaUrl
     } else if (type === 'document') {
+      body.document = mediaUrl
       body.documentUrl = mediaUrl
     }
+    // Also set generic media field as fallback
+    body.mediaUrl = mediaUrl
 
     if (caption) body.message = caption
+    if (caption) body.caption = caption
     if (fileName) body.fileName = fileName
     if (mimeType) body.mimeType = mimeType
     if (quotedMsg) body.quotedMsg = quotedMsg

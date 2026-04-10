@@ -1419,7 +1419,6 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
     if (!file) return
     setUploading(true)
     try {
-      const ext = file.name.split('.').pop() || 'pdf'
       const filePath = `${mentee.id}/${Date.now()}_${file.name.replace(/\s+/g, '-')}`
 
       const { error } = await supabase.storage

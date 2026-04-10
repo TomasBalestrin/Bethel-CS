@@ -1384,10 +1384,9 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
   const [exporting, setExporting] = useState(false)
-  const [attachmentUrl, setAttachmentUrl] = useState<string | null>(null)
-  const [attachmentName, setAttachmentName] = useState<string | null>(null)
+  const [attachments, setAttachments] = useState<{ name: string; url: string }[]>([])
   const [uploading, setUploading] = useState(false)
-  const [viewerOpen, setViewerOpen] = useState(false)
+  const [viewerFile, setViewerFile] = useState<{ name: string; url: string } | null>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -1398,18 +1397,19 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
       .maybeSingle()
       .then(({ data }) => { if (data) setPlan(data) })
 
-    // Check for existing attachment
+    // Load all attachments
     supabase.storage
       .from('action-plans')
       .list(mentee.id)
       .then(({ data: files }) => {
         if (files && files.length > 0) {
-          const file = files[0]
-          const { data: urlData } = supabase.storage
-            .from('action-plans')
-            .getPublicUrl(`${mentee.id}/${file.name}`)
-          setAttachmentUrl(urlData.publicUrl)
-          setAttachmentName(file.name)
+          const all = files.map((f) => {
+            const { data: urlData } = supabase.storage
+              .from('action-plans')
+              .getPublicUrl(`${mentee.id}/${f.name}`)
+            return { name: f.name, url: urlData.publicUrl }
+          })
+          setAttachments(all)
         }
       })
   }, [mentee.id]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -1420,21 +1420,14 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
     setUploading(true)
     try {
       const ext = file.name.split('.').pop() || 'pdf'
-      const filePath = `${mentee.id}/${Date.now()}_plano-de-acao.${ext}`
-
-      // Remove ALL existing files in the mentee's folder first
-      const { data: existingFiles } = await supabase.storage.from('action-plans').list(mentee.id)
-      if (existingFiles && existingFiles.length > 0) {
-        const pathsToRemove = existingFiles.map((f) => `${mentee.id}/${f.name}`)
-        await supabase.storage.from('action-plans').remove(pathsToRemove)
-      }
+      const filePath = `${mentee.id}/${Date.now()}_${file.name.replace(/\s+/g, '-')}`
 
       const { error } = await supabase.storage
         .from('action-plans')
         .upload(filePath, file, { contentType: file.type })
 
       if (error) {
-        toast.error('Erro ao enviar arquivo')
+        toast.error('Erro ao enviar arquivo: ' + error.message)
         return
       }
 
@@ -1443,33 +1436,29 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
         .getPublicUrl(filePath)
 
       const newName = filePath.split('/').pop()!
-      setAttachmentUrl(urlData.publicUrl)
-      setAttachmentName(newName)
-      toast.success('Plano de ação anexado com sucesso')
+      setAttachments((prev) => [...prev, { name: newName, url: urlData.publicUrl }])
+      toast.success('Arquivo anexado com sucesso')
     } finally {
       setUploading(false)
       e.target.value = ''
     }
   }
 
-  async function handleRemoveAttachment() {
-    if (!attachmentName) return
-    const confirmed = window.confirm('Remover o plano de ação anexado?')
+  async function handleRemoveAttachment(fileName: string) {
+    const confirmed = window.confirm('Remover este arquivo?')
     if (!confirmed) return
 
-    // Remove ALL files in the mentee's folder to prevent orphans
-    const { data: existingFiles } = await supabase.storage.from('action-plans').list(mentee.id)
-    if (existingFiles && existingFiles.length > 0) {
-      const pathsToRemove = existingFiles.map((f) => `${mentee.id}/${f.name}`)
-      const { error } = await supabase.storage.from('action-plans').remove(pathsToRemove)
-      if (error) {
-        toast.error('Erro ao remover: ' + error.message)
-        return
-      }
+    const { error } = await supabase.storage
+      .from('action-plans')
+      .remove([`${mentee.id}/${fileName}`])
+
+    if (error) {
+      toast.error('Erro ao remover: ' + error.message)
+      return
     }
 
-    setAttachmentUrl(null)
-    setAttachmentName(null)
+    setAttachments((prev) => prev.filter((a) => a.name !== fileName))
+    if (viewerFile?.name === fileName) setViewerFile(null)
     toast.success('Arquivo removido')
   }
 
@@ -1554,81 +1543,69 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
 
   const planData = plan?.data as Record<string, unknown> | null
 
-  const isPdf = attachmentName?.toLowerCase().endsWith('.pdf')
-  const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(attachmentName ?? '')
-
   return (
     <div className="space-y-4 animate-fade-in">
-      {/* ── Plano de ação anexado ── */}
+      {/* ── Planos de ação anexados ── */}
       <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
         <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
           <FileDown className="h-3.5 w-3.5 text-accent" />
-          <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Plano de ação anexado</h3>
+          <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Planos de ação anexados</h3>
         </div>
-        <div className="p-3">
-          {attachmentUrl ? (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2.5">
+        <div className="p-3 space-y-2">
+          {attachments.length > 0 ? (
+            attachments.map((att) => (
+              <div key={att.name} className="flex items-center gap-2 rounded-md bg-muted/50 px-3 py-2">
                 <FileDown className="h-4 w-4 text-accent shrink-0" />
-                <span className="text-sm text-foreground font-medium truncate flex-1">{attachmentName}</span>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <Button size="sm" variant="outline" onClick={() => setViewerOpen(true)} className="text-xs gap-1.5 h-7">
-                    <FileDown className="h-3 w-3" /> Visualizar
+                <span className="text-sm text-foreground font-medium truncate flex-1">{att.name}</span>
+                <div className="flex items-center gap-1 shrink-0">
+                  <Button size="sm" variant="outline" onClick={() => setViewerFile(att)} className="text-xs gap-1 h-7">
+                    <FileDown className="h-3 w-3" /> Ver
                   </Button>
-                  <a href={attachmentUrl} download={attachmentName ?? 'plano-de-acao'} target="_blank" rel="noopener noreferrer">
-                    <Button size="sm" variant="outline" className="text-xs gap-1.5 h-7">
+                  <a href={att.url} download={att.name} target="_blank" rel="noopener noreferrer">
+                    <Button size="sm" variant="outline" className="text-xs gap-1 h-7">
                       <FileDown className="h-3 w-3" /> Baixar
                     </Button>
                   </a>
-                  <Button size="sm" variant="ghost" onClick={handleRemoveAttachment} className="text-xs text-destructive h-7">
+                  <Button size="sm" variant="ghost" onClick={() => handleRemoveAttachment(att.name)} className="text-xs text-destructive h-7">
                     <Trash2 className="h-3 w-3" />
                   </Button>
                 </div>
               </div>
-            </div>
+            ))
           ) : (
-            <div className="text-center py-4">
-              <p className="text-sm text-muted-foreground mb-3">Nenhum plano de ação anexado</p>
-              <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted/50 transition-colors">
-                <Plus className="h-3.5 w-3.5" />
-                {uploading ? 'Enviando...' : 'Anexar plano de ação'}
-                <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp" onChange={handleUploadAttachment} disabled={uploading} />
-              </label>
-            </div>
+            <p className="text-sm text-muted-foreground text-center py-2">Nenhum arquivo anexado</p>
           )}
-          {attachmentUrl && (
-            <label className="cursor-pointer inline-flex items-center gap-1.5 mt-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
-              <Plus className="h-3 w-3" />
-              {uploading ? 'Enviando...' : 'Substituir arquivo'}
-              <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp" onChange={handleUploadAttachment} disabled={uploading} />
-            </label>
-          )}
+          <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium hover:bg-muted/50 transition-colors">
+            <Plus className="h-3.5 w-3.5" />
+            {uploading ? 'Enviando...' : 'Anexar arquivo'}
+            <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp" onChange={handleUploadAttachment} disabled={uploading} />
+          </label>
         </div>
       </div>
 
       {/* ── Viewer dialog ── */}
-      {viewerOpen && attachmentUrl && (
-        <div className="fixed inset-0 z-[100] flex flex-col bg-black/80" onClick={() => setViewerOpen(false)}>
+      {viewerFile && (
+        <div className="fixed inset-0 z-[100] flex flex-col bg-black/80" onClick={() => setViewerFile(null)}>
           <div className="flex items-center justify-between px-4 py-3 bg-card border-b border-border shrink-0" onClick={(e) => e.stopPropagation()}>
-            <span className="text-sm font-medium text-foreground truncate">{attachmentName}</span>
+            <span className="text-sm font-medium text-foreground truncate">{viewerFile.name}</span>
             <div className="flex items-center gap-2">
-              <a href={attachmentUrl} download={attachmentName ?? 'plano-de-acao'} target="_blank" rel="noopener noreferrer">
+              <a href={viewerFile.url} download={viewerFile.name} target="_blank" rel="noopener noreferrer">
                 <Button size="sm" variant="outline" className="text-xs gap-1.5">
                   <FileDown className="h-3.5 w-3.5" /> Baixar
                 </Button>
               </a>
-              <Button size="sm" variant="ghost" onClick={() => setViewerOpen(false)} className="text-xs">
+              <Button size="sm" variant="ghost" onClick={() => setViewerFile(null)} className="text-xs">
                 Fechar
               </Button>
             </div>
           </div>
           <div className="flex-1 overflow-auto p-4" onClick={(e) => e.stopPropagation()}>
-            {isPdf ? (
-              <iframe src={attachmentUrl} className="w-full h-full min-h-[80vh] rounded-lg bg-white" title="Plano de ação" />
-            ) : isImage ? (
+            {viewerFile.name.toLowerCase().endsWith('.pdf') ? (
+              <iframe src={viewerFile.url} className="w-full h-full min-h-[80vh] rounded-lg bg-white" title="Plano de ação" />
+            ) : /\.(jpg|jpeg|png|gif|webp)$/i.test(viewerFile.name) ? (
               <div className="flex items-center justify-center h-full">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={attachmentUrl} alt="Plano de ação" className="max-w-full max-h-[85vh] rounded-lg shadow-lg" />
+                <img src={viewerFile.url} alt="Plano de ação" className="max-w-full max-h-[85vh] rounded-lg shadow-lg" />
               </div>
             ) : (
               <div className="flex items-center justify-center h-full">

@@ -1214,6 +1214,7 @@ export interface Database {
           is_read: boolean
           sent_at: string
           channel: string
+          quoted_message_id: string | null
           created_at: string
         }
         Insert: {
@@ -1230,6 +1231,7 @@ export interface Database {
           is_read?: boolean
           sent_at: string
           channel?: string
+          quoted_message_id?: string | null
           created_at?: string
         }
         Update: {

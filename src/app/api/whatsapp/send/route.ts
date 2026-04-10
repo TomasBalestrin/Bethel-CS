@@ -99,9 +99,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (!result.success) {
-      console.error('[WPP Send] NextTrack error:', result.error, { menteeId, instanceId: nextrackUUID, phone, channel })
+      console.error('[WPP Send] NextTrack error:', result.error, { menteeId, instanceId: nextrackUUID, phone, channel, type, mimeType, imageUrl: imageUrl?.slice(0, 80) })
       return NextResponse.json({ error: result.error || 'Falha ao enviar via WhatsApp' }, { status: 502 })
     }
+
+    console.log('[WPP Send] Success:', { menteeId, type, phone, channel })
 
     // 7. Save message with channel
     await supabase.from('wpp_messages').insert({

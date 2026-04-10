@@ -233,24 +233,37 @@ function parseDateServer(val: string | number | undefined): string | null {
     const serial = typeof val === 'number' ? val : parseFloat(val)
     if (serial > 1000 && serial < 100000) {
       // Excel epoch: Jan 0, 1900 (with the Lotus 123 leap year bug)
-      // Round to nearest day to avoid fractional time issues
-      const excelEpoch = new Date(1899, 11, 30) // Dec 30, 1899
-      const date = new Date(excelEpoch.getTime() + Math.round(serial) * 86400000)
+      // Use UTC to avoid timezone-related date shifts
+      const utcDays = Math.round(serial) - 25569 // 25569 = days from 1900-01-01 to 1970-01-01
+      const date = new Date(utcDays * 86400000)
       if (!isNaN(date.getTime())) {
-        const y = date.getFullYear()
-        const m = String(date.getMonth() + 1).padStart(2, '0')
-        const d = String(date.getDate()).padStart(2, '0')
+        const y = date.getUTCFullYear()
+        const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+        const d = String(date.getUTCDate()).padStart(2, '0')
         return `${y}-${m}-${d}`
       }
     }
   }
   const str = String(val).trim()
-  // DD/MM/YYYY
+  // DD/MM/YYYY (4-digit year)
   const brMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
   if (brMatch) return `${brMatch[3]}-${brMatch[2].padStart(2, '0')}-${brMatch[1].padStart(2, '0')}`
+  // DD/MM/YY (2-digit year → assume 20xx)
+  const brMatch2 = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/)
+  if (brMatch2) {
+    const year = parseInt(brMatch2[3], 10)
+    const fullYear = year >= 0 && year <= 99 ? 2000 + year : year
+    return `${fullYear}-${brMatch2[2].padStart(2, '0')}-${brMatch2[1].padStart(2, '0')}`
+  }
   if (/^\d{4}-\d{2}-\d{2}/.test(str)) return str.substring(0, 10)
+  // Fallback: try native parsing but use UTC to avoid timezone shifts
   const d = new Date(str)
-  if (!isNaN(d.getTime())) return d.toISOString().substring(0, 10)
+  if (!isNaN(d.getTime())) {
+    const y = d.getUTCFullYear()
+    const mo = String(d.getUTCMonth() + 1).padStart(2, '0')
+    const da = String(d.getUTCDate()).padStart(2, '0')
+    return `${y}-${mo}-${da}`
+  }
   return null
 }
 

@@ -839,6 +839,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
               <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Mentoria</h3>
             </div>
             <div className="px-3 py-2 space-y-0">
+              {mentee.start_date && <ContactRow icon={Calendar} label="Início" value={formatDateBR(mentee.start_date)} color="text-success" bg="bg-success/10" />}
               {mentee.end_date && <ContactRow icon={Calendar} label="Término" value={formatDateBR(mentee.end_date)} color="text-info" bg="bg-info/10" />}
               {mentee.seller_name && <ContactRow icon={Users} label="Vendedor" value={mentee.seller_name} color="text-success" bg="bg-success/10" />}
               {mentee.funnel_origin && <ContactRow icon={Target} label="Funil" value={mentee.funnel_origin} color="text-warning" bg="bg-warning/10" />}

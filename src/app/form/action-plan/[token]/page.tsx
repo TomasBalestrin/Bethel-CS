@@ -19,13 +19,6 @@ export default async function ActionPlanPage({ params }: Props) {
     notFound()
   }
 
-  // Check if already submitted — allow resubmission (updates existing data)
-  const { data: plan } = await supabase
-    .from('action_plans')
-    .select('submitted_at')
-    .eq('mentee_id', mentee.id)
-    .maybeSingle()
-
   // Always show the form — if resubmitted, data will be updated
   return <ActionPlanForm token={params.token} menteeName={mentee.full_name} />
 }

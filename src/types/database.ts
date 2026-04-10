@@ -139,6 +139,8 @@ export interface Database {
           metrics_updated_at: string | null
           personal_tags: string[] | null
           notes: string | null
+          nome_empresa: string | null
+          num_colaboradores: number | null
         }
         Insert: {
           id?: string
@@ -196,6 +198,8 @@ export interface Database {
           metrics_updated_at?: string | null
           personal_tags?: string[] | null
           notes?: string | null
+          nome_empresa?: string | null
+          num_colaboradores?: number | null
         }
         Update: {
           full_name?: string
@@ -249,6 +253,33 @@ export interface Database {
           metrics_updated_at?: string | null
           personal_tags?: string[] | null
           notes?: string | null
+          nome_empresa?: string | null
+          num_colaboradores?: number | null
+        }
+        Relationships: []
+      }
+      chat_channels: {
+        Row: {
+          id: string
+          slug: string
+          label: string
+          position: number
+          is_default: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          slug: string
+          label: string
+          position?: number
+          is_default?: boolean
+          created_at?: string
+        }
+        Update: {
+          slug?: string
+          label?: string
+          position?: number
+          is_default?: boolean
         }
         Relationships: []
       }

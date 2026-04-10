@@ -223,6 +223,7 @@ interface BulkImportResult {
   total: number
   created: number
   errors: { row: number; name: string; error: string }[]
+  importedMenteeIds?: string[]
 }
 
 function parseDateServer(val: string | number | undefined): string | null {
@@ -475,6 +476,7 @@ export async function bulkImportActionPlans(input: BulkActionPlanInput): Promise
 
   const errors: BulkImportResult['errors'] = []
   let created = 0
+  const importedMenteeIds: string[] = []
 
   for (let i = 0; i < input.rows.length; i++) {
     const raw = input.rows[i]
@@ -523,14 +525,37 @@ export async function bulkImportActionPlans(input: BulkActionPlanInput): Promise
           .from('action_plans')
           .insert({ mentee_id: menteeId, data: planData as unknown as Database['public']['Tables']['action_plans']['Insert']['data'], submitted_at: new Date().toISOString() })
       }
+      // Sync direct fields back to mentee when present in the imported data
+      const syncUpdates: Record<string, unknown> = {}
+      if (planData.nicho) syncUpdates.niche = String(planData.nicho).trim()
+      if (planData.nome_empresa) syncUpdates.nome_empresa = String(planData.nome_empresa).trim()
+      if (planData.num_colaboradores) {
+        const n = parseInt(String(planData.num_colaboradores), 10)
+        if (!isNaN(n) && n > 0) syncUpdates.num_colaboradores = n
+      }
+      if (planData.faturamento_medio) {
+        const f = parseFloat(String(planData.faturamento_medio).replace(/[R$\s.]/g, '').replace(',', '.'))
+        if (!isNaN(f) && f > 0) syncUpdates.faturamento_atual = f
+      }
+      if (planData.cpf) syncUpdates.cpf = String(planData.cpf).trim()
+      if (planData.email) syncUpdates.email = String(planData.email).trim()
+      if (planData.instagram) syncUpdates.instagram = String(planData.instagram).trim()
+      if (planData.cidade) syncUpdates.city = String(planData.cidade).trim()
+      if (planData.estado) syncUpdates.state = String(planData.estado).trim()
+      if (Object.keys(syncUpdates).length > 0) {
+        syncUpdates.updated_at = new Date().toISOString()
+        await supabase.from('mentees').update(syncUpdates).eq('id', menteeId)
+      }
+
       created++
+      importedMenteeIds.push(menteeId)
     } catch (err) {
       errors.push({ row: rowNum, name, error: String(err) })
     }
   }
 
   revalidatePath('/mentorados')
-  return { total: input.rows.length, created, errors }
+  return { total: input.rows.length, created, errors, importedMenteeIds }
 }
 
 // ─── Bulk Import: Stage Assignments ──────────────────────────────────────────

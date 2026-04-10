@@ -32,6 +32,7 @@ export const CallInterface = memo(function CallInterface({
   const endedRef = useRef(false)
   const callIdRef = useRef(callId)
   const onEndRef = useRef(onEnd)
+  const audioRef = useRef<HTMLAudioElement>(null)
 
   callIdRef.current = callId
   onEndRef.current = onEnd
@@ -118,8 +119,23 @@ export const CallInterface = memo(function CallInterface({
       call!.setLocalAudio(true)
     })
     call.on('participant-joined', () => updateRemoteCount())
-    call.on('participant-updated', () => updateRemoteCount())
-    call.on('participant-left', () => updateRemoteCount())
+    call.on('participant-updated', (ev) => {
+      updateRemoteCount()
+      // Attach remote audio track when available
+      if (ev?.participant && !ev.participant.local && ev.participant.tracks?.audio?.persistentTrack) {
+        const track = ev.participant.tracks.audio.persistentTrack
+        if (audioRef.current) {
+          const stream = new MediaStream([track])
+          audioRef.current.srcObject = stream
+          audioRef.current.play().catch(() => {})
+          console.log('[Call] Remote audio track attached')
+        }
+      }
+    })
+    call.on('participant-left', () => {
+      updateRemoteCount()
+      if (audioRef.current) audioRef.current.srcObject = null
+    })
     call.on('left-meeting', () => {
       console.log('[Call] left-meeting')
       if (!endedRef.current) doEnd()
@@ -169,6 +185,8 @@ export const CallInterface = memo(function CallInterface({
 
   return (
     <div className="flex flex-col items-center justify-center h-full py-6 px-4">
+      {/* Hidden audio element for remote participant audio playback */}
+      <audio ref={audioRef} autoPlay playsInline />
       <p className="text-xs text-white/50">Ligação de voz</p>
       <h2 className="text-lg font-semibold text-white mt-1">{menteeName}</h2>
       <p className="text-3xl font-mono text-white mt-4 tabular">{formatTimer}</p>

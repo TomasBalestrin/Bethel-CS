@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import type { TestimonialCategory, EngagementType, CsActivityType, RevenueType, Database } from '@/types/database'
 
 type MenteeUpdate = Database['public']['Tables']['mentees']['Update']
@@ -44,8 +45,11 @@ export async function deleteMentee(menteeId: string) {
 
   if (profile?.role !== 'admin') return { error: 'Sem permissão' }
 
+  // Use admin client to bypass RLS for cascade deletion
+  const admin = createAdminClient()
+
   // Clear referrals pointing to this mentee
-  await supabase.from('mentees').update({ referred_by_mentee_id: null }).eq('referred_by_mentee_id', menteeId)
+  await admin.from('mentees').update({ referred_by_mentee_id: null }).eq('referred_by_mentee_id', menteeId)
 
   // Delete related records first (cascade)
   const tables = [
@@ -66,13 +70,15 @@ export async function deleteMentee(menteeId: string) {
     'call_records',
     'attendance_sessions',
     'tasks',
+    'delivery_participations',
+    'stage_changes',
   ] as const
 
   for (const table of tables) {
-    await supabase.from(table).delete().eq('mentee_id', menteeId)
+    await admin.from(table as never).delete().eq('mentee_id' as never, menteeId as never)
   }
 
-  const { error } = await supabase.from('mentees').delete().eq('id', menteeId)
+  const { error } = await admin.from('mentees').delete().eq('id', menteeId)
 
   if (error) return { error: error.message }
   revalidatePath('/etapas-iniciais')

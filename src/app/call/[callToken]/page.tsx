@@ -198,6 +198,7 @@ function MenteeVoiceCall({ roomUrl, token, specialistName, status, onStatusChang
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const timerStarted = useRef(false)
   const endedRef = useRef(false)
+  const audioRef = useRef<HTMLAudioElement>(null)
 
   const isActive = remoteCount > 0
 
@@ -242,8 +243,22 @@ function MenteeVoiceCall({ roomUrl, token, specialistName, status, onStatusChang
       call.setLocalAudio(true)
     })
     call.on('participant-joined', () => updateRemoteCount())
-    call.on('participant-updated', () => updateRemoteCount())
-    call.on('participant-left', () => updateRemoteCount())
+    call.on('participant-updated', (ev) => {
+      updateRemoteCount()
+      if (ev?.participant && !ev.participant.local && ev.participant.tracks?.audio?.persistentTrack) {
+        const track = ev.participant.tracks.audio.persistentTrack
+        if (audioRef.current) {
+          const stream = new MediaStream([track])
+          audioRef.current.srcObject = stream
+          audioRef.current.play().catch(() => {})
+          console.log('[MenteeCall] Remote audio track attached')
+        }
+      }
+    })
+    call.on('participant-left', () => {
+      updateRemoteCount()
+      if (audioRef.current) audioRef.current.srcObject = null
+    })
     call.on('left-meeting', () => { if (!endedRef.current) doEnd() })
     call.on('error', () => { if (!endedRef.current) doEnd() })
 
@@ -285,6 +300,7 @@ function MenteeVoiceCall({ roomUrl, token, specialistName, status, onStatusChang
 
   return (
     <div className="flex flex-1 flex-col landscape:flex-row items-center justify-center px-6 gap-4">
+      <audio ref={audioRef} autoPlay playsInline />
       <div className="flex flex-col items-center">
         <p className="text-xs text-white/50">Ligação de voz</p>
         <h2 className="text-xl font-semibold text-white mt-1">{specialistName}</h2>

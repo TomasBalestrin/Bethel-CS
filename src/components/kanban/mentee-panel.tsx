@@ -1419,7 +1419,11 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
     if (!file) return
     setUploading(true)
     try {
-      const filePath = `${mentee.id}/${Date.now()}_${file.name.replace(/\s+/g, '-')}`
+      const safeName = file.name
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove accents
+        .replace(/[^a-zA-Z0-9._-]/g, '-') // only safe chars
+        .replace(/-+/g, '-') // collapse dashes
+      const filePath = `${mentee.id}/${Date.now()}_${safeName}`
 
       const { error } = await supabase.storage
         .from('action-plans')

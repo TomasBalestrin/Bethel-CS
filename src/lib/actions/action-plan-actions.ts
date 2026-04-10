@@ -17,15 +17,21 @@ export async function submitActionPlan(token: string, data: Record<string, Json>
     return { error: 'Token inválido ou mentorado não encontrado' }
   }
 
-  // Check if already submitted
+  // Check if already submitted via the web form (not bulk import)
   const { data: existing } = await supabase
     .from('action_plans')
-    .select('id, submitted_at')
+    .select('id, submitted_at, data')
     .eq('mentee_id', mentee.id)
     .maybeSingle()
 
+  // Only block if submitted via web form (has detailed form fields like motivacao_elite_premium)
+  // Allow overwriting plans that came from bulk import (they won't have form-specific fields)
   if (existing?.submitted_at) {
-    return { error: 'Formulário já foi enviado anteriormente' }
+    const existingData = existing.data as Record<string, unknown> | null
+    const isFromWebForm = existingData?.motivacao_elite_premium || existingData?.expectativas_resultados
+    if (isFromWebForm) {
+      return { error: 'Formulário já foi enviado anteriormente' }
+    }
   }
 
   if (existing) {

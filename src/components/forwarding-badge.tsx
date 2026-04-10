@@ -118,8 +118,8 @@ export function ForwardingBadge() {
                 <p className="text-xs text-muted-foreground">{n.mentee_phone}</p>
                 <p className="text-xs text-foreground">{n.description}</p>
                 <div className="flex items-center gap-2 pt-1">
-                  {n.department !== 'system' && (
-                    <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => openMentee(n.mentee_id)}>
+                  {n.department !== 'system' && n.mentee_id && (
+                    <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => openMentee(n.mentee_id!)}>
                       Abrir mentorado
                     </Button>
                   )}

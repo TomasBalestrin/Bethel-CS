@@ -23,6 +23,10 @@ export type TestimonialCategory =
   | 'atendimento'
   | 'intensivo'
   | 'encontro_elite_premium'
+  | 'mentoria_comercial'
+  | 'mentoria_marketing'
+  | 'mentoria_gestao'
+  | 'hotseat'
 
 export interface Database {
   public: {

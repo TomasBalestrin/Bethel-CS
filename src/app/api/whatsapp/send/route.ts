@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 6. Send via NextTrack API
-    let result: { success: boolean; error?: string }
+    let result: { success: boolean; error?: string; messageId?: string }
 
     if (!type || type === 'text') {
       result = await sendTextMessage(phone, signedMessage, nextrackUUID, quotedMessageId || undefined)

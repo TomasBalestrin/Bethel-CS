@@ -1825,7 +1825,7 @@ function CardIndividualSessions({ menteeId }: { menteeId: string }) {
     } as Database['public']['Tables']['individual_sessions']['Row']
     setItems((prev) => [optimisticItem, ...prev])
     const savedDate = sessionDate; const savedSpecialist = specialist; const savedNotes = notes
-    setSessionDate(''); setDuration(''); setSpecialist(''); setNotes(''); setShowForm(false)
+    setSessionDate(''); setSpecialist(''); setNotes(''); setShowForm(false)
 
     try {
       await addIndividualSession(menteeId, { session_date: savedDate, specialist_name: savedSpecialist || undefined, notes: savedNotes || undefined })

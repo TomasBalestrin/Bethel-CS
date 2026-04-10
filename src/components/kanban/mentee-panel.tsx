@@ -1800,7 +1800,6 @@ function CardIndividualSessions({ menteeId }: { menteeId: string }) {
   const [items, setItems] = useState<Database['public']['Tables']['individual_sessions']['Row'][]>([])
   const [showForm, setShowForm] = useState(false)
   const [sessionDate, setSessionDate] = useState('')
-  const [duration, setDuration] = useState('')
   const [specialist, setSpecialist] = useState('')
   const [notes, setNotes] = useState('')
   const [loading] = useState(false)
@@ -1819,17 +1818,17 @@ function CardIndividualSessions({ menteeId }: { menteeId: string }) {
       id: `temp-${Date.now()}`,
       mentee_id: menteeId,
       session_date: sessionDate,
-      duration_minutes: duration ? parseInt(duration) : null,
+      duration_minutes: null,
       specialist_name: specialist || null,
       notes: notes || null,
       created_at: new Date().toISOString(),
     } as Database['public']['Tables']['individual_sessions']['Row']
     setItems((prev) => [optimisticItem, ...prev])
-    const savedDate = sessionDate; const savedDuration = duration; const savedSpecialist = specialist; const savedNotes = notes
+    const savedDate = sessionDate; const savedSpecialist = specialist; const savedNotes = notes
     setSessionDate(''); setDuration(''); setSpecialist(''); setNotes(''); setShowForm(false)
 
     try {
-      await addIndividualSession(menteeId, { session_date: savedDate, duration_minutes: savedDuration ? parseInt(savedDuration) : undefined, specialist_name: savedSpecialist || undefined, notes: savedNotes || undefined })
+      await addIndividualSession(menteeId, { session_date: savedDate, specialist_name: savedSpecialist || undefined, notes: savedNotes || undefined })
       fetchData()
     } catch {
       // Revert on error
@@ -1852,7 +1851,6 @@ function CardIndividualSessions({ menteeId }: { menteeId: string }) {
         <form onSubmit={handleSubmit} className="space-y-3 rounded-lg border border-border bg-muted/50 p-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1"><Label>Data *</Label><Input type="date" value={sessionDate} onChange={(e) => setSessionDate(e.target.value)} required /></div>
-            <div className="space-y-1"><Label>Duração (min)</Label><Input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} /></div>
           </div>
           <div className="space-y-1"><Label>Especialista</Label><Input value={specialist} onChange={(e) => setSpecialist(e.target.value)} placeholder="Ex: Ericles" /></div>
           <div className="space-y-1"><Label>Observações</Label><Input value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
@@ -1870,7 +1868,6 @@ function CardIndividualSessions({ menteeId }: { menteeId: string }) {
         <div key={item.id} className="rounded-lg border border-border bg-card p-3 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs text-muted-foreground">{formatDateBR(item.session_date)}</span>
-            {item.duration_minutes && <Badge variant="info" className="text-[10px]">{item.duration_minutes}min</Badge>}
           </div>
           {item.specialist_name && <p className="mt-1 text-foreground">{item.specialist_name}</p>}
           {item.notes && <p className="text-xs text-muted-foreground mt-0.5">{item.notes}</p>}

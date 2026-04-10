@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select'
 import {
   Phone, Mail, Calendar, Star, AtSign, Plus, Upload,
-  CheckSquare, Square, Trash2, UserPlus, ArrowRightLeft, X, Loader2,
+  CheckSquare, Square, Trash2, UserPlus, ArrowRightLeft, X, Loader2, ChevronDown, ChevronUp, MessageSquare,
 } from 'lucide-react'
 import { MenteePanel } from '@/components/kanban/mentee-panel'
 import { CreateMenteeDialog } from '@/components/kanban/create-mentee-dialog'
@@ -297,6 +297,13 @@ export function MentoradosList({
   }, [selectedIds, targetSpecialistId, router])
 
   const initialStages = stages.filter((s) => s.type === 'initial')
+
+  // Lookup maps for card display
+  const specialistNameMap = new Map(specialists.map((s) => [s.id, s.full_name]))
+  const stageNameMap = new Map(stages.map((s) => [s.id, s.name]))
+
+  // Collapsible notes state
+  const [expandedNotes, setExpandedNotes] = useState<Set<string>>(new Set())
   const mentorshipStages = stages.filter((s) => s.type === 'mentorship')
 
   return (
@@ -469,6 +476,8 @@ export function MentoradosList({
           const instHandle = m.instagram?.replace(/^@/, '') || null
           const unread = unreadMap[m.id] ?? 0
           const isSelected = selectedIds.has(m.id)
+          const specialistName = m.created_by ? specialistNameMap.get(m.created_by) : null
+          const stageName = m.current_stage_id ? stageNameMap.get(m.current_stage_id) : null
 
           return (
             <div
@@ -524,6 +533,16 @@ export function MentoradosList({
                     )}
                   </div>
 
+                  {/* Tags: specialist + stage */}
+                  <div className="flex flex-wrap gap-1 mt-2">
+                    {specialistName && (
+                      <Badge variant="secondary" className="text-[10px] font-medium">{specialistName}</Badge>
+                    )}
+                    {stageName && (
+                      <Badge variant="accent" className="text-[10px] font-medium">{stageName}</Badge>
+                    )}
+                  </div>
+
                   {/* Contact section */}
                   <div className="mt-3 pt-3 border-t border-border/50 space-y-1.5 text-sm text-muted-foreground">
                     <div className="flex items-center gap-2">
@@ -567,6 +586,33 @@ export function MentoradosList({
                       <Badge variant="info" className="text-[10px] ml-2">Mentoria</Badge>
                     )}
                   </div>
+
+                  {/* Collapsible notes */}
+                  {m.notes && (
+                    <div className="mt-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setExpandedNotes((prev) => {
+                            const next = new Set(prev)
+                            if (next.has(m.id)) next.delete(m.id)
+                            else next.add(m.id)
+                            return next
+                          })
+                        }}
+                        className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <MessageSquare className="h-3 w-3" />
+                        Observações
+                        {expandedNotes.has(m.id) ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                      </button>
+                      {expandedNotes.has(m.id) && (
+                        <div className="mt-1.5 rounded-md bg-muted/50 px-2.5 py-2 text-xs text-muted-foreground whitespace-pre-wrap">
+                          {m.notes}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

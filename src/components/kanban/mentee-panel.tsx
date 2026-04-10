@@ -384,18 +384,21 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
               { value: 'engajamento', label: 'Engajamento' },
               { value: 'historico', label: 'Histórico' },
               { value: 'intensivo', label: 'Eventos' },
-              { value: 'chat', label: 'Chat' },
+              { value: 'chat-principal', label: 'Chat Principal' },
+              { value: 'chat-comercial', label: 'Comercial' },
+              { value: 'chat-marketing', label: 'Marketing' },
+              { value: 'chat-gestao', label: 'Gestão' },
             ].map((tab) => (
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
                 className="whitespace-nowrap rounded-none border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-accent data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
               >
-                {tab.value === 'chat' ? (
+                {tab.value.startsWith('chat-') ? (
                   <span className="flex items-center gap-1.5">
-                    <MessageSquare className="h-3.5 w-3.5" />
-                    Chat
-                    {chatUnread > 0 && (
+                    {tab.value === 'chat-principal' && <MessageSquare className="h-3.5 w-3.5" />}
+                    {tab.label}
+                    {tab.value === 'chat-principal' && chatUnread > 0 && (
                       <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-white">
                         {chatUnread}
                       </span>
@@ -422,7 +425,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
           </button>
         )}
       </div>
-      <ScrollArea className={`flex-1 px-4 py-4 sm:px-6 lg:px-8 ${activeTab === 'chat' ? 'hidden' : ''}`}>
+      <ScrollArea className={`flex-1 px-4 py-4 sm:px-6 lg:px-8 ${activeTab.startsWith('chat-') ? 'hidden' : ''}`}>
         <TabsContent value="info"><ErrorBoundary>
           <TabInfo
             mentee={mentee}
@@ -439,16 +442,25 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
         <TabsContent value="historico"><ErrorBoundary><TabHistorico menteeId={mentee.id} /></ErrorBoundary></TabsContent>
         <TabsContent value="intensivo"><ErrorBoundary><TabIntensivo menteeId={mentee.id} /></ErrorBoundary></TabsContent>
       </ScrollArea>
-      {/* Chat tab — outside ScrollArea (manages its own scroll) */}
-      <TabsContent value="chat" className={`flex-1 overflow-hidden ${activeTab !== 'chat' ? 'hidden' : ''}`}>
-        <ErrorBoundary><TabChat
-          menteeId={mentee.id}
+      {/* Chat tabs — outside ScrollArea (each manages its own scroll) */}
+      {[
+        { value: 'chat-principal', channel: 'principal', signature: 'Canal do especialista' },
+        { value: 'chat-comercial', channel: 'comercial', signature: 'Hannah' },
+        { value: 'chat-marketing', channel: 'marketing', signature: 'Matheus' },
+        { value: 'chat-gestao', channel: 'gestao', signature: 'Keyth' },
+      ].map((chat) => (
+        <TabsContent key={chat.value} value={chat.value} className={`flex-1 overflow-hidden ${activeTab !== chat.value ? 'hidden' : ''}`}>
+          <ErrorBoundary><TabChat
+            menteeId={mentee.id}
             menteePhone={mentee.phone}
             menteeName={mentee.full_name}
             specialistId={mentee.created_by}
-            onUnreadCountChange={setChatUnread}
+            onUnreadCountChange={chat.value === 'chat-principal' ? setChatUnread : undefined}
+            channel={chat.channel}
+            signatureName={chat.signature}
           /></ErrorBoundary>
         </TabsContent>
+      ))}
     </Tabs>
   )
 }

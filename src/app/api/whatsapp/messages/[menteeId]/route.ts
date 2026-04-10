@@ -16,11 +16,15 @@ export async function GET(
 
   const { menteeId } = params
 
-  // 1. Fetch last 100 messages
+  // Channel filter from query param
+  const channel = request.nextUrl.searchParams.get('channel') || 'principal'
+
+  // 1. Fetch last 100 messages for this channel
   const { data: messages, error } = await supabase
     .from('wpp_messages')
-    .select('id, mentee_id, specialist_id, instance_id, message_id, direction, message_type, content, media_url, sender_name, is_read, sent_at, created_at')
+    .select('id, mentee_id, specialist_id, instance_id, message_id, direction, message_type, content, media_url, sender_name, is_read, sent_at, created_at, channel')
     .eq('mentee_id', menteeId)
+    .eq('channel', channel)
     .order('sent_at', { ascending: true })
     .limit(100)
 
@@ -28,13 +32,14 @@ export async function GET(
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // 2. Mark unread incoming messages as read
+  // 2. Mark unread incoming messages as read for this channel
   await supabase
     .from('wpp_messages')
     .update({ is_read: true })
     .eq('mentee_id', menteeId)
     .eq('direction', 'incoming')
     .eq('is_read', false)
+    .eq('channel', channel)
 
   return NextResponse.json(messages || [])
 }

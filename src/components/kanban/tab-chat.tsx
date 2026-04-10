@@ -31,6 +31,8 @@ interface TabChatProps {
   menteeName: string
   specialistId: string | null
   onUnreadCountChange?: (count: number) => void
+  channel?: string
+  signatureName?: string
 }
 
 // ─── Helpers ───
@@ -64,7 +66,7 @@ function getDateKey(dateStr: string) {
 
 // ─── Component ───
 
-export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnreadCountChange }: TabChatProps) {
+export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnreadCountChange, channel = 'principal', signatureName }: TabChatProps) {
   const [messages, setMessages] = useState<WppMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
@@ -132,17 +134,18 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch(`/api/whatsapp/messages/${menteeId}`)
+        const res = await fetch(`/api/whatsapp/messages/${menteeId}?channel=${channel}`)
         if (res.ok) {
           setMessages(await res.json())
           onUnreadRef.current?.(0)
-          // Mark all unread messages as read
+          // Mark all unread messages as read for this channel
           const supabase = createClient()
           supabase.from('wpp_messages')
             .update({ is_read: true })
             .eq('mentee_id', menteeId)
             .eq('is_read', false)
             .eq('direction', 'incoming')
+            .eq('channel', channel)
             .then(() => {})
         }
 
@@ -289,6 +292,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           sender_name: 'Você',
           is_read: true,
           sent_at: new Date().toISOString(),
+          channel,
           created_at: new Date().toISOString(),
         }
         setMessages((prev) => [...prev, optimistic])
@@ -305,6 +309,8 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
             imageUrl: url,
             fileName: attachedFile.name,
             mimeType: attachedFile.type,
+            channel,
+            signatureName,
           }),
         })
 
@@ -337,6 +343,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           sender_name: 'Você',
           is_read: true,
           sent_at: new Date().toISOString(),
+          channel,
           created_at: new Date().toISOString(),
         }
         setMessages((prev) => [...prev, optimistic])
@@ -351,6 +358,8 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
             type: 'audio',
             imageUrl: url,
             mimeType: 'audio/ogg',
+            channel,
+            signatureName,
           }),
         })
 
@@ -382,6 +391,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         sender_name: 'Você',
         is_read: true,
         sent_at: new Date().toISOString(),
+        channel,
         created_at: new Date().toISOString(),
       }
       setMessages((prev) => [...prev, optimistic])
@@ -389,7 +399,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
       const res = await fetch('/api/whatsapp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ menteeId, message: text }),
+        body: JSON.stringify({ menteeId, message: text, channel, signatureName }),
       })
 
       if (!res.ok) {
@@ -658,6 +668,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                 const { data: sess } = await sb.from('attendance_sessions').insert({
                   mentee_id: menteeId,
                   specialist_id: user.id,
+                  channel,
                 }).select('id, started_at').single()
                 if (sess) {
                   setActiveSession(sess.id)

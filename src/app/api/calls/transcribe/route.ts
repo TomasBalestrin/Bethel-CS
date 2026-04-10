@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
   // Get the call record
   const { data: call } = await supabase
     .from('call_records')
-    .select('id, recording_url, recording_status, transcription_status')
+    .select('id, mentee_id, specialist_id, recording_url, recording_status, transcription_status')
     .eq('id', callId)
     .single()
 
@@ -68,6 +68,65 @@ export async function POST(request: NextRequest) {
         transcription_status: 'ready',
       })
       .eq('id', callId)
+
+    // Auto-generate summary from transcription
+    try {
+      const { data: mentee } = await supabase
+        .from('mentees')
+        .select('full_name')
+        .eq('id', call.mentee_id)
+        .single()
+
+      const summaryCompletion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        temperature: 0.3,
+        messages: [
+          {
+            role: 'system',
+            content: `Você é um assistente que analisa transcrições de ligações entre um especialista de Customer Success e um mentorado.
+Gere um resumo estruturado da ligação em português brasileiro.
+
+Responda EXATAMENTE neste formato JSON (sem markdown, sem backticks):
+{
+  "summary": "Resumo geral do que foi discutido (2-3 frases)",
+  "questions": "Principais dúvidas do mentorado (ou null se não houver)",
+  "difficulties": "Dificuldades mencionadas pelo mentorado (ou null se não houver)",
+  "next_steps": "Próximos passos combinados (ou null se não houver)"
+}
+
+Seja conciso e objetivo. Foque no que é útil para o especialista na próxima conversa.`,
+          },
+          {
+            role: 'user',
+            content: `Transcrição da ligação com o mentorado ${mentee?.full_name || 'desconhecido'}:\n\n${transcription}`,
+          },
+        ],
+      })
+
+      const summaryContent = summaryCompletion.choices[0]?.message?.content?.trim()
+      if (summaryContent) {
+        let parsed: { summary: string; questions: string | null; difficulties: string | null; next_steps: string | null }
+        try {
+          parsed = JSON.parse(summaryContent)
+        } catch {
+          parsed = { summary: summaryContent, questions: null, difficulties: null, next_steps: null }
+        }
+
+        await supabase.from('attendance_notes').insert({
+          mentee_id: call.mentee_id,
+          specialist_id: call.specialist_id,
+          summary: parsed.summary,
+          questions: parsed.questions,
+          difficulties: parsed.difficulties,
+          next_steps: parsed.next_steps,
+          generated_by_ai: true,
+        })
+
+        console.log('[Transcribe] Auto-summary saved as attendance_note')
+      }
+    } catch (summaryErr) {
+      console.error('[Transcribe] Auto-summary failed (non-blocking):', summaryErr)
+    }
 
     return NextResponse.json({ status: 'ready', transcription })
   } catch (err) {

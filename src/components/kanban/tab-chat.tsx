@@ -302,6 +302,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           is_read: true,
           sent_at: new Date().toISOString(),
           channel,
+          quoted_message_id: null,
           created_at: new Date().toISOString(),
         }
         setMessages((prev) => [...prev, optimistic])
@@ -355,6 +356,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           is_read: true,
           sent_at: new Date().toISOString(),
           channel,
+          quoted_message_id: null,
           created_at: new Date().toISOString(),
         }
         setMessages((prev) => [...prev, optimistic])

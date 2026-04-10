@@ -566,6 +566,8 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
     setForwarding(true)
     try {
       const supabase = createClient()
+      const deptLabel = forwardChannel === 'comercial' ? 'Comercial' : forwardChannel === 'marketing' ? 'Marketing' : 'Gestão'
+
       // Save internal message to the target channel
       await supabase.from('wpp_messages').insert({
         mentee_id: menteeId,
@@ -573,12 +575,32 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         instance_id: 'internal',
         direction: 'outgoing' as const,
         message_type: 'text' as const,
-        content: `📋 Encaminhamento — ${forwardChannel === 'comercial' ? 'Comercial' : forwardChannel === 'marketing' ? 'Marketing' : 'Gestão'}\n\n👤 ${menteeName}\n📱 ${menteePhone}\n\n📝 ${forwardDescription.trim()}`,
+        content: `📋 Encaminhamento — ${deptLabel}\n\n👤 ${menteeName}\n📱 ${menteePhone}\n\n📝 ${forwardDescription.trim()}`,
         is_read: false,
         sent_at: new Date().toISOString(),
         channel: forwardChannel,
       })
-      toast.success(`Encaminhado para ${forwardChannel === 'comercial' ? 'Comercial' : forwardChannel === 'marketing' ? 'Marketing' : 'Gestão'}`)
+
+      // Find the user assigned to this department and create notification
+      const { data: assignment } = await supabase
+        .from('department_assignments')
+        .select('user_id')
+        .eq('department', forwardChannel)
+        .single()
+
+      if (assignment) {
+        await supabase.from('forwarding_notifications').insert({
+          recipient_id: assignment.user_id,
+          mentee_id: menteeId,
+          department: forwardChannel,
+          description: forwardDescription.trim(),
+          mentee_name: menteeName,
+          mentee_phone: menteePhone,
+          sent_by: specialistId || null,
+        })
+      }
+
+      toast.success(`Encaminhado para ${deptLabel}`)
       setForwardOpen(false)
       setForwardChannel(null)
       setForwardDescription('')

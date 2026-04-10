@@ -81,7 +81,7 @@ export function ForwardingBadge() {
     setOpen(false)
   }
 
-  const deptLabel = (d: string) => d === 'comercial' ? 'Comercial' : d === 'marketing' ? 'Marketing' : 'Gestão'
+  const deptLabel = (d: string) => d === 'comercial' ? 'Comercial' : d === 'marketing' ? 'Marketing' : d === 'gestao' ? 'Gestão' : d === 'system' ? 'Sistema' : d
 
   if (unreadCount === 0) return null
 
@@ -118,9 +118,16 @@ export function ForwardingBadge() {
                 <p className="text-xs text-muted-foreground">{n.mentee_phone}</p>
                 <p className="text-xs text-foreground">{n.description}</p>
                 <div className="flex items-center gap-2 pt-1">
-                  <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => openMentee(n.mentee_id)}>
-                    Abrir mentorado
-                  </Button>
+                  {n.department !== 'system' && (
+                    <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => openMentee(n.mentee_id)}>
+                      Abrir mentorado
+                    </Button>
+                  )}
+                  {n.department === 'system' && (
+                    <Button size="sm" variant="outline" className="h-6 text-[10px]" onClick={() => { router.push('/admin'); setOpen(false) }}>
+                      Ir para Admin
+                    </Button>
+                  )}
                   <Button size="sm" variant="ghost" className="h-6 text-[10px] text-muted-foreground" onClick={() => markAsRead(n.id)}>
                     Marcar como lido
                   </Button>

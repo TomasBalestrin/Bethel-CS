@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
           .from('wpp_instances')
           .update({ status, updated_at: new Date().toISOString() })
           .eq('instance_id', whatsmeowId)
-          .select('id')
+          .select('id, specialist_id, phone_number')
 
         if (!updated || updated.length === 0) {
           const phone = connData.connectedPhone
@@ -104,6 +104,42 @@ export async function POST(request: NextRequest) {
               .from('wpp_instances')
               .update({ status, updated_at: new Date().toISOString() })
               .eq('phone_number', phone)
+          }
+        }
+
+        // Alert all admins when a WhatsApp instance disconnects
+        if (event === 'disconnected') {
+          const { data: admins } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('role', 'admin')
+
+          // Get the specialist name for the notification
+          const instanceInfo = updated?.[0]
+          let specialistName = 'Desconhecido'
+          if (instanceInfo?.specialist_id) {
+            const { data: spec } = await supabase
+              .from('profiles')
+              .select('full_name')
+              .eq('id', instanceInfo.specialist_id)
+              .single()
+            if (spec) specialistName = spec.full_name
+          }
+
+          const phone = instanceInfo?.phone_number || connData.connectedPhone || whatsmeowId
+
+          if (admins && admins.length > 0) {
+            const notifications = admins.map((admin) => ({
+              recipient_id: admin.id,
+              mentee_id: null,
+              department: 'system',
+              description: `WhatsApp de ${specialistName} (${phone}) foi desconectado. Reconecte na aba Admin → WhatsApp.`,
+              mentee_name: `⚠️ WhatsApp Desconectado`,
+              mentee_phone: String(phone),
+              sent_by: instanceInfo?.specialist_id || null,
+            }))
+            await supabase.from('forwarding_notifications').insert(notifications as never)
+            console.log('[WPP Webhook] Disconnect alert sent to', admins.length, 'admins')
           }
         }
       }

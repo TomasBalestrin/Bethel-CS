@@ -75,7 +75,7 @@ export async function deleteMentee(menteeId: string) {
   ] as const
 
   for (const table of tables) {
-    await admin.from(table).delete().eq('mentee_id', menteeId)
+    await admin.from(table as never).delete().eq('mentee_id' as never, menteeId as never)
   }
 
   const { error } = await admin.from('mentees').delete().eq('id', menteeId)

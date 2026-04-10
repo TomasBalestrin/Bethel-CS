@@ -17,7 +17,7 @@ export async function getCachedSpecialists() {
 /**
  * Query for kanban stages by type.
  */
-export async function getCachedStages(type: 'initial' | 'mentorship') {
+export async function getCachedStages(type: 'initial' | 'mentorship' | 'exit') {
   const supabase = createClient()
   const { data } = await supabase
     .from('kanban_stages')

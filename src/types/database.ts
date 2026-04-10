@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type UserRole = 'admin' | 'especialista'
-export type KanbanType = 'initial' | 'mentorship'
+export type KanbanType = 'initial' | 'mentorship' | 'exit'
 export type AttachmentType = 'photo' | 'video'
 export type EngagementType = 'aula' | 'live' | 'evento' | 'whatsapp_contato'
 export type CsActivityType = 'ligacao' | 'whatsapp'

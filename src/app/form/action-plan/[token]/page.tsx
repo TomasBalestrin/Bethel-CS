@@ -19,14 +19,18 @@ export default async function ActionPlanPage({ params }: Props) {
     notFound()
   }
 
-  // Check if already submitted
+  // Check if already submitted via web form
   const { data: plan } = await supabase
     .from('action_plans')
-    .select('submitted_at')
+    .select('submitted_at, data')
     .eq('mentee_id', mentee.id)
     .maybeSingle()
 
-  if (plan?.submitted_at) {
+  // Only block if the plan was submitted via the web form (has form-specific fields)
+  const planData = plan?.data as Record<string, unknown> | null
+  const isFromWebForm = planData?.motivacao_elite_premium || planData?.expectativas_resultados
+
+  if (plan?.submitted_at && isFromWebForm) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4" style={{ backgroundColor: '#F8FBFF' }}>
         <div className="w-full max-w-[680px] rounded-lg bg-white p-10 text-center shadow-card">

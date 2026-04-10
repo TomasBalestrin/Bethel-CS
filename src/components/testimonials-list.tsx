@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import Image from 'next/image'
 import { Badge } from '@/components/ui/badge'
 import { formatDateBR } from '@/lib/format'
 import { Label } from '@/components/ui/label'
@@ -11,7 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { MessageSquareQuote } from 'lucide-react'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog'
+import { MessageSquareQuote, Users, TrendingUp, Award, BarChart3 } from 'lucide-react'
 import type { Database, TestimonialCategory } from '@/types/database'
 
 type Testimonial = Database['public']['Tables']['testimonials']['Row']
@@ -47,6 +55,7 @@ export function TestimonialsList({ testimonials }: TestimonialsListProps) {
   const [revenueFilter, setRevenueFilter] = useState('')
   const [employeeFilter, setEmployeeFilter] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
+  const [viewingItem, setViewingItem] = useState<EnrichedTestimonial | null>(null)
 
   const filtered = testimonials.filter((t) => {
     if (nicheFilter && t.niche !== nicheFilter) return false
@@ -61,12 +70,67 @@ export function TestimonialsList({ testimonials }: TestimonialsListProps) {
   const revenueRanges = Array.from(new Set(testimonials.map((t) => t.revenue_range).filter(Boolean))) as string[]
   const employeeCounts = Array.from(new Set(testimonials.map((t) => t.employee_count).filter(Boolean))) as string[]
 
+  // Dashboard metrics
+  const metrics = useMemo(() => {
+    const total = testimonials.length
+    const uniqueMentees = new Set(testimonials.map((t) => t.mentee_id)).size
+    const withAttachment = testimonials.filter((t) => t.attachment_url).length
+    const categoryCounts: Record<string, number> = {}
+    testimonials.forEach((t) => {
+      t.categories?.forEach((cat) => {
+        categoryCounts[cat] = (categoryCounts[cat] ?? 0) + 1
+      })
+    })
+    const topCategory = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0]
+    return { total, uniqueMentees, withAttachment, topCategory }
+  }, [testimonials])
+
   return (
     <div>
       <h1 className="font-heading text-2xl font-bold text-foreground">Depoimentos</h1>
       <p className="mt-1 text-sm text-muted-foreground">
         {filtered.length} depoimento{filtered.length !== 1 ? 's' : ''} encontrado{filtered.length !== 1 ? 's' : ''}
       </p>
+
+      {/* Dashboard metrics */}
+      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="flex items-center gap-2">
+            <div className="rounded-md p-1.5 bg-accent/10"><MessageSquareQuote className="h-4 w-4 text-accent" /></div>
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase">Total de depoimentos</p>
+              <p className="font-heading text-lg font-bold">{metrics.total}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="flex items-center gap-2">
+            <div className="rounded-md p-1.5 bg-success/10"><Users className="h-4 w-4 text-success" /></div>
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase">Mentorados com depoimento</p>
+              <p className="font-heading text-lg font-bold">{metrics.uniqueMentees}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="flex items-center gap-2">
+            <div className="rounded-md p-1.5 bg-warning/10"><Award className="h-4 w-4 text-warning" /></div>
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase">Com anexo (foto/vídeo)</p>
+              <p className="font-heading text-lg font-bold">{metrics.withAttachment}</p>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-lg border border-border bg-card p-3">
+          <div className="flex items-center gap-2">
+            <div className="rounded-md p-1.5 bg-info/10"><BarChart3 className="h-4 w-4 text-info" /></div>
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase">Categoria mais frequente</p>
+              <p className="font-heading text-sm font-bold">{metrics.topCategory ? CATEGORY_LABELS[metrics.topCategory[0] as TestimonialCategory] ?? metrics.topCategory[0] : '—'}</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <div className="space-y-1">
@@ -119,11 +183,48 @@ export function TestimonialsList({ testimonials }: TestimonialsListProps) {
         </div>
       </div>
 
+      {/* Detail modal */}
+      <Dialog open={!!viewingItem} onOpenChange={(open) => { if (!open) setViewingItem(null) }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{viewingItem?.mentee_name}</DialogTitle>
+            <DialogDescription>
+              {viewingItem?.testimonial_date ? formatDateBR(viewingItem.testimonial_date) : ''}
+              {viewingItem?.niche ? ` · ${viewingItem.niche}` : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-foreground whitespace-pre-line">{viewingItem?.description}</p>
+            {viewingItem?.attachment_url && (
+              <div>
+                {viewingItem.attachment_type === 'video' ? (
+                  <video src={viewingItem.attachment_url} controls className="rounded-lg w-full max-h-[400px] object-contain bg-black" />
+                ) : (
+                  <Image src={viewingItem.attachment_url} alt="Depoimento" width={600} height={400} className="rounded-lg w-full object-contain" unoptimized />
+                )}
+              </div>
+            )}
+            {viewingItem?.categories && viewingItem.categories.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {viewingItem.categories.map((cat) => (
+                  <Badge key={cat} variant="info" className="text-[10px]">
+                    {CATEGORY_LABELS[cat as TestimonialCategory] ?? cat}
+                  </Badge>
+                ))}
+              </div>
+            )}
+            {viewingItem?.revenue_range && <p className="text-xs text-muted-foreground">Faturamento: {viewingItem.revenue_range}</p>}
+            {viewingItem?.employee_count && <p className="text-xs text-muted-foreground">Colaboradores: {viewingItem.employee_count}</p>}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filtered.map((t) => (
           <div
             key={t.id}
-            className="rounded-lg border border-border bg-card p-4 shadow-card animate-fade-in"
+            onClick={() => setViewingItem(t)}
+            className="rounded-lg border border-border bg-card p-4 shadow-card animate-fade-in cursor-pointer hover:bg-muted/30 transition-colors"
           >
             <div className="flex items-start justify-between">
               <div>
@@ -135,7 +236,10 @@ export function TestimonialsList({ testimonials }: TestimonialsListProps) {
                 <span className="tabular">{t.mentee_testimonial_count}</span>
               </div>
             </div>
-            <p className="mt-2 text-sm text-foreground">{t.description}</p>
+            <p className="mt-2 text-sm text-foreground line-clamp-3">{t.description}</p>
+            {t.attachment_url && (
+              <p className="mt-1 text-[10px] text-accent">{t.attachment_type === 'video' ? '🎥 Vídeo anexado' : '📷 Imagem anexada'}</p>
+            )}
             {t.niche && (
               <Badge variant="outline" className="mt-2 text-[10px]">{t.niche}</Badge>
             )}

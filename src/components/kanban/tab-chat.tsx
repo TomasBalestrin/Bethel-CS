@@ -325,7 +325,9 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
       // Handle audio — send as native audio
       if (audioBlob) {
-        const url = await uploadFile(audioBlob, `audio_${Date.now()}.ogg`)
+        const audioMime = audioBlob.type || 'audio/webm'
+        const ext = audioMime.includes('mp4') ? 'mp4' : audioMime.includes('ogg') ? 'ogg' : 'webm'
+        const url = await uploadFile(audioBlob, `audio_${Date.now()}.${ext}`)
         if (!url) { setSending(false); setUploading(false); return }
 
         setUploading(false)
@@ -357,7 +359,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
             menteeId,
             type: 'audio',
             imageUrl: url,
-            mimeType: 'audio/ogg',
+            mimeType: audioMime,
             channel,
             signatureName,
           }),
@@ -480,13 +482,27 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   async function startRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' })
+
+      // Pick a supported mimeType (Safari doesn't support webm)
+      let mimeType = 'audio/webm;codecs=opus'
+      if (!MediaRecorder.isTypeSupported(mimeType)) {
+        mimeType = 'audio/mp4'
+        if (!MediaRecorder.isTypeSupported(mimeType)) {
+          mimeType = '' // let browser pick default
+        }
+      }
+
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream)
+
+      const actualMime = recorder.mimeType || mimeType || 'audio/webm'
       const chunks: Blob[] = []
 
       recorder.ondataavailable = (e) => chunks.push(e.data)
       recorder.onstop = () => {
         stream.getTracks().forEach((t) => t.stop())
-        const blob = new Blob(chunks, { type: 'audio/ogg' })
+        const blob = new Blob(chunks, { type: actualMime })
         setAudioBlob(blob)
         setAudioUrl(URL.createObjectURL(blob))
       }
@@ -496,8 +512,9 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
       setRecording(true)
       setRecordingTime(0)
       recordingTimerRef.current = setInterval(() => setRecordingTime((t) => t + 1), 1000)
-    } catch {
-      console.error('Microphone access denied')
+    } catch (err) {
+      console.error('Microphone access denied or not supported:', err)
+      toast.error('Não foi possível acessar o microfone')
     }
   }
 

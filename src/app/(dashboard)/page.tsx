@@ -71,8 +71,21 @@ export default async function DashboardPage({ searchParams }: Props) {
   if (closer) menteesQuery = menteesQuery.eq('closer_name', closer)
   if (estado) menteesQuery = menteesQuery.eq('state', estado)
   if (nicho) menteesQuery = menteesQuery.eq('niche', nicho)
-  if (dataInicio) menteesQuery = menteesQuery.gte('start_date', dataInicio)
-  if (dataTermino) menteesQuery = menteesQuery.lte('end_date', dataTermino)
+  // Period filter: match by month of the selected date
+  if (dataInicio) {
+    const d = new Date(dataInicio + 'T00:00:00Z')
+    const startOfMonth = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`
+    const endOfMonth = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0))
+    const endStr = `${endOfMonth.getUTCFullYear()}-${String(endOfMonth.getUTCMonth() + 1).padStart(2, '0')}-${String(endOfMonth.getUTCDate()).padStart(2, '0')}`
+    menteesQuery = menteesQuery.gte('start_date', startOfMonth).lte('start_date', endStr)
+  }
+  if (dataTermino) {
+    const d = new Date(dataTermino + 'T00:00:00Z')
+    const startOfMonth = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-01`
+    const endOfMonth = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0))
+    const endStr = `${endOfMonth.getUTCFullYear()}-${String(endOfMonth.getUTCMonth() + 1).padStart(2, '0')}-${String(endOfMonth.getUTCDate()).padStart(2, '0')}`
+    menteesQuery = menteesQuery.gte('end_date', startOfMonth).lte('end_date', endStr)
+  }
 
   // Fetch mentees + birthday mentees in parallel
   let birthdayQuery = supabase

@@ -19,7 +19,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog'
-import { MessageSquareQuote, Users, TrendingUp, Award, BarChart3 } from 'lucide-react'
+import { MessageSquareQuote, Users, Award, BarChart3 } from 'lucide-react'
 import type { Database, TestimonialCategory } from '@/types/database'
 
 type Testimonial = Database['public']['Tables']['testimonials']['Row']

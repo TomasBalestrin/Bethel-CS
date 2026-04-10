@@ -918,7 +918,7 @@ function DepartmentsSection({ users, assignments }: { users: Profile[]; assignme
     } else if (existingId) {
       await supabase.from('department_assignments').update({ user_id: userId }).eq('id', existingId)
     } else {
-      await supabase.from('department_assignments').insert({ user_id: userId, department })
+      await supabase.from('department_assignments').insert({ user_id: userId, department: department as 'comercial' | 'marketing' | 'gestao' })
     }
 
     setSaving(null)

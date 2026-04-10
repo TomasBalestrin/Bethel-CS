@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Fetch mentee data for all related mentees
-  const apMenteeIds = [...new Set(actionPlans.map((ap) => ap.mentee_id))]
+  const apMenteeIds = Array.from(new Set(actionPlans.map((ap) => ap.mentee_id)))
   const { data: menteesData } = await supabase
     .from('mentees')
     .select('id, full_name, niche, nome_empresa, num_colaboradores, faturamento_atual')

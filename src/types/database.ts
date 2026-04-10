@@ -1248,6 +1248,7 @@ export interface Database {
           sender_name?: string | null
           is_read?: boolean
           sent_at?: string
+          delivery_status?: 'sent' | 'delivered' | 'read' | null
         }
         Relationships: []
       }

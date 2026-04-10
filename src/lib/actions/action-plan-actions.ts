@@ -52,6 +52,15 @@ export async function submitActionPlan(token: string, data: Record<string, Json>
   if (data.cidade) updates.city = data.cidade
   if (data.estado) updates.state = data.estado
   if (data.nicho) updates.niche = data.nicho
+  if (data.nome_empresa) updates.nome_empresa = data.nome_empresa
+  if (data.num_colaboradores) {
+    const n = parseInt(String(data.num_colaboradores), 10)
+    if (!isNaN(n) && n > 0) updates.num_colaboradores = n
+  }
+  if (data.faturamento_medio) {
+    const f = parseFloat(String(data.faturamento_medio).replace(/[R$\s.]/g, '').replace(',', '.'))
+    if (!isNaN(f) && f > 0) updates.faturamento_atual = f
+  }
   if (Object.keys(updates).length > 0) {
     await supabase.from('mentees').update(updates).eq('id', mentee.id)
   }

@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Upload, FileText, CheckCircle2, XCircle, AlertCircle, ArrowRight, Users, ClipboardList, GitBranch, CalendarCheck, UserCheck } from 'lucide-react'
+import { Upload, FileText, CheckCircle2, XCircle, AlertCircle, ArrowRight, Users, ClipboardList, GitBranch, CalendarCheck, UserCheck, Sparkles, Loader2 } from 'lucide-react'
 import { bulkCreateMentees, bulkImportActionPlans, bulkImportStages, bulkImportDeliveryEvents, bulkImportDeliveryParticipations } from '@/lib/actions/mentee-actions'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -39,6 +39,13 @@ interface ImportResult {
   total: number
   created: number
   errors: { row: number; name: string; error: string }[]
+  importedMenteeIds?: string[]
+}
+
+interface AiExtractionResult {
+  processed: number
+  updated: number
+  results: { menteeId: string; name: string; extracted: Record<string, unknown>; error?: string }[]
 }
 
 // ─── Field Definitions: Mentorados ──────────────────────────────────────────
@@ -200,6 +207,9 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
   const [matchField, setMatchField] = useState<'full_name' | 'phone' | 'email'>('full_name')
   const [result, setResult] = useState<ImportResult | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [aiExtracting, setAiExtracting] = useState(false)
+  const [aiResult, setAiResult] = useState<AiExtractionResult | null>(null)
+  const [aiError, setAiError] = useState<string | null>(null)
 
   const currentFields = activeTab === 'mentees' ? MENTEE_FIELDS
     : activeTab === 'action_plan' ? ACTION_PLAN_FIELDS
@@ -215,6 +225,9 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
     setMapping({})
     setDefaultSpecialistId('')
     setResult(null)
+    setAiExtracting(false)
+    setAiResult(null)
+    setAiError(null)
   }
 
   function switchTab(tab: ImportTab) {
@@ -318,6 +331,31 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
     setResult(res)
     setStep('done')
     router.refresh()
+
+    // After action plan import, trigger AI extraction in the background
+    if (activeTab === 'action_plan' && res.created > 0 && res.importedMenteeIds && res.importedMenteeIds.length > 0) {
+      setAiExtracting(true)
+      setAiError(null)
+      try {
+        const response = await fetch('/api/action-plans/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ menteeIds: res.importedMenteeIds }),
+        })
+        if (response.ok) {
+          const data: AiExtractionResult = await response.json()
+          setAiResult(data)
+        } else {
+          const err = await response.json()
+          setAiError(err.error || 'Erro na extração por IA')
+        }
+      } catch {
+        setAiError('Erro de conexão com o servidor')
+      } finally {
+        setAiExtracting(false)
+        router.refresh()
+      }
+    }
   }
 
   const tabLabels: Record<ImportTab, { importing: string; button: string; success: string }> = {
@@ -570,6 +608,66 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
                         <span className="text-destructive"> — {e.error}</span>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* AI Extraction Status (action plan tab only) */}
+              {activeTab === 'action_plan' && result.created > 0 && (
+                <div className="rounded-lg border border-accent/20 overflow-hidden">
+                  <div className="bg-accent/5 px-3 py-2 text-sm font-medium text-foreground flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-accent" />
+                    Extração por IA — Nicho, Empresa, Colaboradores, Faturamento
+                  </div>
+                  <div className="p-3">
+                    {aiExtracting && (
+                      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                        <Loader2 className="h-4 w-4 animate-spin text-accent" />
+                        <span>Analisando respostas com IA para extrair dados do negócio...</span>
+                      </div>
+                    )}
+                    {aiError && (
+                      <div className="flex items-center gap-2 text-sm text-destructive">
+                        <XCircle className="h-4 w-4" />
+                        <span>{aiError}</span>
+                      </div>
+                    )}
+                    {aiResult && (
+                      <div className="space-y-2">
+                        <p className="text-sm">
+                          <span className="font-medium text-success">{aiResult.updated}</span> de {aiResult.processed} mentorados tiveram dados extraídos e atualizados
+                        </p>
+                        {aiResult.results.filter((r) => !r.error && Object.keys(r.extracted).length > 0).length > 0 && (
+                          <div className="divide-y divide-border max-h-40 overflow-y-auto rounded border border-border">
+                            {aiResult.results
+                              .filter((r) => !r.error && Object.keys(r.extracted).length > 0)
+                              .map((r, i) => {
+                                const applied = (r.extracted.applied ?? {}) as Record<string, unknown>
+                                const fields = Object.entries(applied)
+                                  .filter(([k]) => k !== 'updated_at')
+                                  .map(([k, v]) => {
+                                    const labels: Record<string, string> = {
+                                      niche: 'Nicho', nome_empresa: 'Empresa',
+                                      num_colaboradores: 'Colaboradores', faturamento_atual: 'Faturamento',
+                                    }
+                                    return `${labels[k] || k}: ${v}`
+                                  })
+                                return (
+                                  <div key={i} className="px-2 py-1.5 text-xs">
+                                    <span className="font-medium">{r.name}</span>
+                                    {fields.length > 0 && (
+                                      <span className="text-muted-foreground"> — {fields.join(' · ')}</span>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {!aiExtracting && !aiResult && !aiError && (
+                      <p className="text-sm text-muted-foreground">Os campos diretos da planilha já foram sincronizados automaticamente.</p>
+                    )}
                   </div>
                 </div>
               )}

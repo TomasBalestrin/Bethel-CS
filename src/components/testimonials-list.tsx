@@ -30,6 +30,10 @@ const CATEGORY_LABELS: Record<TestimonialCategory, string> = {
   atendimento: 'Atendimento',
   intensivo: 'Intensivo',
   encontro_elite_premium: 'Encontro Elite Premium',
+  mentoria_comercial: 'Mentoria Comercial',
+  mentoria_marketing: 'Mentoria de Marketing',
+  mentoria_gestao: 'Mentoria de Gestão',
+  hotseat: 'Hotseat',
 }
 
 const ALL_CATEGORIES = Object.keys(CATEGORY_LABELS) as TestimonialCategory[]

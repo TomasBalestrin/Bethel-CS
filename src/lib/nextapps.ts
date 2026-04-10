@@ -210,7 +210,14 @@ export async function sendTextMessage(
       return { success: false, error: `Send failed (${res.status}): ${text}` }
     }
 
-    return { success: true }
+    // Try to extract messageId from response
+    let messageId: string | undefined
+    try {
+      const resData = await res.json()
+      messageId = resData.messageId || resData.id || resData.key?.id || undefined
+    } catch { /* response might not be JSON */ }
+
+    return { success: true, messageId }
   } catch (err) {
     return { success: false, error: String(err) }
   }
@@ -274,7 +281,13 @@ export async function sendMediaMessage(
     const responseText = await res.text()
     console.log('[NextTrack] sendMediaMessage OK:', responseText.slice(0, 200))
 
-    return { success: true }
+    let messageId: string | undefined
+    try {
+      const resData = JSON.parse(responseText)
+      messageId = resData.messageId || resData.id || resData.key?.id || undefined
+    } catch { /* not JSON */ }
+
+    return { success: true, messageId }
   } catch (err) {
     return { success: false, error: String(err) }
   }

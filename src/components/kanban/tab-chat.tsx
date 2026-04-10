@@ -585,7 +585,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
       const { data: assignment } = await supabase
         .from('department_assignments')
         .select('user_id')
-        .eq('department', forwardChannel)
+        .eq('department', forwardChannel as 'comercial' | 'marketing' | 'gestao')
         .single()
 
       if (assignment) {

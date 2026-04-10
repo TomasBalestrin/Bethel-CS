@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
-import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown, Sparkles, ChevronUp, BellOff, Pencil, Check, ClipboardCheck, Timer, TimerOff, CheckSquare, ClipboardList, Reply } from 'lucide-react'
+import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown, Sparkles, ChevronUp, BellOff, Pencil, Check, ClipboardCheck, Timer, TimerOff, CheckSquare, ClipboardList, Reply, Forward } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
@@ -120,6 +120,12 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // Forward to department
+  const [forwardOpen, setForwardOpen] = useState(false)
+  const [forwardChannel, setForwardChannel] = useState<string | null>(null)
+  const [forwardDescription, setForwardDescription] = useState('')
+  const [forwarding, setForwarding] = useState(false)
 
   // Reply/quote
   const [replyingTo, setReplyingTo] = useState<WppMessage | null>(null)
@@ -554,6 +560,35 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
     }
   }
 
+  // Forward mentee to department channel
+  async function handleForward() {
+    if (!forwardChannel || !forwardDescription.trim()) return
+    setForwarding(true)
+    try {
+      const supabase = createClient()
+      // Save internal message to the target channel
+      await supabase.from('wpp_messages').insert({
+        mentee_id: menteeId,
+        specialist_id: specialistId || '',
+        instance_id: 'internal',
+        direction: 'outgoing' as const,
+        message_type: 'text' as const,
+        content: `📋 Encaminhamento — ${forwardChannel === 'comercial' ? 'Comercial' : forwardChannel === 'marketing' ? 'Marketing' : 'Gestão'}\n\n👤 ${menteeName}\n📱 ${menteePhone}\n\n📝 ${forwardDescription.trim()}`,
+        is_read: false,
+        sent_at: new Date().toISOString(),
+        channel: forwardChannel,
+      })
+      toast.success(`Encaminhado para ${forwardChannel === 'comercial' ? 'Comercial' : forwardChannel === 'marketing' ? 'Marketing' : 'Gestão'}`)
+      setForwardOpen(false)
+      setForwardChannel(null)
+      setForwardDescription('')
+    } catch {
+      toast.error('Erro ao encaminhar')
+    } finally {
+      setForwarding(false)
+    }
+  }
+
   // Convert selected messages to action plan
   async function handleConvertToPlan() {
     if (selectedIds.size === 0) return
@@ -705,6 +740,61 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
             <PhoneCall className="h-3 w-3" />
             Ligações {callRecords.length > 0 && `(${callRecords.length})`}
           </Button>
+          <div className="relative">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 text-xs"
+              onClick={() => setForwardOpen(!forwardOpen)}
+            >
+              <Forward className="h-3 w-3" />
+              Enviar para
+            </Button>
+            {forwardOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setForwardOpen(false)} />
+                <div className="absolute right-0 top-full mt-1 z-20 w-64 rounded-lg border border-border bg-card shadow-lg p-3 space-y-2">
+                  <p className="text-xs font-medium text-foreground">Encaminhar para:</p>
+                  <div className="flex gap-1.5">
+                    {[
+                      { key: 'comercial', label: 'Comercial' },
+                      { key: 'marketing', label: 'Marketing' },
+                      { key: 'gestao', label: 'Gestão' },
+                    ].map((dept) => (
+                      <button
+                        key={dept.key}
+                        onClick={() => setForwardChannel(dept.key)}
+                        className={`flex-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${forwardChannel === dept.key ? 'bg-accent text-white' : 'bg-muted text-foreground hover:bg-muted/80'}`}
+                      >
+                        {dept.label}
+                      </button>
+                    ))}
+                  </div>
+                  {forwardChannel && (
+                    <>
+                      <textarea
+                        value={forwardDescription}
+                        onChange={(e) => setForwardDescription(e.target.value)}
+                        placeholder="Descreva brevemente a situação..."
+                        className="w-full rounded-md border border-border bg-background px-2.5 py-2 text-xs resize-none focus:outline-none focus:ring-1 focus:ring-accent"
+                        rows={3}
+                        autoFocus
+                      />
+                      <Button
+                        size="sm"
+                        className="w-full h-7 text-xs"
+                        onClick={handleForward}
+                        disabled={!forwardDescription.trim() || forwarding}
+                      >
+                        {forwarding ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Forward className="h-3 w-3 mr-1" />}
+                        {forwarding ? 'Enviando...' : 'Encaminhar'}
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
           {activeSession ? (
             <Button
               size="sm"

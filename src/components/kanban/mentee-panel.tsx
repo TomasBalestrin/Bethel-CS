@@ -1422,9 +1422,11 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
       const ext = file.name.split('.').pop() || 'pdf'
       const filePath = `${mentee.id}/${Date.now()}_plano-de-acao.${ext}`
 
-      // Remove existing files first
-      if (attachmentName) {
-        await supabase.storage.from('action-plans').remove([`${mentee.id}/${attachmentName}`])
+      // Remove ALL existing files in the mentee's folder first
+      const { data: existingFiles } = await supabase.storage.from('action-plans').list(mentee.id)
+      if (existingFiles && existingFiles.length > 0) {
+        const pathsToRemove = existingFiles.map((f) => `${mentee.id}/${f.name}`)
+        await supabase.storage.from('action-plans').remove(pathsToRemove)
       }
 
       const { error } = await supabase.storage
@@ -1454,7 +1456,18 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
     if (!attachmentName) return
     const confirmed = window.confirm('Remover o plano de ação anexado?')
     if (!confirmed) return
-    await supabase.storage.from('action-plans').remove([`${mentee.id}/${attachmentName}`])
+
+    // Remove ALL files in the mentee's folder to prevent orphans
+    const { data: existingFiles } = await supabase.storage.from('action-plans').list(mentee.id)
+    if (existingFiles && existingFiles.length > 0) {
+      const pathsToRemove = existingFiles.map((f) => `${mentee.id}/${f.name}`)
+      const { error } = await supabase.storage.from('action-plans').remove(pathsToRemove)
+      if (error) {
+        toast.error('Erro ao remover: ' + error.message)
+        return
+      }
+    }
+
     setAttachmentUrl(null)
     setAttachmentName(null)
     toast.success('Arquivo removido')

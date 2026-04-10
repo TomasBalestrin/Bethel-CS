@@ -233,25 +233,27 @@ export async function sendMediaMessage(
     const body: Record<string, unknown> = {
       phone,
       type,
+      // Send URL in multiple fields — NextTrack docs are unclear on which field is used
+      imageUrl: mediaUrl,
+      mediaUrl: mediaUrl,
+      url: mediaUrl,
     }
 
-    // Use the correct URL field based on media type
+    // Type-specific fields
     if (type === 'audio') {
       body.audioUrl = mediaUrl
       body.ptt = true // push-to-talk (voice note)
-    } else if (type === 'image') {
-      body.imageUrl = mediaUrl
     } else if (type === 'video') {
       body.videoUrl = mediaUrl
     } else if (type === 'document') {
       body.documentUrl = mediaUrl
-    } else {
-      body.imageUrl = mediaUrl // fallback
     }
 
     if (caption) body.message = caption
     if (fileName) body.fileName = fileName
     if (mimeType) body.mimeType = mimeType
+
+    console.log('[NextTrack] sendMediaMessage →', { phone, type, mediaUrl: mediaUrl.slice(0, 80), mimeType, instanceUUID })
 
     const res = await authFetch(url, {
       method: 'POST',
@@ -260,8 +262,12 @@ export async function sendMediaMessage(
 
     if (!res.ok) {
       const text = await res.text()
+      console.error('[NextTrack] sendMediaMessage FAILED:', res.status, text)
       return { success: false, error: `Send failed (${res.status}): ${text}` }
     }
+
+    const responseText = await res.text()
+    console.log('[NextTrack] sendMediaMessage OK:', responseText.slice(0, 200))
 
     return { success: true }
   } catch (err) {

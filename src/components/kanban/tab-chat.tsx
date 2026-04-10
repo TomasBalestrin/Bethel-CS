@@ -309,6 +309,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           sent_at: new Date().toISOString(),
           channel,
           quoted_message_id: null,
+          delivery_status: 'sent',
           created_at: new Date().toISOString(),
         }
         setMessages((prev) => [...prev, optimistic])
@@ -363,6 +364,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           sent_at: new Date().toISOString(),
           channel,
           quoted_message_id: null,
+          delivery_status: 'sent',
           created_at: new Date().toISOString(),
         }
         setMessages((prev) => [...prev, optimistic])
@@ -413,6 +415,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         sent_at: new Date().toISOString(),
         channel,
         quoted_message_id: quotedId,
+        delivery_status: 'sent',
         created_at: new Date().toISOString(),
       }
       setMessages((prev) => [...prev, optimistic])
@@ -1114,10 +1117,17 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                     )}
                   </div>
 
-                  {/* Time — last in same-time group only */}
+                  {/* Time + delivery status — last in same-time group only */}
                   {showTime && (
-                    <p className={`text-[10px] text-muted-foreground/50 mt-0.5 px-1 ${isOutgoing ? 'text-right' : ''}`}>
+                    <p className={`text-[10px] text-muted-foreground/50 mt-0.5 px-1 flex items-center gap-0.5 ${isOutgoing ? 'justify-end' : ''}`}>
                       {formatTime(msg.sent_at)}
+                      {isOutgoing && msg.delivery_status && (
+                        <span className={msg.delivery_status === 'read' ? 'text-blue-500' : ''}>
+                          {msg.delivery_status === 'sent' && '✓'}
+                          {msg.delivery_status === 'delivered' && '✓✓'}
+                          {msg.delivery_status === 'read' && '✓✓'}
+                        </span>
+                      )}
                     </p>
                   )}
                 </div>

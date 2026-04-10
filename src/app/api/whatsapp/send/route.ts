@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 6. Send via NextTrack API
-    let result: { success: boolean; error?: string }
+    let result: { success: boolean; error?: string; messageId?: string }
 
     if (!type || type === 'text') {
       result = await sendTextMessage(phone, signedMessage, nextrackUUID, quotedMessageId || undefined)
@@ -104,21 +104,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: result.error || 'Falha ao enviar via WhatsApp' }, { status: 502 })
     }
 
-    console.log('[WPP Send] Success:', { menteeId, type, phone, channel })
+    console.log('[WPP Send] Success:', { menteeId, type, phone, channel, messageId: result.messageId })
 
-    // 7. Save message with channel
+    // 7. Save message with channel and delivery status
     await supabase.from('wpp_messages').insert({
       mentee_id: menteeId,
       specialist_id: instance.specialist_id || user.id,
       instance_id: instance.instance_id,
+      message_id: result.messageId || null,
       direction: 'outgoing',
       message_type: type || 'text',
-      content: message || null, // Save original message without signature (signature is for WPP only)
+      content: message || null,
       media_url: imageUrl || null,
       is_read: true,
       sent_at: new Date().toISOString(),
       channel,
       quoted_message_id: quotedMessageId || null,
+      delivery_status: 'sent',
     })
 
     return NextResponse.json({ success: true })

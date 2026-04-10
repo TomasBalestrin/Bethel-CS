@@ -192,7 +192,7 @@ export async function sendTextMessage(
   message: string,
   overrideInstanceUUID?: string,
   quotedMsg?: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
   try {
     const instanceUUID = overrideInstanceUUID || getInstanceUUID()
     if (!instanceUUID) return { success: false, error: 'Instância WhatsApp não configurada' }
@@ -210,7 +210,14 @@ export async function sendTextMessage(
       return { success: false, error: `Send failed (${res.status}): ${text}` }
     }
 
-    return { success: true }
+    // Try to extract messageId from response
+    let messageId: string | undefined
+    try {
+      const resData = await res.json()
+      messageId = resData.messageId || resData.id || resData.key?.id || undefined
+    } catch { /* response might not be JSON */ }
+
+    return { success: true, messageId }
   } catch (err) {
     return { success: false, error: String(err) }
   }
@@ -228,7 +235,7 @@ export async function sendMediaMessage(
   mimeType?: string,
   overrideInstanceUUID?: string,
   quotedMsg?: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; messageId?: string }> {
   try {
     const instanceUUID = overrideInstanceUUID || getInstanceUUID()
     if (!instanceUUID) return { success: false, error: 'Instância WhatsApp não configurada' }
@@ -274,7 +281,13 @@ export async function sendMediaMessage(
     const responseText = await res.text()
     console.log('[NextTrack] sendMediaMessage OK:', responseText.slice(0, 200))
 
-    return { success: true }
+    let messageId: string | undefined
+    try {
+      const resData = JSON.parse(responseText)
+      messageId = resData.messageId || resData.id || resData.key?.id || undefined
+    } catch { /* not JSON */ }
+
+    return { success: true, messageId }
   } catch (err) {
     return { success: false, error: String(err) }
   }

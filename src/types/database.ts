@@ -1215,6 +1215,7 @@ export interface Database {
           sent_at: string
           channel: string
           quoted_message_id: string | null
+          delivery_status: 'sent' | 'delivered' | 'read' | null
           created_at: string
         }
         Insert: {
@@ -1232,6 +1233,7 @@ export interface Database {
           sent_at: string
           channel?: string
           quoted_message_id?: string | null
+          delivery_status?: 'sent' | 'delivered' | 'read' | null
           created_at?: string
         }
         Update: {
@@ -1246,6 +1248,7 @@ export interface Database {
           sender_name?: string | null
           is_read?: boolean
           sent_at?: string
+          delivery_status?: 'sent' | 'delivered' | 'read' | null
         }
         Relationships: []
       }

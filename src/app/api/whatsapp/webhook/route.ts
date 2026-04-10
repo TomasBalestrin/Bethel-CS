@@ -291,7 +291,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
-    console.log('[WPP Webhook] Unknown event:', event)
+    // ─── Message status update (delivered / read) ───
+    if (event === 'message_status' || event === 'message_update' || event === 'messages.update') {
+      const msgId = (data.messageId as string) || (data.id as string) || null
+      const status = (data.status as string) || (data.type as string) || ''
+
+      console.log('[WPP Webhook] Status update:', { msgId, status, event })
+
+      if (msgId && (status === 'delivered' || status === 'DELIVERY_ACK' || status === 'received' || status === '3')) {
+        await supabase
+          .from('wpp_messages')
+          .update({ delivery_status: 'delivered' })
+          .eq('message_id', msgId)
+          .eq('delivery_status', 'sent')
+        console.log('[WPP Webhook] Marked as delivered:', msgId)
+      }
+
+      if (msgId && (status === 'read' || status === 'READ' || status === 'viewed' || status === '4')) {
+        await supabase
+          .from('wpp_messages')
+          .update({ delivery_status: 'read' })
+          .eq('message_id', msgId)
+        console.log('[WPP Webhook] Marked as read:', msgId)
+      }
+
+      return NextResponse.json({ ok: true })
+    }
+
+    console.log('[WPP Webhook] Unknown event:', event, JSON.stringify(data).slice(0, 200))
     return NextResponse.json({ ok: true })
   } catch (err) {
     console.error('[WPP Webhook] EXCEPTION:', err)

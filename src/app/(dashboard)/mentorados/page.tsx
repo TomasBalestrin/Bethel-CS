@@ -38,7 +38,7 @@ export default async function MentoradosPage() {
       ? supabase.from('revenue_records').select('mentee_id, sale_value').in('mentee_id', menteeIds)
       : Promise.resolve({ data: [] as { mentee_id: string; sale_value: number }[] }),
     supabase.from('mentees').select('id, full_name').order('full_name'),
-    supabase.from('profiles').select('id, full_name').eq('role', 'especialista').order('full_name'),
+    supabase.from('profiles').select('id, full_name').order('full_name'),
     supabase.from('kanban_stages').select('id, name, type, position').order('position'),
     menteeIds.length > 0
       ? supabase.from('action_plans').select('mentee_id, data').in('mentee_id', menteeIds).not('data', 'is', null)

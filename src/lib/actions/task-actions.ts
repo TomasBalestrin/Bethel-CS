@@ -67,13 +67,25 @@ export async function createTask(data: {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autenticado', task: null }
 
+  // If no column_id provided, assign to the first column ("A fazer")
+  let columnId = data.column_id || null
+  if (!columnId) {
+    const { data: firstCol } = await supabase
+      .from('task_columns')
+      .select('id')
+      .order('position')
+      .limit(1)
+      .single()
+    if (firstCol) columnId = firstCol.id
+  }
+
   const { data: task, error } = await supabase.from('tasks').insert({
     title: data.title,
     description: data.description || null,
     notes: data.notes || null,
     due_date: data.due_date || null,
     mentee_id: data.mentee_id || null,
-    column_id: data.column_id || null,
+    column_id: columnId,
     created_by: user.id,
   }).select().single()
 

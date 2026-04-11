@@ -430,35 +430,6 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
         </div>
       </section>
 
-      {/* ═══ ENGAJAMENTO ═══ */}
-      <section className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-gradient-to-r from-info/5 to-transparent">
-          <BookOpen className="h-4 w-4 text-info" />
-          <h2 className="text-sm font-semibold text-foreground">Engajamento</h2>
-        </div>
-        <div className="p-4">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-            {deliveryCards.map(({ key, label, stat, rate }) => (
-              <MetricCard
-                key={key}
-                icon={CalendarCheck}
-                label={label}
-                value={`${stat.participated}/${stat.delivered}`}
-                color="text-info"
-                bg="bg-info/10"
-                source={`${rate}% taxa de participação`}
-                note={`Entregues: ${stat.delivered} · Participou: ${stat.participated}`}
-              />
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 mt-3">
-            <MetricCard icon={CalendarCheck} label="Eventos" value={props.engajamento.eventos} color="text-warning" bg="bg-warning/10" source="engagement_records (evento)" />
-            <MetricCard icon={Video} label="Participação Intensivo" value={props.engajamento.intensivo} color="text-accent" bg="bg-accent/10" source="engagement_records (live)" />
-            <MetricCard icon={Star} label="Encontro Elite Premium" value={props.engajamento.encontro} color="text-success" bg="bg-success/10" source="engagement_records" />
-          </div>
-        </div>
-      </section>
-
       {/* ═══ TRABALHO DO CS ═══ */}
       <section className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
         <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-gradient-to-r from-warning/5 to-transparent">
@@ -493,6 +464,35 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
             <MetricCard icon={UserPlus} label="Indicação que fechou" value={indicacaoPerpFormatted} color="text-info" bg="bg-info/10" source="revenue_records (indic_perpetuo)" />
             <MetricCard icon={UserPlus} label="Indicação intensivo que fechou" value={indicacaoIntFormatted} color="text-warning" bg="bg-warning/10" source="revenue_records (indic_intensivo)" />
             <MetricCard icon={DollarSign} label="Total geral" value={totalGeralFormatted} color="text-foreground" bg="bg-muted" source="revenue_records (soma)" highlight />
+          </div>
+        </div>
+      </section>
+
+      {/* ═══ ENGAJAMENTO ═══ */}
+      <section className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-gradient-to-r from-info/5 to-transparent">
+          <BookOpen className="h-4 w-4 text-info" />
+          <h2 className="text-sm font-semibold text-foreground">Engajamento</h2>
+        </div>
+        <div className="p-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            {deliveryCards.map(({ key, label, stat, rate }) => (
+              <MetricCard
+                key={key}
+                icon={CalendarCheck}
+                label={label}
+                value={`${stat.participated}/${stat.delivered}`}
+                color="text-info"
+                bg="bg-info/10"
+                source={`${rate}% taxa de participação`}
+                note={`Entregues: ${stat.delivered} · Participou: ${stat.participated}`}
+              />
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 mt-3">
+            <MetricCard icon={CalendarCheck} label="Eventos" value={props.engajamento.eventos} color="text-warning" bg="bg-warning/10" source="engagement_records (evento)" />
+            <MetricCard icon={Video} label="Participação Intensivo" value={props.engajamento.intensivo} color="text-accent" bg="bg-accent/10" source="engagement_records (live)" />
+            <MetricCard icon={Star} label="Encontro Elite Premium" value={props.engajamento.encontro} color="text-success" bg="bg-success/10" source="engagement_records" />
           </div>
         </div>
       </section>

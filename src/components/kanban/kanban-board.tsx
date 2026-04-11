@@ -35,6 +35,7 @@ import { CreateMenteeDialog } from './create-mentee-dialog'
 import { MenteePanel } from './mentee-panel'
 import { moveMentee, transitionToMentorship } from '@/lib/actions/mentee-actions'
 import { useUnreadCounts } from '@/hooks/use-unread-counts'
+import { MenteeFilters, EMPTY_FILTERS, type MenteeFilterValues } from '@/components/mentee-filters'
 import type { MenteeWithStats } from '@/types/kanban'
 import type { Database, KanbanType } from '@/types/database'
 
@@ -48,6 +49,7 @@ interface KanbanBoardProps {
   existingMentees: { id: string; full_name: string }[]
   isAdmin?: boolean
   specialists?: { id: string; full_name: string }[]
+  filterOptions?: { funisOrigem: string[]; closers: string[]; nichos: string[]; especialistas?: { id: string; full_name: string }[] }
 }
 
 export function KanbanBoard({
@@ -58,11 +60,13 @@ export function KanbanBoard({
   existingMentees,
   isAdmin = false,
   specialists = [],
+  filterOptions = { funisOrigem: [], closers: [], nichos: [] },
 }: KanbanBoardProps) {
   const [mentees, setMentees] = useState<MenteeWithStats[]>(initialMentees)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedSpecialist, setSelectedSpecialist] = useState<string>('all')
+  const [advFilters, setAdvFilters] = useState<MenteeFilterValues>(EMPTY_FILTERS)
   const { unreadMap, lastMessageMap } = useUnreadCounts()
 
   useEffect(() => {
@@ -173,6 +177,25 @@ export function KanbanBoard({
       if (!m.full_name?.toLowerCase().includes(q)) return false
     }
     if (selectedSpecialist !== 'all' && m.created_by !== selectedSpecialist) return false
+    // Advanced filters
+    if (advFilters.funilOrigem && m.funnel_origin !== advFilters.funilOrigem) return false
+    if (advFilters.closer && m.closer_name !== advFilters.closer) return false
+    if (advFilters.especialista && m.created_by !== advFilters.especialista) return false
+    if (advFilters.nicho && m.niche !== advFilters.nicho) return false
+    if (advFilters.estado && m.state !== advFilters.estado) return false
+    if (advFilters.fatInicialMin && (m.faturamento_antes_mentoria ?? 0) < Number(advFilters.fatInicialMin)) return false
+    if (advFilters.fatInicialMax && (m.faturamento_antes_mentoria ?? 0) > Number(advFilters.fatInicialMax)) return false
+    if (advFilters.fatAtualMin && (m.faturamento_atual ?? 0) < Number(advFilters.fatAtualMin)) return false
+    if (advFilters.fatAtualMax && (m.faturamento_atual ?? 0) > Number(advFilters.fatAtualMax)) return false
+    if (advFilters.mesAniversario && m.birth_date) {
+      if (String(new Date(m.birth_date).getMonth() + 1) !== advFilters.mesAniversario) return false
+    } else if (advFilters.mesAniversario && !m.birth_date) return false
+    if (advFilters.dataInicio) {
+      if (!m.start_date || m.start_date.substring(0, 7) !== advFilters.dataInicio.substring(0, 7)) return false
+    }
+    if (advFilters.dataTermino) {
+      if (!m.end_date || m.end_date.substring(0, 7) !== advFilters.dataTermino.substring(0, 7)) return false
+    }
     return true
   })
 
@@ -238,6 +261,12 @@ export function KanbanBoard({
             </Select>
           )}
         </div>
+        <MenteeFilters
+          filters={advFilters}
+          onFilterChange={(key, value) => setAdvFilters((prev) => ({ ...prev, [key]: value }))}
+          onClearAll={() => setAdvFilters(EMPTY_FILTERS)}
+          options={filterOptions}
+        />
       </div>
 
       <DndContext

@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { KanbanBoard } from '@/components/kanban/kanban-board'
 import { MENTEE_SUMMARY_FIELDS, type MenteeWithStats } from '@/types/kanban'
-import { getCachedSpecialists, getCachedStages, getCachedAllStages } from '@/lib/cache'
+import { getCachedStages, getCachedAllStages } from '@/lib/cache'
 
 export default async function EtapasMentoriaPage() {
   const supabase = createClient()

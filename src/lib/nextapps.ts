@@ -242,34 +242,53 @@ export async function sendMediaMessage(
     const instanceUUID = overrideInstanceUUID || getInstanceUUID()
     if (!instanceUUID) return { success: false, error: 'Instância WhatsApp não configurada' }
 
-    const url = `${BASE_URL}/api/chats/instances/${instanceUUID}/send`
-    const body: Record<string, unknown> = { phone, type }
-
-    // Set media as nested object matching NextTrack's expected format
-    if (type === 'audio') {
-      body.audio = { url: mediaUrl, audioUrl: mediaUrl, ptt: true, ...(mimeType ? { mimeType } : {}) }
-    } else if (type === 'image') {
-      body.image = { url: mediaUrl, imageUrl: mediaUrl, ...(caption ? { caption } : {}), ...(mimeType ? { mimeType } : {}) }
-    } else if (type === 'video') {
-      body.video = { url: mediaUrl, videoUrl: mediaUrl, ...(caption ? { caption } : {}), ...(mimeType ? { mimeType } : {}) }
-    } else if (type === 'document') {
-      body.document = { url: mediaUrl, documentUrl: mediaUrl, ...(fileName ? { fileName } : {}), ...(mimeType ? { mimeType } : {}) }
+    // Use type-specific endpoints (same pattern as /send-text)
+    const endpointMap: Record<string, string> = {
+      image: 'send-image',
+      audio: 'send-audio',
+      video: 'send-video',
+      document: 'send-file',
     }
-    // Also set flat fields as fallback
-    body.mediaUrl = mediaUrl
+    const endpoint = endpointMap[type] || 'send'
+    const url = `${BASE_URL}/api/chats/instances/${instanceUUID}/${endpoint}`
+    const body: Record<string, unknown> = { phone }
 
-    if (caption) body.message = caption
+    // Set media URL as flat field (matching /send-text pattern)
+    if (type === 'image') {
+      body.image = mediaUrl
+    } else if (type === 'audio') {
+      body.audio = mediaUrl
+      body.ptt = true
+    } else if (type === 'video') {
+      body.video = mediaUrl
+    } else if (type === 'document') {
+      body.document = mediaUrl
+    }
+
     if (caption) body.caption = caption
+    if (caption) body.message = caption
     if (fileName) body.fileName = fileName
     if (mimeType) body.mimeType = mimeType
     if (quotedMsg) body.quotedMsg = quotedMsg
 
-    console.log('[NextTrack] sendMediaMessage →', { phone, type, mediaUrl: mediaUrl.slice(0, 80), mimeType, instanceUUID })
+    console.log('[NextTrack] sendMediaMessage →', { phone, type, endpoint, mediaUrl: mediaUrl.slice(0, 100), instanceUUID })
 
-    const res = await authFetch(url, {
+    let res = await authFetch(url, {
       method: 'POST',
       body: JSON.stringify(body),
     })
+
+    // Fallback to generic /send endpoint if type-specific returns 404
+    if (res.status === 404) {
+      console.log('[NextTrack] Endpoint', endpoint, 'not found, falling back to /send')
+      const fallbackUrl = `${BASE_URL}/api/chats/instances/${instanceUUID}/send`
+      body.type = type
+      body.mediaUrl = mediaUrl
+      res = await authFetch(fallbackUrl, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+    }
 
     if (!res.ok) {
       const text = await res.text()

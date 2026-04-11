@@ -1300,7 +1300,7 @@ function NotesCard({ menteeId, initialNotes }: { menteeId: string; initialNotes:
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleAdd()
     }
@@ -1327,12 +1327,13 @@ function NotesCard({ menteeId, initialNotes }: { menteeId: string; initialNotes:
         {items.map((note, idx) => (
           <div key={idx} className="group rounded-md border border-border/50 bg-muted/30 px-2.5 py-1.5">
             {editingIdx === idx ? (
-              <div className="flex items-center gap-1.5">
-                <Input
+              <div className="flex items-start gap-1.5">
+                <textarea
                   value={editText}
                   onChange={(e) => setEditText(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleEditSave(idx) } if (e.key === 'Escape') setEditingIdx(null) }}
-                  className="h-7 text-xs flex-1"
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEditSave(idx) } if (e.key === 'Escape') setEditingIdx(null) }}
+                  className="flex-1 resize-none rounded-md border border-border bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-accent"
+                  rows={3}
                   autoFocus
                 />
                 <Button size="sm" variant="outline" className="h-7 px-2 shrink-0" onClick={() => handleEditSave(idx)}>
@@ -1370,15 +1371,16 @@ function NotesCard({ menteeId, initialNotes }: { menteeId: string; initialNotes:
             )}
           </div>
         ))}
-        <div className="flex items-center gap-1.5 pt-1">
-          <Input
+        <div className="flex items-start gap-1.5 pt-1">
+          <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ex: Gosta de viajar, Meta: 100k/mês..."
-            className="h-7 text-xs"
+            placeholder="Ex: Gosta de viajar, Meta: 100k/mês... (Shift+Enter para quebra de linha)"
+            className="flex-1 resize-none rounded-md border border-border bg-background px-2 py-1.5 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent"
+            rows={2}
           />
-          <Button size="sm" variant="outline" className="h-7 px-2 shrink-0" onClick={handleAdd} disabled={!input.trim()}>
+          <Button size="sm" variant="outline" className="h-7 px-2 shrink-0 mt-0.5" onClick={handleAdd} disabled={!input.trim()}>
             <Plus className="h-3 w-3" />
           </Button>
         </div>

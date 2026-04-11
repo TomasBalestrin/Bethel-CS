@@ -3,7 +3,7 @@
 import { memo } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { Users, DollarSign, Star, Clock, Calendar } from 'lucide-react'
+import { Users, DollarSign, Star, Clock, Calendar, Headphones } from 'lucide-react'
 import type { MenteeWithStats } from '@/types/kanban'
 import { formatDateBR } from '@/lib/format'
 
@@ -101,6 +101,17 @@ export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, on
               </span>
             )}
           </div>
+          {/* Active session badge */}
+          {mentee.has_active_session && (
+            <div className="mt-1.5 flex items-center gap-1.5 rounded-md bg-success/10 border border-success/20 px-2 py-1">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+              </span>
+              <Headphones size={11} className="text-success" />
+              <span className="text-[10px] font-medium text-success">Em atendimento</span>
+            </div>
+          )}
           {/* Metrics */}
           <div className="mt-2 pt-1.5 border-t border-border/40 flex items-center gap-2.5 text-[11px] text-muted-foreground tabular">
             <span className="flex items-center gap-0.5" title="Indicações">

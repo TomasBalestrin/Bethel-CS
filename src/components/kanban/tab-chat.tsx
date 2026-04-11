@@ -33,6 +33,7 @@ interface TabChatProps {
   menteeName: string
   specialistId: string | null
   onUnreadCountChange?: (count: number) => void
+  onSessionChange?: (active: boolean) => void
   channel?: string
   signatureName?: string
 }
@@ -68,7 +69,7 @@ function getDateKey(dateStr: string) {
 
 // ─── Component ───
 
-export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnreadCountChange, channel = 'principal', signatureName }: TabChatProps) {
+export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnreadCountChange, onSessionChange, channel = 'principal', signatureName }: TabChatProps) {
   const [messages, setMessages] = useState<WppMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
@@ -143,6 +144,8 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const onUnreadRef = useRef(onUnreadCountChange)
   onUnreadRef.current = onUnreadCountChange
+  const onSessionRef = useRef(onSessionChange)
+  onSessionRef.current = onSessionChange
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
@@ -874,6 +877,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                   setSessionStart(prevStart)
                   toast.error('Erro ao finalizar atendimento')
                 } else {
+                  onSessionRef.current?.(false)
                   // Auto-generate summary after ending session
                   handleSummarize()
                 }
@@ -899,6 +903,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                 if (sess) {
                   setActiveSession(sess.id)
                   setSessionStart(new Date(sess.started_at))
+                  onSessionRef.current?.(true)
                   toast.success('Atendimento iniciado')
                 }
               }}

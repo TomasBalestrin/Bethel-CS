@@ -456,7 +456,9 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
           />
         </ErrorBoundary></TabsContent>
         <TabsContent value="action-plan"><ErrorBoundary><TabActionPlan mentee={mentee} /></ErrorBoundary></TabsContent>
-        <TabsContent value="acompanhamento"><ErrorBoundary><TabAcompanhamento menteeId={mentee.id} mentee={mentee} /></ErrorBoundary></TabsContent>
+        <TabsContent value="acompanhamento"><ErrorBoundary><TabAcompanhamento menteeId={mentee.id} mentee={mentee} onStatsChange={(stats) => {
+          onMenteeUpdated?.({ ...mentee, indication_count: stats.indications, revenue_total: stats.revenue })
+        }} /></ErrorBoundary></TabsContent>
         <TabsContent value="engajamento"><ErrorBoundary><TabEngajamento menteeId={mentee.id} mentee={mentee} /></ErrorBoundary></TabsContent>
         <TabsContent value="historico"><ErrorBoundary><TabHistorico menteeId={mentee.id} /></ErrorBoundary></TabsContent>
         <TabsContent value="intensivo"><ErrorBoundary><TabIntensivo menteeId={mentee.id} /></ErrorBoundary></TabsContent>
@@ -475,6 +477,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
             menteeName={mentee.full_name}
             specialistId={mentee.created_by}
             onUnreadCountChange={(count: number) => setChatUnreads((prev) => ({ ...prev, [chat.channel]: count === -1 ? (prev[chat.channel] ?? 0) + 1 : count }))}
+            onSessionChange={(active) => onMenteeUpdated?.({ ...mentee, has_active_session: active })}
             channel={chat.channel}
             signatureName={chat.signature}
           /></ErrorBoundary>
@@ -1899,31 +1902,34 @@ function CardEntregasMentoria({ menteeId, startDate }: { menteeId: string; start
   )
 }
 
-function TabAcompanhamento({ menteeId, mentee }: { menteeId: string; mentee: MenteeWithStats }) {
+function TabAcompanhamento({ menteeId, mentee, onStatsChange }: { menteeId: string; mentee: MenteeWithStats; onStatsChange?: (stats: { indications: number; revenue: number }) => void }) {
   const [stats, setStats] = useState({ indications: 0, converted: 0, convertedValue: 0, revenue: 0, testimonials: 0, sessions: 0, extras: 0 })
   const supabase = createClient()
+  const onStatsChangeRef = useRef(onStatsChange)
+  onStatsChangeRef.current = onStatsChange
 
-  useEffect(() => {
-    async function fetchStats() {
-      const [{ data: ind }, { data: rev }, { data: test }, { data: sess }, { data: ext }] = await Promise.all([
-        supabase.from('indications').select('id, converted, converted_value').eq('mentee_id', menteeId),
-        supabase.from('revenue_records').select('sale_value').eq('mentee_id', menteeId),
-        supabase.from('testimonials').select('id').eq('mentee_id', menteeId),
-        supabase.from('individual_sessions').select('id').eq('mentee_id', menteeId),
-        supabase.from('extra_deliveries').select('id').eq('mentee_id', menteeId),
-      ])
-      setStats({
-        indications: ind?.length ?? 0,
-        converted: ind?.filter((i) => i.converted).length ?? 0,
-        convertedValue: ind?.filter((i) => i.converted).reduce((s, i) => s + Number(i.converted_value ?? 0), 0) ?? 0,
-        revenue: rev?.reduce((s, r) => s + Number(r.sale_value), 0) ?? 0,
-        testimonials: test?.length ?? 0,
-        sessions: sess?.length ?? 0,
-        extras: ext?.length ?? 0,
-      })
+  const fetchStats = useCallback(async () => {
+    const [{ data: ind }, { data: rev }, { data: test }, { data: sess }, { data: ext }] = await Promise.all([
+      supabase.from('indications').select('id, converted, converted_value').eq('mentee_id', menteeId),
+      supabase.from('revenue_records').select('sale_value').eq('mentee_id', menteeId),
+      supabase.from('testimonials').select('id').eq('mentee_id', menteeId),
+      supabase.from('individual_sessions').select('id').eq('mentee_id', menteeId),
+      supabase.from('extra_deliveries').select('id').eq('mentee_id', menteeId),
+    ])
+    const newStats = {
+      indications: ind?.length ?? 0,
+      converted: ind?.filter((i) => i.converted).length ?? 0,
+      convertedValue: ind?.filter((i) => i.converted).reduce((s, i) => s + Number(i.converted_value ?? 0), 0) ?? 0,
+      revenue: rev?.reduce((s, r) => s + Number(r.sale_value), 0) ?? 0,
+      testimonials: test?.length ?? 0,
+      sessions: sess?.length ?? 0,
+      extras: ext?.length ?? 0,
     }
-    fetchStats()
-  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
+    setStats(newStats)
+    onStatsChangeRef.current?.({ indications: newStats.indications, revenue: newStats.revenue })
+  }, [menteeId, supabase])
+
+  useEffect(() => { fetchStats() }, [fetchStats])
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -1961,10 +1967,10 @@ function TabAcompanhamento({ menteeId, mentee }: { menteeId: string; mentee: Men
           <CardEntregasMentoria menteeId={menteeId} startDate={mentee.start_date} />
         </div>
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-          <CardIndicacoes menteeId={menteeId} />
+          <CardIndicacoes menteeId={menteeId} onChanged={fetchStats} />
         </div>
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-          <TabRevenue menteeId={menteeId} />
+          <TabRevenue menteeId={menteeId} onChanged={fetchStats} />
         </div>
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
           <CardIndividualSessions menteeId={menteeId} />
@@ -2156,7 +2162,7 @@ function CardExtraDeliveries({ menteeId }: { menteeId: string }) {
 }
 
 // ─── Tab: LTV do Mentorado ───
-function TabRevenue({ menteeId }: { menteeId: string }) {
+function TabRevenue({ menteeId, onChanged }: { menteeId: string; onChanged?: () => void }) {
   const [items, setItems] = useState<RevenueRecord[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [showForm, setShowForm] = useState(false)
@@ -2227,6 +2233,7 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
       await deleteRevenueRecord(recordId)
       setDeletingId(null)
       fetchData()
+      onChanged?.()
     }, 5000)
 
     toast('Registro excluído', {
@@ -2235,7 +2242,8 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
         onClick: () => {
           clearTimeout(undoTimeout)
           setDeletingId(null)
-          fetchData() // Restore from DB
+          fetchData()
+          onChanged?.()
         },
       },
       duration: 5000,
@@ -2288,6 +2296,7 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
         })
       }
       fetchData()
+      onChanged?.()
     } catch {
       // Revert on error
       setItems(prevItems)
@@ -2438,7 +2447,7 @@ function fmtCurrencyInd(cents: number): string {
   return (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function CardIndicacoes({ menteeId }: { menteeId: string }) {
+function CardIndicacoes({ menteeId, onChanged }: { menteeId: string; onChanged?: () => void }) {
   const [indications, setIndications] = useState<Indication[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -2511,6 +2520,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
         await addIndication(menteeId, data)
       }
       fetchAll()
+      onChanged?.()
     } catch {
       // Revert on error
       setIndications(prevIndications)
@@ -2521,8 +2531,8 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
   async function handleDelete(id: string) {
     setConfirmDeleteInd(null)
     setIndications((prev) => prev.filter((i) => i.id !== id))
-    const undoTimeout = setTimeout(async () => { await deleteIndication(id); fetchAll() }, 5000)
-    toast('Indicação excluída', { action: { label: 'Desfazer', onClick: () => { clearTimeout(undoTimeout); fetchAll() } }, duration: 5000 })
+    const undoTimeout = setTimeout(async () => { await deleteIndication(id); fetchAll(); onChanged?.() }, 5000)
+    toast('Indicação excluída', { action: { label: 'Desfazer', onClick: () => { clearTimeout(undoTimeout); fetchAll(); onChanged?.() } }, duration: 5000 })
   }
 
   const totalIndicated = indications.reduce((s, i) => s + (i.quantity_indicated ?? 0), 0)

@@ -53,6 +53,7 @@ export default async function EtapasMentoriaPage() {
     { data: indications },
     { data: revenues },
     { data: activeSessions },
+    { data: lastMessages },
     specialists,
   ] = await Promise.all([
     menteeIds.length > 0
@@ -67,6 +68,9 @@ export default async function EtapasMentoriaPage() {
     menteeIds.length > 0
       ? supabase.from('attendance_sessions').select('mentee_id').in('mentee_id', menteeIds).is('ended_at', null)
       : Promise.resolve({ data: [] as { mentee_id: string }[] }),
+    menteeIds.length > 0
+      ? supabase.from('wpp_messages').select('mentee_id, sent_at').in('mentee_id', menteeIds).order('sent_at', { ascending: false })
+      : Promise.resolve({ data: [] as { mentee_id: string; sent_at: string }[] }),
     getCachedSpecialists(),
   ])
 
@@ -87,13 +91,24 @@ export default async function EtapasMentoriaPage() {
 
   const activeSessionSet = new Set(activeSessions?.map((s) => s.mentee_id) ?? [])
 
-  const menteesWithStats: MenteeWithStats[] = menteeList.map((m) => ({
-    ...m,
-    attendance_count: attendanceMap.get(m.id) ?? 0,
-    indication_count: indicationMap.get(m.id) ?? 0,
-    revenue_total: revenueMap.get(m.id) ?? 0,
-    has_active_session: activeSessionSet.has(m.id),
-  }))
+  const lastContactMap = new Map<string, string>()
+  lastMessages?.forEach((m) => {
+    if (!lastContactMap.has(m.mentee_id)) lastContactMap.set(m.mentee_id, m.sent_at)
+  })
+  const now = Date.now()
+
+  const menteesWithStats: MenteeWithStats[] = menteeList.map((m) => {
+    const lastContact = lastContactMap.get(m.id)
+    const daysSince = lastContact ? Math.floor((now - new Date(lastContact).getTime()) / 86400000) : undefined
+    return {
+      ...m,
+      attendance_count: attendanceMap.get(m.id) ?? 0,
+      indication_count: indicationMap.get(m.id) ?? 0,
+      revenue_total: revenueMap.get(m.id) ?? 0,
+      has_active_session: activeSessionSet.has(m.id),
+      days_since_contact: daysSince,
+    }
+  })
 
   return (
     <KanbanBoard

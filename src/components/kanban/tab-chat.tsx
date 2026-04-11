@@ -3,7 +3,9 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
-import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown, Sparkles, ChevronUp, BellOff, Pencil, Check, ClipboardCheck, Timer, TimerOff, CheckSquare, ClipboardList, Reply, Forward } from 'lucide-react'
+import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown, Sparkles, ChevronUp, BellOff, Pencil, Check, ClipboardCheck, Timer, TimerOff, CheckSquare, ClipboardList, Reply, Forward, Smile } from 'lucide-react'
+import dynamic from 'next/dynamic'
+const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false })
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
@@ -129,6 +131,8 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
   // Reply/quote
   const [replyingTo, setReplyingTo] = useState<WppMessage | null>(null)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const emojiRef = useRef<HTMLDivElement>(null)
 
   // Message selection for converting to action plan
   const [selectMode, setSelectMode] = useState(false)
@@ -654,6 +658,18 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
       setSelectedIds(new Set())
     }
   }
+
+  // Close emoji picker on outside click
+  useEffect(() => {
+    if (!showEmojiPicker) return
+    function handleClickOutside(e: MouseEvent) {
+      if (emojiRef.current && !emojiRef.current.contains(e.target as Node)) {
+        setShowEmojiPicker(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showEmojiPicker])
 
   // Paste image from clipboard (Ctrl+V with screenshot)
   function handlePaste(e: React.ClipboardEvent) {
@@ -1252,19 +1268,43 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
               <Mic className="h-4 w-4" />
             </Button>
 
-            {/* Text input */}
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={handleInputChange}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-              placeholder={canSend ? 'Mensagem...' : inputDisabledReason || ''}
-              disabled={!canSend || uploading}
-              rows={1}
-              className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ minHeight: '44px', maxHeight: '120px' }}
-            />
+            {/* Text input + emoji */}
+            <div className="flex-1 relative">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+                placeholder={canSend ? 'Mensagem...' : inputDisabledReason || ''}
+                disabled={!canSend || uploading}
+                rows={1}
+                className="w-full resize-none rounded-lg border border-border bg-background pl-3 pr-9 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ minHeight: '44px', maxHeight: '120px' }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Emojis"
+              >
+                <Smile className="h-4.5 w-4.5" />
+              </button>
+              {showEmojiPicker && (
+                <div ref={emojiRef} className="absolute bottom-12 right-0 z-50">
+                  <EmojiPicker
+                    onEmojiClick={(emojiData) => {
+                      setInput((prev) => prev + emojiData.emoji)
+                      textareaRef.current?.focus()
+                    }}
+                    width={320}
+                    height={400}
+                    searchPlaceHolder="Buscar emoji..."
+                    previewConfig={{ showPreview: false }}
+                  />
+                </div>
+              )}
+            </div>
 
             {/* Send */}
             <Button

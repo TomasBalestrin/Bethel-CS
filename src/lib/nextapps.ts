@@ -214,7 +214,9 @@ export async function sendTextMessage(
     let messageId: string | undefined
     try {
       const resData = await res.json()
-      messageId = resData.messageId || resData.id || resData.key?.id || undefined
+      messageId = resData.messageId || resData.id || resData.key?.id
+        || resData.message?.key?.id || resData.response?.key?.id
+        || resData.result?.key?.id || resData.data?.key?.id || undefined
     } catch { /* response might not be JSON */ }
 
     return { success: true, messageId }
@@ -280,14 +282,16 @@ export async function sendMediaMessage(
       return { success: false, error: `Send failed (${res.status}): ${text}` }
     }
 
-    const responseText = await res.text()
-    console.log('[NextTrack] sendMediaMessage OK:', responseText.slice(0, 200))
-
     let messageId: string | undefined
     try {
-      const resData = JSON.parse(responseText)
-      messageId = resData.messageId || resData.id || resData.key?.id || undefined
-    } catch { /* not JSON */ }
+      const resData = await res.json()
+      console.log('[NextTrack] sendMediaMessage OK:', JSON.stringify(resData).slice(0, 300))
+      messageId = resData.messageId || resData.id || resData.key?.id
+        || resData.message?.key?.id || resData.response?.key?.id
+        || resData.result?.key?.id || resData.data?.key?.id || undefined
+    } catch {
+      console.log('[NextTrack] sendMediaMessage OK (non-JSON response)')
+    }
 
     return { success: true, messageId }
   } catch (err) {

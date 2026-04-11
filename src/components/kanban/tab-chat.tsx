@@ -234,7 +234,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   // ─── Realtime ───
   useEffect(() => {
     const supabase = createClient()
-    const channel = supabase
+    const realtimeChannel = supabase
       .channel(`wpp_messages:mentee_id=eq.${menteeId}`)
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'wpp_messages',
@@ -243,6 +243,16 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         const newMsg = payload.new as WppMessage
         setMessages((prev) => {
           if (prev.some((m) => m.id === newMsg.id)) return prev
+          // Replace optimistic message (temp-*) if it matches this real message
+          const tempIdx = prev.findIndex((m) =>
+            m.id.startsWith('temp-') && m.direction === newMsg.direction &&
+            (m.content === newMsg.content || (m.media_url && m.media_url === newMsg.media_url))
+          )
+          if (tempIdx >= 0) {
+            const updated = [...prev]
+            updated[tempIdx] = newMsg
+            return updated
+          }
           return [...prev, newMsg]
         })
         if (newMsg.direction === 'incoming') {
@@ -250,7 +260,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         }
       })
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    return () => { supabase.removeChannel(realtimeChannel) }
   }, [menteeId])
 
   // ─── Upload to Supabase Storage ───

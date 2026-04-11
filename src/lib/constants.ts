@@ -27,7 +27,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Depoimentos', href: '/depoimentos', icon: MessageSquareQuote },
   { label: 'Tarefas', href: '/tarefas', icon: ClipboardCheck },
   { label: 'Entregas', href: '/entregas', icon: CalendarCheck },
-  { label: 'Saídas', href: '/saidas', icon: LogOutIcon },
+  { label: 'Gestão de Saídas', href: '/saidas', icon: LogOutIcon },
   { label: 'Especialistas', href: '/especialistas', icon: UserCog, adminOnly: true },
   { label: 'Admin', href: '/admin', icon: Shield, adminOnly: true },
 ]

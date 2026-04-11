@@ -263,7 +263,7 @@ export function BulkImportDialog({ open, onOpenChange, specialists = [], isAdmin
     reader.onload = async (e) => {
       const XLSX = await import('xlsx')
       const data = new Uint8Array(e.target?.result as ArrayBuffer)
-      const wb = XLSX.read(data, { type: 'array', cellDates: false, codepage: 65001 })
+      const wb = XLSX.read(data, { type: 'array', cellDates: false })
       processWorkbook(XLSX, wb)
     }
     reader.readAsArrayBuffer(file)

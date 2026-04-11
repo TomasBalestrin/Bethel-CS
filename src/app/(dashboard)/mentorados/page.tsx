@@ -30,6 +30,7 @@ export default async function MentoradosPage() {
     { data: specialists },
     { data: stages },
     { data: actionPlans },
+    { data: lastMessages },
   ] = await Promise.all([
     menteeIds.length > 0
       ? supabase.from('indications').select('mentee_id').in('mentee_id', menteeIds)
@@ -43,6 +44,9 @@ export default async function MentoradosPage() {
     menteeIds.length > 0
       ? supabase.from('action_plans').select('mentee_id, data').in('mentee_id', menteeIds).not('data', 'is', null)
       : Promise.resolve({ data: [] as { mentee_id: string; data: unknown }[] }),
+    menteeIds.length > 0
+      ? supabase.from('wpp_messages').select('mentee_id, sent_at').in('mentee_id', menteeIds).order('sent_at', { ascending: false })
+      : Promise.resolve({ data: [] as { mentee_id: string; sent_at: string }[] }),
   ])
 
   const indicationMap = new Map<string, number>()
@@ -51,12 +55,23 @@ export default async function MentoradosPage() {
   const revenueMap = new Map<string, number>()
   revenues?.forEach((r) => { revenueMap.set(r.mentee_id, (revenueMap.get(r.mentee_id) ?? 0) + Number(r.sale_value)) })
 
-  const menteesWithStats: MenteeWithStats[] = allMenteesData.map((m) => ({
-    ...m,
-    attendance_count: 0,
-    indication_count: indicationMap.get(m.id) ?? 0,
-    revenue_total: revenueMap.get(m.id) ?? 0,
-  }))
+  const lastContactMap = new Map<string, string>()
+  lastMessages?.forEach((m) => {
+    if (!lastContactMap.has(m.mentee_id)) lastContactMap.set(m.mentee_id, m.sent_at)
+  })
+  const now = Date.now()
+
+  const menteesWithStats: MenteeWithStats[] = allMenteesData.map((m) => {
+    const lastContact = lastContactMap.get(m.id)
+    const daysSince = lastContact ? Math.floor((now - new Date(lastContact).getTime()) / 86400000) : undefined
+    return {
+      ...m,
+      attendance_count: 0,
+      indication_count: indicationMap.get(m.id) ?? 0,
+      revenue_total: revenueMap.get(m.id) ?? 0,
+      days_since_contact: daysSince,
+    }
+  })
 
   // Fetch distinct filter options from mentees
   const funisOrigem = Array.from(new Set(allMenteesData.map((m) => m.funnel_origin).filter(Boolean))) as string[]

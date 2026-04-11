@@ -245,22 +245,17 @@ export async function sendMediaMessage(
     const url = `${BASE_URL}/api/chats/instances/${instanceUUID}/send`
     const body: Record<string, unknown> = { phone, type }
 
-    // Set media URL based on type — use ONLY the correct field per type
+    // Set media as nested object matching NextTrack's expected format
     if (type === 'audio') {
-      body.audio = mediaUrl
-      body.audioUrl = mediaUrl
-      body.ptt = true
+      body.audio = { url: mediaUrl, audioUrl: mediaUrl, ptt: true, ...(mimeType ? { mimeType } : {}) }
     } else if (type === 'image') {
-      body.image = mediaUrl
-      body.imageUrl = mediaUrl
+      body.image = { url: mediaUrl, imageUrl: mediaUrl, ...(caption ? { caption } : {}), ...(mimeType ? { mimeType } : {}) }
     } else if (type === 'video') {
-      body.video = mediaUrl
-      body.videoUrl = mediaUrl
+      body.video = { url: mediaUrl, videoUrl: mediaUrl, ...(caption ? { caption } : {}), ...(mimeType ? { mimeType } : {}) }
     } else if (type === 'document') {
-      body.document = mediaUrl
-      body.documentUrl = mediaUrl
+      body.document = { url: mediaUrl, documentUrl: mediaUrl, ...(fileName ? { fileName } : {}), ...(mimeType ? { mimeType } : {}) }
     }
-    // Also set generic media field as fallback
+    // Also set flat fields as fallback
     body.mediaUrl = mediaUrl
 
     if (caption) body.message = caption

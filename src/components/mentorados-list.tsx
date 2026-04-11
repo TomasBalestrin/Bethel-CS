@@ -534,9 +534,9 @@ export function MentoradosList({
                   </div>
 
                   {/* Tags: specialist + stage */}
-                  <div className="flex flex-wrap gap-1 mt-2">
+                  <div className="flex flex-wrap gap-1.5 mt-2">
                     {specialistName && (
-                      <Badge variant="secondary" className="text-[10px] font-medium">{specialistName}</Badge>
+                      <Badge variant="default" className="text-[10px] font-semibold">{specialistName}</Badge>
                     )}
                     {stageName && (
                       <Badge variant="accent" className="text-[10px] font-medium">{stageName}</Badge>

@@ -26,10 +26,11 @@ const LEVEL_LABELS: Record<number, string> = {
 interface MenteeCardProps {
   mentee: MenteeWithStats
   unreadCount?: number
+  specialistName?: string
   onClick?: (mentee: MenteeWithStats) => void
 }
 
-export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, onClick }: MenteeCardProps) {
+export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, specialistName, onClick }: MenteeCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: mentee.id,
@@ -96,11 +97,16 @@ export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, on
           </span>
         </div>
 
-        {/* Product badge + date */}
-        <div className="flex items-center gap-1.5 mt-1.5">
+        {/* Product + specialist badges + date */}
+        <div className="flex items-center flex-wrap gap-1 mt-1.5">
           {mentee.product_name && (
             <span className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
               {mentee.product_name}
+            </span>
+          )}
+          {specialistName && (
+            <span className="inline-flex items-center rounded-md bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
+              {specialistName}
             </span>
           )}
           {mentee.start_date && (

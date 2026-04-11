@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -68,6 +68,7 @@ export function KanbanBoard({
   const [selectedSpecialist, setSelectedSpecialist] = useState<string>('all')
   const [advFilters, setAdvFilters] = useState<MenteeFilterValues>(EMPTY_FILTERS)
   const { unreadMap, lastMessageMap } = useUnreadCounts()
+  const specialistNameMap = useMemo(() => new Map(specialists.map((s) => [s.id, s.full_name])), [specialists])
 
   useEffect(() => {
     setMentees(initialMentees)
@@ -291,6 +292,7 @@ export function KanbanBoard({
                 stage={stage}
                 mentees={getMenteesForStage(stage.id)}
                 unreadMap={unreadMap}
+                specialistNameMap={specialistNameMap}
                 onCardClick={handleCardClick}
                 showAddButton={idx === 0 && firstStage?.id === stage.id}
                 onAddClick={() => setDialogOpen(true)}

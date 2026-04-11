@@ -52,6 +52,7 @@ export default async function EtapasIniciaisPage() {
     { data: attendances },
     { data: indications },
     { data: revenues },
+    { data: activeSessions },
     specialists,
   ] = await Promise.all([
     menteeIds.length > 0
@@ -63,6 +64,9 @@ export default async function EtapasIniciaisPage() {
     menteeIds.length > 0
       ? supabase.from('revenue_records').select('mentee_id, sale_value').in('mentee_id', menteeIds)
       : Promise.resolve({ data: [] as { mentee_id: string; sale_value: number }[] }),
+    menteeIds.length > 0
+      ? supabase.from('attendance_sessions').select('mentee_id').in('mentee_id', menteeIds).is('ended_at', null)
+      : Promise.resolve({ data: [] as { mentee_id: string }[] }),
     getCachedSpecialists(),
   ])
 
@@ -82,11 +86,14 @@ export default async function EtapasIniciaisPage() {
     revenueMap.set(r.mentee_id, (revenueMap.get(r.mentee_id) ?? 0) + Number(r.sale_value))
   })
 
+  const activeSessionSet = new Set(activeSessions?.map((s) => s.mentee_id) ?? [])
+
   const menteesWithStats: MenteeWithStats[] = menteeList.map((m) => ({
     ...m,
     attendance_count: attendanceMap.get(m.id) ?? 0,
     indication_count: indicationMap.get(m.id) ?? 0,
     revenue_total: revenueMap.get(m.id) ?? 0,
+    has_active_session: activeSessionSet.has(m.id),
   }))
 
   return (

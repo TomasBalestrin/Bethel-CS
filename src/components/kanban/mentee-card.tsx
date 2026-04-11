@@ -3,7 +3,7 @@
 import { memo } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { Users, DollarSign, Star, Clock, Calendar } from 'lucide-react'
+import { Users, DollarSign, Star, Clock, Calendar, Headphones } from 'lucide-react'
 import type { MenteeWithStats } from '@/types/kanban'
 import { formatDateBR } from '@/lib/format'
 
@@ -49,6 +49,8 @@ export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, on
   }
 
   const isInactive = mentee.days_since_contact != null && mentee.days_since_contact >= 30
+  const hasIndications = mentee.indication_count > 0
+  const hasRevenue = mentee.revenue_total > 0
 
   return (
     <div
@@ -57,70 +59,89 @@ export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, on
       {...listeners}
       {...attributes}
       onClick={handleClick}
-      className={`relative cursor-pointer rounded-lg border transition-colors hover:shadow-sm active:cursor-grabbing ${
-        isInactive
-          ? 'border-muted-foreground/30 bg-muted/60'
-          : 'border-border/60 bg-card hover:border-accent/30'
+      className={`relative cursor-pointer rounded-xl border transition-all hover:shadow-md hover:-translate-y-0.5 active:cursor-grabbing ${
+        mentee.has_active_session
+          ? 'border-success/40 bg-success/5 shadow-sm shadow-success/10'
+          : isInactive
+            ? 'border-muted-foreground/20 bg-muted/40'
+            : 'border-border/50 bg-card hover:border-accent/30'
       }`}
     >
+      {/* Unread badge */}
       {unreadCount > 0 && (
-        <span className="absolute -top-1.5 -right-1.5 z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-white shadow-sm">
+        <span className="absolute -top-2 -right-2 z-10 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-white shadow-md ring-2 ring-background">
           {unreadCount > 99 ? '99+' : unreadCount}
         </span>
       )}
-      <div className="flex">
-        {/* Priority color bar */}
-        <div
-          className="w-1.5 shrink-0 rounded-l-lg"
-          style={{ backgroundColor: color }}
-        />
-        <div className="flex-1 px-3 py-2.5">
-          {/* Name + priority */}
-          <div className="flex items-start justify-between gap-2">
-            <h4 className="flex items-center gap-1 font-heading font-semibold text-[13px] leading-tight text-foreground truncate">
-              {mentee.cliente_fit && <Star className="h-3.5 w-3.5 text-warning fill-warning shrink-0" />}
-              {mentee.full_name}
-            </h4>
+
+      {/* Priority accent line */}
+      <div
+        className="absolute top-0 left-3 right-3 h-[2px] rounded-b-full"
+        style={{ backgroundColor: color }}
+      />
+
+      <div className="px-3 pt-3 pb-2.5">
+        {/* Header: Name + Priority */}
+        <div className="flex items-start justify-between gap-2">
+          <h4 className="flex items-start gap-1 font-heading font-semibold text-[13px] leading-snug text-foreground min-w-0">
+            {mentee.cliente_fit && <Star className="h-3 w-3 text-warning fill-warning shrink-0 mt-0.5" />}
+            <span>{mentee.full_name}</span>
+          </h4>
+          <span
+            className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular"
+            style={{ backgroundColor: `${color}18`, color }}
+            title={LEVEL_LABELS[mentee.priority_level] ?? ''}
+          >
+            P{mentee.priority_level}
+          </span>
+        </div>
+
+        {/* Product badge + date */}
+        <div className="flex items-center gap-1.5 mt-1.5">
+          {mentee.product_name && (
+            <span className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+              {mentee.product_name}
+            </span>
+          )}
+          {mentee.start_date && (
+            <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/60 shrink-0 ml-auto tabular" title="Data de início">
+              <Calendar size={9} />
+              {formatDateBR(mentee.start_date)}
+            </span>
+          )}
+        </div>
+
+        {/* Active session indicator */}
+        {mentee.has_active_session && (
+          <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-success/10 px-2 py-1">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+            </span>
+            <Headphones size={10} className="text-success" />
+            <span className="text-[10px] font-semibold text-success">Em atendimento</span>
+          </div>
+        )}
+
+        {/* Metrics row */}
+        <div className="mt-2 pt-2 border-t border-border/30 flex items-center gap-3 text-[11px] tabular">
+          <span className={`flex items-center gap-1 ${hasIndications ? 'text-accent font-medium' : 'text-muted-foreground/60'}`} title="Indicações">
+            <Users size={11} className="shrink-0" />
+            {mentee.indication_count}
+          </span>
+          <span className={`flex items-center gap-1 ${hasRevenue ? 'text-success font-medium' : 'text-muted-foreground/60'}`} title="Receita">
+            <DollarSign size={11} className="shrink-0" />
+            R$ {mentee.revenue_total.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+          </span>
+          {mentee.days_since_contact != null && (
             <span
-              className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
-              style={{ backgroundColor: `${color}15`, color }}
-              title={LEVEL_LABELS[mentee.priority_level] ?? ''}
+              className={`flex items-center gap-0.5 ml-auto ${mentee.days_since_contact > 7 ? 'text-destructive font-semibold' : mentee.days_since_contact > 3 ? 'text-warning font-medium' : 'text-muted-foreground/60'}`}
+              title={`${mentee.days_since_contact} dias sem contato`}
             >
-              P{mentee.priority_level}
+              <Clock size={10} className="shrink-0" />
+              {mentee.days_since_contact}d
             </span>
-          </div>
-          {/* Product + start date */}
-          <div className="flex items-center gap-1.5 mt-0.5">
-            {mentee.product_name && (
-              <p className="text-[11px] text-muted-foreground truncate">{mentee.product_name}</p>
-            )}
-            {mentee.start_date && (
-              <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/70 shrink-0 ml-auto" title="Data de início">
-                <Calendar size={9} />
-                {formatDateBR(mentee.start_date)}
-              </span>
-            )}
-          </div>
-          {/* Metrics */}
-          <div className="mt-2 pt-1.5 border-t border-border/40 flex items-center gap-2.5 text-[11px] text-muted-foreground tabular">
-            <span className="flex items-center gap-0.5" title="Indicações">
-              <Users size={11} className="shrink-0" />
-              {mentee.indication_count}
-            </span>
-            <span className="flex items-center gap-0.5" title="Receita">
-              <DollarSign size={11} className="shrink-0" />
-              R$ {mentee.revenue_total.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-            </span>
-            {mentee.days_since_contact != null && (
-              <span
-                className={`flex items-center gap-0.5 ml-auto ${mentee.days_since_contact > 7 ? 'text-destructive font-medium' : mentee.days_since_contact > 3 ? 'text-warning' : ''}`}
-                title={`${mentee.days_since_contact} dias sem contato`}
-              >
-                <Clock size={11} className="shrink-0" />
-                {mentee.days_since_contact}d
-              </span>
-            )}
-          </div>
+          )}
         </div>
       </div>
     </div>

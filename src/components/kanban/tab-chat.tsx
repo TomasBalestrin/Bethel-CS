@@ -33,6 +33,7 @@ interface TabChatProps {
   menteeName: string
   specialistId: string | null
   onUnreadCountChange?: (count: number) => void
+  onSessionChange?: (active: boolean) => void
   channel?: string
   signatureName?: string
 }
@@ -68,7 +69,7 @@ function getDateKey(dateStr: string) {
 
 // ─── Component ───
 
-export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnreadCountChange, channel = 'principal', signatureName }: TabChatProps) {
+export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnreadCountChange, onSessionChange, channel = 'principal', signatureName }: TabChatProps) {
   const [messages, setMessages] = useState<WppMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
@@ -143,6 +144,8 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const onUnreadRef = useRef(onUnreadCountChange)
   onUnreadRef.current = onUnreadCountChange
+  const onSessionRef = useRef(onSessionChange)
+  onSessionRef.current = onSessionChange
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
@@ -245,6 +248,10 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         filter: `mentee_id=eq.${menteeId}`,
       }, (payload) => {
         const newMsg = payload.new as WppMessage
+        // Only process messages for this channel
+        const msgChannel = (newMsg as Record<string, unknown>).channel as string || 'principal'
+        if (msgChannel !== channel) return
+
         setMessages((prev) => {
           if (prev.some((m) => m.id === newMsg.id)) return prev
           // Replace optimistic message (temp-*) if it matches this real message
@@ -260,6 +267,8 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           return [...prev, newMsg]
         })
         if (newMsg.direction === 'incoming') {
+          // Notify parent about new unread message (-1 = increment by 1)
+          onUnreadRef.current?.(-1)
           supabase.from('wpp_messages').update({ is_read: true }).eq('id', newMsg.id).then(() => {})
         }
       })
@@ -868,6 +877,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                   setSessionStart(prevStart)
                   toast.error('Erro ao finalizar atendimento')
                 } else {
+                  onSessionRef.current?.(false)
                   // Auto-generate summary after ending session
                   handleSummarize()
                 }
@@ -893,6 +903,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                 if (sess) {
                   setActiveSession(sess.id)
                   setSessionStart(new Date(sess.started_at))
+                  onSessionRef.current?.(true)
                   toast.success('Atendimento iniciado')
                 }
               }}

@@ -350,8 +350,28 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
 }) {
   const tabsRef = useRef<HTMLDivElement>(null)
   const [showOverflow, setShowOverflow] = useState(false)
-  const [chatUnread, setChatUnread] = useState(0)
+  const [chatUnreads, setChatUnreads] = useState<Record<string, number>>({ principal: 0, comercial: 0, marketing: 0, gestao: 0 })
   const [activeTab, setActiveTab] = useState('info')
+
+  // Fetch unread counts per channel on mount
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('wpp_messages')
+      .select('channel')
+      .eq('mentee_id', mentee.id)
+      .eq('direction', 'incoming')
+      .eq('is_read', false)
+      .then(({ data }) => {
+        if (!data) return
+        const counts: Record<string, number> = { principal: 0, comercial: 0, marketing: 0, gestao: 0 }
+        data.forEach((m) => {
+          const ch = (m as { channel: string }).channel || 'principal'
+          counts[ch] = (counts[ch] ?? 0) + 1
+        })
+        setChatUnreads(counts)
+      })
+  }, [mentee.id])
 
   useEffect(() => {
     function check() {
@@ -384,31 +404,30 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
               { value: 'engajamento', label: 'Engajamento' },
               { value: 'historico', label: 'Histórico' },
               { value: 'intensivo', label: 'Eventos' },
-              { value: 'chat-principal', label: 'Chat Principal' },
-              { value: 'chat-comercial', label: 'Comercial' },
-              { value: 'chat-marketing', label: 'Marketing' },
-              { value: 'chat-gestao', label: 'Gestão' },
-            ].map((tab) => (
-              <TabsTrigger
-                key={tab.value}
-                value={tab.value}
-                className="whitespace-nowrap rounded-none border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-accent data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-              >
-                {tab.value.startsWith('chat-') ? (
+              { value: 'chat-principal', label: 'Chat Principal', channel: 'principal' },
+              { value: 'chat-comercial', label: 'Comercial', channel: 'comercial' },
+              { value: 'chat-marketing', label: 'Marketing', channel: 'marketing' },
+              { value: 'chat-gestao', label: 'Gestão', channel: 'gestao' },
+            ].map((tab) => {
+              const unread = tab.channel ? chatUnreads[tab.channel] ?? 0 : 0
+              return (
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className="whitespace-nowrap rounded-none border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-accent data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                >
                   <span className="flex items-center gap-1.5">
                     {tab.value === 'chat-principal' && <MessageSquare className="h-3.5 w-3.5" />}
                     {tab.label}
-                    {tab.value === 'chat-principal' && chatUnread > 0 && (
+                    {unread > 0 && (
                       <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-white">
-                        {chatUnread}
+                        {unread}
                       </span>
                     )}
                   </span>
-                ) : (
-                  tab.label
-                )}
-              </TabsTrigger>
-            ))}
+                </TabsTrigger>
+              )
+            })}
           </TabsList>
         </div>
         {showOverflow && (
@@ -437,7 +456,9 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
           />
         </ErrorBoundary></TabsContent>
         <TabsContent value="action-plan"><ErrorBoundary><TabActionPlan mentee={mentee} /></ErrorBoundary></TabsContent>
-        <TabsContent value="acompanhamento"><ErrorBoundary><TabAcompanhamento menteeId={mentee.id} mentee={mentee} /></ErrorBoundary></TabsContent>
+        <TabsContent value="acompanhamento"><ErrorBoundary><TabAcompanhamento menteeId={mentee.id} mentee={mentee} onStatsChange={(stats) => {
+          onMenteeUpdated?.({ ...mentee, indication_count: stats.indications, revenue_total: stats.revenue })
+        }} /></ErrorBoundary></TabsContent>
         <TabsContent value="engajamento"><ErrorBoundary><TabEngajamento menteeId={mentee.id} mentee={mentee} /></ErrorBoundary></TabsContent>
         <TabsContent value="historico"><ErrorBoundary><TabHistorico menteeId={mentee.id} /></ErrorBoundary></TabsContent>
         <TabsContent value="intensivo"><ErrorBoundary><TabIntensivo menteeId={mentee.id} /></ErrorBoundary></TabsContent>
@@ -455,7 +476,8 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
             menteePhone={mentee.phone}
             menteeName={mentee.full_name}
             specialistId={mentee.created_by}
-            onUnreadCountChange={chat.value === 'chat-principal' ? setChatUnread : undefined}
+            onUnreadCountChange={(count: number) => setChatUnreads((prev) => ({ ...prev, [chat.channel]: count === -1 ? (prev[chat.channel] ?? 0) + 1 : count }))}
+            onSessionChange={(active) => onMenteeUpdated?.({ ...mentee, has_active_session: active })}
             channel={chat.channel}
             signatureName={chat.signature}
           /></ErrorBoundary>
@@ -879,7 +901,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
           </div>
 
           {/* Empresa — nome, nicho, colaboradores, faturamento, motivação, expectativas */}
-          {(empresaData.nome_empresa || mentee.niche || empresaData.nicho || empresaData.num_colaboradores || mentee.faturamento_atual != null || mentee.faturamento_antes_mentoria != null || empresaData.faturamento_medio || empresaData.motivacao_elite_premium || empresaData.expectativas_resultados) && (
+          {(empresaData.nome_empresa || mentee.niche || empresaData.nicho || empresaData.num_colaboradores || mentee.has_partner || mentee.faturamento_atual != null || mentee.faturamento_antes_mentoria != null || empresaData.faturamento_medio || empresaData.motivacao_elite_premium || empresaData.expectativas_resultados) && (
             <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
               <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-success/5 to-transparent">
                 <Building2 className="h-3.5 w-3.5 text-success" />
@@ -889,6 +911,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
                 {empresaData.nome_empresa && <ContactRow icon={Building2} label="Nome" value={empresaData.nome_empresa} color="text-success" bg="bg-success/10" />}
                 {(mentee.niche || empresaData.nicho) && <ContactRow icon={Target} label="Nicho" value={(mentee.niche || empresaData.nicho)!} color="text-accent" bg="bg-accent/10" />}
                 {empresaData.num_colaboradores && <ContactRow icon={Users} label="Colaboradores" value={empresaData.num_colaboradores} color="text-info" bg="bg-info/10" />}
+                <ContactRow icon={Users} label="Sócio" value={mentee.has_partner ? (mentee.partner_name || 'Sim') : 'Não'} color={mentee.has_partner ? 'text-accent' : 'text-muted-foreground'} bg={mentee.has_partner ? 'bg-accent/10' : 'bg-muted'} />
                 {mentee.faturamento_atual != null && <ContactRow icon={DollarSign} label="Faturamento atual" value={formatBRL(mentee.faturamento_atual)} color="text-success" bg="bg-success/10" />}
                 {mentee.faturamento_antes_mentoria != null && <ContactRow icon={DollarSign} label="Fat. antes da mentoria" value={formatBRL(mentee.faturamento_antes_mentoria)} color="text-warning" bg="bg-warning/10" />}
                 {empresaData.faturamento_medio != null && empresaData.faturamento_medio > 0 && <ContactRow icon={DollarSign} label="Fat. médio (formulário)" value={formatBRL(empresaData.faturamento_medio / 100)} color="text-info" bg="bg-info/10" />}
@@ -1879,31 +1902,34 @@ function CardEntregasMentoria({ menteeId, startDate }: { menteeId: string; start
   )
 }
 
-function TabAcompanhamento({ menteeId, mentee }: { menteeId: string; mentee: MenteeWithStats }) {
+function TabAcompanhamento({ menteeId, mentee, onStatsChange }: { menteeId: string; mentee: MenteeWithStats; onStatsChange?: (stats: { indications: number; revenue: number }) => void }) {
   const [stats, setStats] = useState({ indications: 0, converted: 0, convertedValue: 0, revenue: 0, testimonials: 0, sessions: 0, extras: 0 })
   const supabase = createClient()
+  const onStatsChangeRef = useRef(onStatsChange)
+  onStatsChangeRef.current = onStatsChange
 
-  useEffect(() => {
-    async function fetchStats() {
-      const [{ data: ind }, { data: rev }, { data: test }, { data: sess }, { data: ext }] = await Promise.all([
-        supabase.from('indications').select('id, converted, converted_value').eq('mentee_id', menteeId),
-        supabase.from('revenue_records').select('sale_value').eq('mentee_id', menteeId),
-        supabase.from('testimonials').select('id').eq('mentee_id', menteeId),
-        supabase.from('individual_sessions').select('id').eq('mentee_id', menteeId),
-        supabase.from('extra_deliveries').select('id').eq('mentee_id', menteeId),
-      ])
-      setStats({
-        indications: ind?.length ?? 0,
-        converted: ind?.filter((i) => i.converted).length ?? 0,
-        convertedValue: ind?.filter((i) => i.converted).reduce((s, i) => s + Number(i.converted_value ?? 0), 0) ?? 0,
-        revenue: rev?.reduce((s, r) => s + Number(r.sale_value), 0) ?? 0,
-        testimonials: test?.length ?? 0,
-        sessions: sess?.length ?? 0,
-        extras: ext?.length ?? 0,
-      })
+  const fetchStats = useCallback(async () => {
+    const [{ data: ind }, { data: rev }, { data: test }, { data: sess }, { data: ext }] = await Promise.all([
+      supabase.from('indications').select('id, converted, converted_value').eq('mentee_id', menteeId),
+      supabase.from('revenue_records').select('sale_value').eq('mentee_id', menteeId),
+      supabase.from('testimonials').select('id').eq('mentee_id', menteeId),
+      supabase.from('individual_sessions').select('id').eq('mentee_id', menteeId),
+      supabase.from('extra_deliveries').select('id').eq('mentee_id', menteeId),
+    ])
+    const newStats = {
+      indications: ind?.length ?? 0,
+      converted: ind?.filter((i) => i.converted).length ?? 0,
+      convertedValue: ind?.filter((i) => i.converted).reduce((s, i) => s + Number(i.converted_value ?? 0), 0) ?? 0,
+      revenue: rev?.reduce((s, r) => s + Number(r.sale_value), 0) ?? 0,
+      testimonials: test?.length ?? 0,
+      sessions: sess?.length ?? 0,
+      extras: ext?.length ?? 0,
     }
-    fetchStats()
-  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
+    setStats(newStats)
+    onStatsChangeRef.current?.({ indications: newStats.indications, revenue: newStats.revenue })
+  }, [menteeId, supabase])
+
+  useEffect(() => { fetchStats() }, [fetchStats])
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -1941,10 +1967,10 @@ function TabAcompanhamento({ menteeId, mentee }: { menteeId: string; mentee: Men
           <CardEntregasMentoria menteeId={menteeId} startDate={mentee.start_date} />
         </div>
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-          <CardIndicacoes menteeId={menteeId} />
+          <CardIndicacoes menteeId={menteeId} onChanged={fetchStats} />
         </div>
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
-          <TabRevenue menteeId={menteeId} />
+          <TabRevenue menteeId={menteeId} onChanged={fetchStats} />
         </div>
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
           <CardIndividualSessions menteeId={menteeId} />
@@ -2136,7 +2162,7 @@ function CardExtraDeliveries({ menteeId }: { menteeId: string }) {
 }
 
 // ─── Tab: LTV do Mentorado ───
-function TabRevenue({ menteeId }: { menteeId: string }) {
+function TabRevenue({ menteeId, onChanged }: { menteeId: string; onChanged?: () => void }) {
   const [items, setItems] = useState<RevenueRecord[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [showForm, setShowForm] = useState(false)
@@ -2207,6 +2233,7 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
       await deleteRevenueRecord(recordId)
       setDeletingId(null)
       fetchData()
+      onChanged?.()
     }, 5000)
 
     toast('Registro excluído', {
@@ -2215,7 +2242,8 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
         onClick: () => {
           clearTimeout(undoTimeout)
           setDeletingId(null)
-          fetchData() // Restore from DB
+          fetchData()
+          onChanged?.()
         },
       },
       duration: 5000,
@@ -2268,6 +2296,7 @@ function TabRevenue({ menteeId }: { menteeId: string }) {
         })
       }
       fetchData()
+      onChanged?.()
     } catch {
       // Revert on error
       setItems(prevItems)
@@ -2418,7 +2447,7 @@ function fmtCurrencyInd(cents: number): string {
   return (cents / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-function CardIndicacoes({ menteeId }: { menteeId: string }) {
+function CardIndicacoes({ menteeId, onChanged }: { menteeId: string; onChanged?: () => void }) {
   const [indications, setIndications] = useState<Indication[]>([])
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -2491,6 +2520,7 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
         await addIndication(menteeId, data)
       }
       fetchAll()
+      onChanged?.()
     } catch {
       // Revert on error
       setIndications(prevIndications)
@@ -2501,8 +2531,8 @@ function CardIndicacoes({ menteeId }: { menteeId: string }) {
   async function handleDelete(id: string) {
     setConfirmDeleteInd(null)
     setIndications((prev) => prev.filter((i) => i.id !== id))
-    const undoTimeout = setTimeout(async () => { await deleteIndication(id); fetchAll() }, 5000)
-    toast('Indicação excluída', { action: { label: 'Desfazer', onClick: () => { clearTimeout(undoTimeout); fetchAll() } }, duration: 5000 })
+    const undoTimeout = setTimeout(async () => { await deleteIndication(id); fetchAll(); onChanged?.() }, 5000)
+    toast('Indicação excluída', { action: { label: 'Desfazer', onClick: () => { clearTimeout(undoTimeout); fetchAll(); onChanged?.() } }, duration: 5000 })
   }
 
   const totalIndicated = indications.reduce((s, i) => s + (i.quantity_indicated ?? 0), 0)

@@ -245,6 +245,10 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         filter: `mentee_id=eq.${menteeId}`,
       }, (payload) => {
         const newMsg = payload.new as WppMessage
+        // Only process messages for this channel
+        const msgChannel = (newMsg as Record<string, unknown>).channel as string || 'principal'
+        if (msgChannel !== channel) return
+
         setMessages((prev) => {
           if (prev.some((m) => m.id === newMsg.id)) return prev
           // Replace optimistic message (temp-*) if it matches this real message
@@ -260,6 +264,8 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           return [...prev, newMsg]
         })
         if (newMsg.direction === 'incoming') {
+          // Notify parent about new unread message (-1 = increment by 1)
+          onUnreadRef.current?.(-1)
           supabase.from('wpp_messages').update({ is_read: true }).eq('id', newMsg.id).then(() => {})
         }
       })

@@ -350,8 +350,28 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
 }) {
   const tabsRef = useRef<HTMLDivElement>(null)
   const [showOverflow, setShowOverflow] = useState(false)
-  const [chatUnread, setChatUnread] = useState(0)
+  const [chatUnreads, setChatUnreads] = useState<Record<string, number>>({ principal: 0, comercial: 0, marketing: 0, gestao: 0 })
   const [activeTab, setActiveTab] = useState('info')
+
+  // Fetch unread counts per channel on mount
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('wpp_messages')
+      .select('channel')
+      .eq('mentee_id', mentee.id)
+      .eq('direction', 'incoming')
+      .eq('is_read', false)
+      .then(({ data }) => {
+        if (!data) return
+        const counts: Record<string, number> = { principal: 0, comercial: 0, marketing: 0, gestao: 0 }
+        data.forEach((m) => {
+          const ch = (m as { channel: string }).channel || 'principal'
+          counts[ch] = (counts[ch] ?? 0) + 1
+        })
+        setChatUnreads(counts)
+      })
+  }, [mentee.id])
 
   useEffect(() => {
     function check() {
@@ -384,31 +404,30 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
               { value: 'engajamento', label: 'Engajamento' },
               { value: 'historico', label: 'Histórico' },
               { value: 'intensivo', label: 'Eventos' },
-              { value: 'chat-principal', label: 'Chat Principal' },
-              { value: 'chat-comercial', label: 'Comercial' },
-              { value: 'chat-marketing', label: 'Marketing' },
-              { value: 'chat-gestao', label: 'Gestão' },
-            ].map((tab) => (
-              <TabsTrigger
-                key={tab.value}
-                value={tab.value}
-                className="whitespace-nowrap rounded-none border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-accent data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-              >
-                {tab.value.startsWith('chat-') ? (
+              { value: 'chat-principal', label: 'Chat Principal', channel: 'principal' },
+              { value: 'chat-comercial', label: 'Comercial', channel: 'comercial' },
+              { value: 'chat-marketing', label: 'Marketing', channel: 'marketing' },
+              { value: 'chat-gestao', label: 'Gestão', channel: 'gestao' },
+            ].map((tab) => {
+              const unread = chatUnreads[tab.channel] ?? 0
+              return (
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className="whitespace-nowrap rounded-none border-b-2 border-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-accent data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                >
                   <span className="flex items-center gap-1.5">
                     {tab.value === 'chat-principal' && <MessageSquare className="h-3.5 w-3.5" />}
                     {tab.label}
-                    {tab.value === 'chat-principal' && chatUnread > 0 && (
+                    {unread > 0 && (
                       <span className="flex h-4 min-w-[16px] items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-white">
-                        {chatUnread}
+                        {unread}
                       </span>
                     )}
                   </span>
-                ) : (
-                  tab.label
-                )}
-              </TabsTrigger>
-            ))}
+                </TabsTrigger>
+              )
+            })}
           </TabsList>
         </div>
         {showOverflow && (
@@ -455,7 +474,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
             menteePhone={mentee.phone}
             menteeName={mentee.full_name}
             specialistId={mentee.created_by}
-            onUnreadCountChange={chat.value === 'chat-principal' ? setChatUnread : undefined}
+            onUnreadCountChange={(count: number) => setChatUnreads((prev) => ({ ...prev, [chat.channel]: count === -1 ? (prev[chat.channel] ?? 0) + 1 : count }))}
             channel={chat.channel}
             signatureName={chat.signature}
           /></ErrorBoundary>

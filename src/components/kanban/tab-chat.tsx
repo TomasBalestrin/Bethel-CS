@@ -148,7 +148,12 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   onSessionRef.current = onSessionChange
 
   const scrollToBottom = useCallback((instant?: boolean) => {
-    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: instant ? 'auto' : 'smooth' }), instant ? 10 : 50)
+    // Use rAF + setTimeout to ensure DOM has rendered before scrolling
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: instant ? 'auto' : 'smooth' })
+      }, instant ? 50 : 50)
+    })
   }, [])
 
   // ─── Load messages + instance ───
@@ -238,13 +243,19 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
   const initialScrollDone = useRef(false)
   useEffect(() => {
-    if (!initialScrollDone.current && messages.length > 0) {
+    // Reset on channel/mentee change
+    initialScrollDone.current = false
+  }, [menteeId, channel])
+  useEffect(() => {
+    if (!initialScrollDone.current && messages.length > 0 && !loading) {
       initialScrollDone.current = true
-      scrollToBottom(true) // instant on first load
+      scrollToBottom(true)
+      // Fallback: scroll again after images/media may have loaded
+      setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'auto' }), 300)
     } else if (initialScrollDone.current) {
-      scrollToBottom() // smooth for new messages
+      scrollToBottom()
     }
-  }, [messages, scrollToBottom])
+  }, [messages, loading, scrollToBottom])
 
   // ─── Realtime ───
   useEffect(() => {

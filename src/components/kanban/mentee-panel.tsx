@@ -1034,7 +1034,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
           <DialogHeader>
             <DialogTitle>Solicitação de Cancelamento</DialogTitle>
             <DialogDescription>
-              Registre o motivo completo da solicitação de cancelamento de {mentee.full_name}. O status do mentorado não será alterado.
+              Registre o motivo da solicitação de cancelamento de {mentee.full_name}. O mentorado será movido para a Gestão de Saídas.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={async (e) => {
@@ -1043,25 +1043,57 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
               toast.error('Descreva o motivo com mais detalhes (mínimo 10 caracteres)')
               return
             }
+            const supabase = createClient()
             const timestamp = new Date().toLocaleDateString('pt-BR')
             const cancelNote = `[SOLICITAÇÃO DE CANCELAMENTO ${timestamp}] ${cancelReason.trim()}`
             const existingNotes = mentee.notes?.trim() || ''
             const newNotes = existingNotes ? `${cancelNote}\n\n${existingNotes}` : cancelNote
 
-            // Optimistic: close dialog and update immediately
-            toast.success('Solicitação de cancelamento registrada')
+            // Find the first exit stage ("Em Processo de Cancelamento")
+            const { data: exitStage } = await supabase
+              .from('kanban_stages')
+              .select('id')
+              .eq('type', 'exit')
+              .order('position')
+              .limit(1)
+              .single()
+
+            if (!exitStage) {
+              toast.error('Etapa de saída não encontrada')
+              return
+            }
+
+            // Update mentee: notes + move to exit kanban
+            const { error } = await supabase
+              .from('mentees')
+              .update({
+                notes: newNotes,
+                current_stage_id: exitStage.id,
+                kanban_type: 'exit' as KanbanType,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', mentee.id)
+
+            if (error) {
+              toast.error(error.message)
+              return
+            }
+
+            // Log stage change
+            const { data: { user } } = await supabase.auth.getUser()
+            if (user) {
+              await supabase.from('stage_changes' as never).insert({
+                mentee_id: mentee.id,
+                from_stage_id: mentee.current_stage_id,
+                to_stage_id: exitStage.id,
+                changed_by: user.id,
+              } as never)
+            }
+
+            toast.success('Solicitação registrada — mentorado movido para Gestão de Saídas')
             setCancelOpen(false)
             setCancelReason('')
-            onMenteeUpdated?.({ ...mentee, notes: newNotes })
-
-            const result = await updateMentee(mentee.id, {
-              notes: newNotes,
-            })
-            if (result.error) {
-              // Revert on error
-              toast.error(result.error)
-              onMenteeUpdated?.(mentee)
-            }
+            onMenteeUpdated?.({ ...mentee, notes: newNotes, current_stage_id: exitStage.id, kanban_type: 'exit' as KanbanType })
           }} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="cancel-reason">Motivo da solicitação *</Label>

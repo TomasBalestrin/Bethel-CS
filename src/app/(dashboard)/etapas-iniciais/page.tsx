@@ -54,7 +54,7 @@ export default async function EtapasIniciaisPage() {
     { data: revenues },
     { data: activeSessions },
     { data: lastMessages },
-    specialists,
+    { data: allProfilesData },
   ] = await Promise.all([
     menteeIds.length > 0
       ? supabase.from('attendances').select('mentee_id').in('mentee_id', menteeIds)
@@ -74,7 +74,7 @@ export default async function EtapasIniciaisPage() {
     supabase.from('profiles').select('id, full_name, role').order('full_name'),
   ])
 
-  const allProfiles = (specialists ?? []) as { id: string; full_name: string; role: string }[]
+  const allProfiles = (allProfilesData ?? []) as { id: string; full_name: string; role: string }[]
 
   // Build stats maps
   const attendanceMap = new Map<string, number>()

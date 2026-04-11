@@ -52,7 +52,7 @@ export default async function SaidasPage() {
     { data: attendances },
     { data: indications },
     { data: revenues },
-    specialists,
+    { data: allProfilesData },
   ] = await Promise.all([
     menteeIds.length > 0
       ? supabase.from('attendances').select('mentee_id').in('mentee_id', menteeIds)
@@ -66,7 +66,7 @@ export default async function SaidasPage() {
     supabase.from('profiles').select('id, full_name, role').order('full_name'),
   ])
 
-  const allProfiles = (specialists ?? []) as { id: string; full_name: string; role: string }[]
+  const allProfiles = (allProfilesData ?? []) as { id: string; full_name: string; role: string }[]
 
   const attendanceMap = new Map<string, number>()
   attendances?.forEach((a) => { attendanceMap.set(a.mentee_id, (attendanceMap.get(a.mentee_id) ?? 0) + 1) })

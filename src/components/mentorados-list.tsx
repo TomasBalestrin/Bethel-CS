@@ -152,6 +152,9 @@ export function MentoradosList({
     // Closer
     if (advFilters.closer && m.closer_name !== advFilters.closer) return false
 
+    // Especialista
+    if (advFilters.especialista && m.created_by !== advFilters.especialista) return false
+
     // Mês de aniversário
     if (advFilters.mesAniversario && m.birth_date) {
       const month = new Date(m.birth_date).getMonth() + 1
@@ -463,7 +466,7 @@ export function MentoradosList({
           filters={advFilters}
           onFilterChange={handleFilterChange}
           onClearAll={handleClearFilters}
-          options={filterOptions}
+          options={{ ...filterOptions, especialistas: specialists }}
         />
       </div>
 

@@ -409,7 +409,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
               { value: 'chat-marketing', label: 'Marketing', channel: 'marketing' },
               { value: 'chat-gestao', label: 'Gestão', channel: 'gestao' },
             ].map((tab) => {
-              const unread = chatUnreads[tab.channel] ?? 0
+              const unread = tab.channel ? chatUnreads[tab.channel] ?? 0 : 0
               return (
                 <TabsTrigger
                   key={tab.value}

@@ -253,17 +253,15 @@ export async function sendMediaMessage(
     const url = `${BASE_URL}/api/chats/instances/${instanceUUID}/${endpoint}`
     const body: Record<string, unknown> = { phone }
 
-    // Set media URL as flat field (matching /send-text pattern)
-    if (type === 'image') {
-      body.image = mediaUrl
-    } else if (type === 'audio') {
-      body.audio = mediaUrl
-      body.ptt = true
-    } else if (type === 'video') {
-      body.video = mediaUrl
-    } else if (type === 'document') {
-      body.document = mediaUrl
-    }
+    // Set media URL in all possible field names (API format unknown)
+    body.image = mediaUrl
+    body.imageUrl = mediaUrl
+    body.media = mediaUrl
+    body.mediaUrl = mediaUrl
+    body.url = mediaUrl
+    body.file = mediaUrl
+    body.type = type
+    if (type === 'audio') body.ptt = true
 
     if (caption) body.caption = caption
     if (caption) body.message = caption
@@ -271,7 +269,7 @@ export async function sendMediaMessage(
     if (mimeType) body.mimeType = mimeType
     if (quotedMsg) body.quotedMsg = quotedMsg
 
-    console.log('[NextTrack] sendMediaMessage →', { phone, type, endpoint, mediaUrl: mediaUrl.slice(0, 100), instanceUUID })
+    console.log('[NextTrack] sendMediaMessage →', { phone, type, endpoint, mediaUrl: mediaUrl.slice(0, 120), body: JSON.stringify(body).slice(0, 200), instanceUUID })
 
     let res = await authFetch(url, {
       method: 'POST',

@@ -21,10 +21,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Plus, CalendarCheck, Users, Trash2, BookOpen, BarChart3 } from 'lucide-react'
+import { Plus, CalendarCheck, Users, Trash2, BookOpen, BarChart3, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { formatDateBR } from '@/lib/format'
+import { BulkImportDialog } from '@/components/kanban/bulk-import-dialog'
 
 const DELIVERY_TYPES = [
   { value: 'hotseat', label: 'Hotseat' },
@@ -73,6 +74,7 @@ function getCurrentMonth() {
 export function EntregasList({ events }: EntregasListProps) {
   const router = useRouter()
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [monthFilter, setMonthFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('')
 
@@ -167,10 +169,16 @@ export function EntregasList({ events }: EntregasListProps) {
           <h1 className="font-heading text-2xl font-bold text-foreground">Entregas</h1>
           <p className="text-sm text-muted-foreground">{filtered.length} entrega{filtered.length !== 1 ? 's' : ''}</p>
         </div>
-        <Button onClick={() => setDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Cadastrar Entregas
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setImportOpen(true)}>
+            <Upload className="mr-2 h-4 w-4" />
+            Importar
+          </Button>
+          <Button onClick={() => setDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Cadastrar Entregas
+          </Button>
+        </div>
       </div>
 
       {/* Metrics */}
@@ -341,6 +349,13 @@ export function EntregasList({ events }: EntregasListProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <BulkImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        initialTab="delivery_participations"
+        visibleTabs={['delivery_events', 'delivery_participations']}
+      />
     </div>
   )
 }

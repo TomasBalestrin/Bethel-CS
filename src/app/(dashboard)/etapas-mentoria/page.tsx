@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { KanbanBoard } from '@/components/kanban/kanban-board'
 import { MENTEE_SUMMARY_FIELDS, type MenteeWithStats } from '@/types/kanban'
-import { getCachedSpecialists, getCachedStages, getCachedAllStages } from '@/lib/cache'
+import { getCachedStages, getCachedAllStages } from '@/lib/cache'
 
 export default async function EtapasMentoriaPage() {
   const supabase = createClient()
@@ -54,7 +54,7 @@ export default async function EtapasMentoriaPage() {
     { data: revenues },
     { data: activeSessions },
     { data: lastMessages },
-    specialists,
+    { data: allProfilesData },
   ] = await Promise.all([
     menteeIds.length > 0
       ? supabase.from('attendances').select('mentee_id').in('mentee_id', menteeIds)
@@ -71,8 +71,10 @@ export default async function EtapasMentoriaPage() {
     menteeIds.length > 0
       ? supabase.from('wpp_messages').select('mentee_id, sent_at').in('mentee_id', menteeIds).order('sent_at', { ascending: false })
       : Promise.resolve({ data: [] as { mentee_id: string; sent_at: string }[] }),
-    getCachedSpecialists(),
+    supabase.from('profiles').select('id, full_name, role').order('full_name'),
   ])
+
+  const allProfiles = (allProfilesData ?? []) as { id: string; full_name: string; role: string }[]
 
   const attendanceMap = new Map<string, number>()
   attendances?.forEach((a) => {
@@ -113,7 +115,7 @@ export default async function EtapasMentoriaPage() {
   const funisOrigem = Array.from(new Set(menteeList.map((m) => m.funnel_origin).filter(Boolean))) as string[]
   const closers = Array.from(new Set(menteeList.map((m) => m.closer_name).filter(Boolean))) as string[]
   const nichos = Array.from(new Set(menteeList.map((m) => m.niche).filter(Boolean))) as string[]
-  const especialistas = (specialists as { id: string; full_name: string; role?: string }[]).filter((s) => !s.role || s.role === 'especialista')
+  const especialistas = allProfiles.filter((s) => s.role === 'especialista')
 
   return (
     <KanbanBoard
@@ -123,7 +125,7 @@ export default async function EtapasMentoriaPage() {
       initialMentees={menteesWithStats}
       existingMentees={menteeList.map((m) => ({ id: m.id, full_name: m.full_name }))}
       isAdmin={userRole === 'admin'}
-      specialists={specialists}
+      specialists={allProfiles}
       filterOptions={{ funisOrigem: funisOrigem.sort(), closers: closers.sort(), nichos: nichos.sort(), especialistas }}
     />
   )

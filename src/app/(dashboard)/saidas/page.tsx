@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { KanbanBoard } from '@/components/kanban/kanban-board'
 import { MENTEE_SUMMARY_FIELDS, type MenteeWithStats } from '@/types/kanban'
-import { getCachedSpecialists, getCachedStages, getCachedAllStages } from '@/lib/cache'
+import { getCachedStages, getCachedAllStages } from '@/lib/cache'
 
 export default async function SaidasPage() {
   const supabase = createClient()
@@ -52,7 +52,7 @@ export default async function SaidasPage() {
     { data: attendances },
     { data: indications },
     { data: revenues },
-    specialists,
+    { data: allProfilesData },
   ] = await Promise.all([
     menteeIds.length > 0
       ? supabase.from('attendances').select('mentee_id').in('mentee_id', menteeIds)
@@ -63,8 +63,10 @@ export default async function SaidasPage() {
     menteeIds.length > 0
       ? supabase.from('revenue_records').select('mentee_id, sale_value').in('mentee_id', menteeIds)
       : Promise.resolve({ data: [] as { mentee_id: string; sale_value: number }[] }),
-    getCachedSpecialists(),
+    supabase.from('profiles').select('id, full_name, role').order('full_name'),
   ])
+
+  const allProfiles = (allProfilesData ?? []) as { id: string; full_name: string; role: string }[]
 
   const attendanceMap = new Map<string, number>()
   attendances?.forEach((a) => { attendanceMap.set(a.mentee_id, (attendanceMap.get(a.mentee_id) ?? 0) + 1) })
@@ -90,7 +92,7 @@ export default async function SaidasPage() {
       initialMentees={menteesWithStats}
       existingMentees={menteeList.map((m) => ({ id: m.id, full_name: m.full_name }))}
       isAdmin={userRole === 'admin'}
-      specialists={specialists}
+      specialists={allProfiles}
     />
   )
 }

@@ -307,6 +307,52 @@ export async function sendMessage(
 }
 
 /**
+ * Revoke/delete a message on WhatsApp ("apagar para todos").
+ * Tries multiple endpoint patterns since NextTrack may expose this differently.
+ */
+export async function revokeMessage(
+  phone: string,
+  messageId: string,
+  overrideInstanceUUID?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const instanceUUID = overrideInstanceUUID || getInstanceUUID()
+    if (!instanceUUID) return { success: false, error: 'Instância WhatsApp não configurada' }
+
+    // Try common endpoint patterns for message revocation
+    const endpoints = [
+      { url: `${BASE_URL}/api/chats/instances/${instanceUUID}/revoke-message`, method: 'POST', body: { phone, messageId } },
+      { url: `${BASE_URL}/api/chats/instances/${instanceUUID}/delete-message`, method: 'POST', body: { phone, messageId } },
+      { url: `${BASE_URL}/api/chats/instances/${instanceUUID}/messages/${messageId}`, method: 'DELETE', body: { phone } },
+    ]
+
+    for (const ep of endpoints) {
+      const res = await authFetch(ep.url, {
+        method: ep.method,
+        body: JSON.stringify(ep.body),
+      })
+
+      if (res.status === 404) continue // endpoint doesn't exist, try next
+
+      if (res.ok) {
+        console.log('[NextTrack] revokeMessage OK:', { phone, messageId, endpoint: ep.url })
+        return { success: true }
+      }
+
+      const text = await res.text()
+      console.error('[NextTrack] revokeMessage FAILED:', res.status, text)
+      return { success: false, error: `Revoke failed (${res.status}): ${text}` }
+    }
+
+    // No endpoint found
+    console.log('[NextTrack] revokeMessage: no revoke endpoint available')
+    return { success: false, error: 'API de revogação não disponível' }
+  } catch (err) {
+    return { success: false, error: String(err) }
+  }
+}
+
+/**
  * Get QR Code for instance connection.
  */
 export async function getQRCode(

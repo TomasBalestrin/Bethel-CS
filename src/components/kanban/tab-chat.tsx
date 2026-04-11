@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Image from 'next/image'
-import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown, Sparkles, ChevronUp, BellOff, Pencil, Check, ClipboardCheck, Timer, TimerOff, CheckSquare, ClipboardList, Reply, Forward, Smile } from 'lucide-react'
+import { Loader2, Send, MessageSquare, ExternalLink, Paperclip, Mic, Square, X, FileDown, Phone, PhoneCall, Play, Video, ChevronDown, Sparkles, ChevronUp, BellOff, Pencil, Check, ClipboardCheck, Timer, TimerOff, CheckSquare, ClipboardList, Reply, Forward, Smile, Trash2 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false })
 import { Button } from '@/components/ui/button'
@@ -1152,13 +1152,38 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                     </div>
                     {/* Reply button on hover */}
                     {!selectMode && (
-                      <button
-                        onClick={() => { setReplyingTo(msg); textareaRef.current?.focus() }}
-                        className={`absolute top-1 ${isOutgoing ? '-left-8' : '-right-8'} opacity-0 group-hover/msg:opacity-100 transition-opacity rounded-full p-1 hover:bg-muted`}
-                        title="Responder"
-                      >
-                        <Reply className="h-3.5 w-3.5 text-muted-foreground" />
-                      </button>
+                      <div className={`absolute top-1 ${isOutgoing ? '-left-8' : '-right-8'} opacity-0 group-hover/msg:opacity-100 transition-opacity flex flex-col gap-0.5`}>
+                        <button
+                          onClick={() => { setReplyingTo(msg); textareaRef.current?.focus() }}
+                          className="rounded-full p-1 hover:bg-muted"
+                          title="Responder"
+                        >
+                          <Reply className="h-3.5 w-3.5 text-muted-foreground" />
+                        </button>
+                        {isOutgoing && (
+                          <button
+                            onClick={async () => {
+                              if (!confirm('Apagar esta mensagem?')) return
+                              setMessages((prev) => prev.filter((m) => m.id !== msg.id))
+                              const res = await fetch('/api/whatsapp/delete', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ messageId: msg.id }),
+                              })
+                              if (res.ok) {
+                                const data = await res.json()
+                                toast.success(data.revokedOnWhatsApp ? 'Mensagem apagada do WhatsApp' : 'Mensagem removida')
+                              } else {
+                                toast.error('Erro ao apagar mensagem')
+                              }
+                            }}
+                            className="rounded-full p-1 hover:bg-destructive/10"
+                            title="Apagar mensagem"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 text-muted-foreground hover:text-destructive" />
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
 

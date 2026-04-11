@@ -242,51 +242,25 @@ export async function sendMediaMessage(
     const instanceUUID = overrideInstanceUUID || getInstanceUUID()
     if (!instanceUUID) return { success: false, error: 'Instância WhatsApp não configurada' }
 
-    // Use type-specific endpoints (same pattern as /send-text)
-    const endpointMap: Record<string, string> = {
-      image: 'send-image',
-      audio: 'send-audio',
-      video: 'send-video',
-      document: 'send-file',
+    // Per NextTrack docs: all media types use /send endpoint with imageUrl field
+    const url = `${BASE_URL}/api/chats/instances/${instanceUUID}/send`
+    const body: Record<string, unknown> = {
+      phone,
+      type,
+      imageUrl: mediaUrl,
     }
-    const endpoint = endpointMap[type] || 'send'
-    const url = `${BASE_URL}/api/chats/instances/${instanceUUID}/${endpoint}`
-    const body: Record<string, unknown> = { phone }
 
-    // Set media URL in all possible field names (API format unknown)
-    body.image = mediaUrl
-    body.imageUrl = mediaUrl
-    body.media = mediaUrl
-    body.mediaUrl = mediaUrl
-    body.url = mediaUrl
-    body.file = mediaUrl
-    body.type = type
-    if (type === 'audio') body.ptt = true
-
-    if (caption) body.caption = caption
     if (caption) body.message = caption
     if (fileName) body.fileName = fileName
     if (mimeType) body.mimeType = mimeType
     if (quotedMsg) body.quotedMsg = quotedMsg
 
-    console.log('[NextTrack] sendMediaMessage →', { phone, type, endpoint, mediaUrl: mediaUrl.slice(0, 120), body: JSON.stringify(body).slice(0, 200), instanceUUID })
+    console.log('[NextTrack] sendMediaMessage →', { phone, type, mediaUrl: mediaUrl.slice(0, 120), instanceUUID })
 
-    let res = await authFetch(url, {
+    const res = await authFetch(url, {
       method: 'POST',
       body: JSON.stringify(body),
     })
-
-    // Fallback to generic /send endpoint if type-specific returns 404
-    if (res.status === 404) {
-      console.log('[NextTrack] Endpoint', endpoint, 'not found, falling back to /send')
-      const fallbackUrl = `${BASE_URL}/api/chats/instances/${instanceUUID}/send`
-      body.type = type
-      body.mediaUrl = mediaUrl
-      res = await authFetch(fallbackUrl, {
-        method: 'POST',
-        body: JSON.stringify(body),
-      })
-    }
 
     if (!res.ok) {
       const text = await res.text()

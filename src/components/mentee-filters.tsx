@@ -51,6 +51,7 @@ export interface MenteeFilterValues {
   fatAtualMax: string
   funilOrigem: string
   closer: string
+  especialista: string
   mesAniversario: string
   numColaboradores: string
   estado: string
@@ -66,6 +67,7 @@ export const EMPTY_FILTERS: MenteeFilterValues = {
   fatAtualMax: '',
   funilOrigem: '',
   closer: '',
+  especialista: '',
   mesAniversario: '',
   numColaboradores: '',
   estado: '',
@@ -82,6 +84,7 @@ interface MenteeFiltersProps {
     funisOrigem: string[]
     closers: string[]
     nichos: string[]
+    especialistas?: { id: string; full_name: string }[]
   }
 }
 
@@ -184,6 +187,22 @@ export function MenteeFilters({ filters, onFilterChange, onClearAll, options }: 
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Especialista responsável */}
+            {options.especialistas && options.especialistas.length > 0 && (
+              <div className="space-y-1">
+                <Label className="text-xs">Especialista</Label>
+                <Select value={filters.especialista || '__all__'} onValueChange={(v) => onFilterChange('especialista', v === '__all__' ? '' : v)}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Todos</SelectItem>
+                    {options.especialistas.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Mês de aniversário */}
             <div className="space-y-1">

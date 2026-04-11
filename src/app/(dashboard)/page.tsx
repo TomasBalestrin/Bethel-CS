@@ -430,6 +430,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         fatAtualMax: searchParams.fatAtualMax ?? '',
         funilOrigem: searchParams.funilOrigem ?? '',
         closer: searchParams.closer ?? '',
+        especialista: '',
         mesAniversario: searchParams.mesAniversario ?? '',
         numColaboradores: searchParams.numColaboradores ?? '',
         estado: searchParams.estado ?? '',

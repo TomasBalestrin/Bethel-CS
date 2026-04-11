@@ -22,7 +22,7 @@ export async function GET(
   // 1. Fetch last 100 messages for this channel
   const { data: messages, error } = await supabase
     .from('wpp_messages')
-    .select('id, mentee_id, specialist_id, instance_id, message_id, direction, message_type, content, media_url, sender_name, is_read, sent_at, created_at, channel')
+    .select('id, mentee_id, specialist_id, instance_id, message_id, direction, message_type, content, media_url, sender_name, is_read, sent_at, created_at, channel, delivery_status, quoted_message_id')
     .eq('mentee_id', menteeId)
     .eq('channel', channel)
     .order('sent_at', { ascending: true })

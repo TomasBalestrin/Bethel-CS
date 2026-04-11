@@ -46,6 +46,8 @@ import {
   Loader2,
   Building2,
   XCircle,
+  X,
+  Check,
   CalendarCheck,
   ClipboardCheck,
 } from 'lucide-react'
@@ -1237,19 +1239,33 @@ function PersonalTagsCard({ menteeId, initialTags }: { menteeId: string; initial
 }
 
 // ─── Notes Card (tag-based, same layout as PersonalTagsCard) ───
+interface NoteItem { text: string; date: string }
+
 function NotesCard({ menteeId, initialNotes }: { menteeId: string; initialNotes: string }) {
-  const parseNotes = (raw: string) => raw.split('\n').map((n) => n.trim()).filter(Boolean)
-  const [items, setItems] = useState<string[]>(parseNotes(initialNotes))
+  // Parse notes: support both legacy plain text and new JSON format
+  const parseNotes = (raw: string): NoteItem[] => {
+    if (!raw.trim()) return []
+    try {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed) && parsed.length > 0 && typeof parsed[0] === 'object' && 'text' in parsed[0]) {
+        return parsed
+      }
+    } catch { /* not JSON, parse as legacy */ }
+    return raw.split('\n').map((n) => n.trim()).filter(Boolean).map((text) => ({ text, date: '' }))
+  }
+
+  const [items, setItems] = useState<NoteItem[]>(parseNotes(initialNotes))
   const [input, setInput] = useState('')
+  const [editingIdx, setEditingIdx] = useState<number | null>(null)
+  const [editText, setEditText] = useState('')
   const [saving, setSaving] = useState(false)
   const supabase = createClient()
 
-  async function saveNotes(newItems: string[], prevItems: string[]) {
+  async function saveNotes(newItems: NoteItem[], prevItems: NoteItem[]) {
     setSaving(true)
-    const { error } = await supabase.from('mentees').update({ notes: newItems.join('\n') }).eq('id', menteeId)
+    const { error } = await supabase.from('mentees').update({ notes: JSON.stringify(newItems) }).eq('id', menteeId)
     setSaving(false)
     if (error) {
-      // Revert on error
       setItems(prevItems)
       toast.error('Erro ao salvar observação')
     }
@@ -1259,8 +1275,7 @@ function NotesCard({ menteeId, initialNotes }: { menteeId: string; initialNotes:
     const note = input.trim()
     if (!note) return
     const prevItems = items
-    const newItems = [...items, note]
-    // Optimistic: update UI immediately
+    const newItems = [...items, { text: note, date: new Date().toISOString() }]
     setItems(newItems)
     setInput('')
     saveNotes(newItems, prevItems)
@@ -1269,8 +1284,18 @@ function NotesCard({ menteeId, initialNotes }: { menteeId: string; initialNotes:
   function handleRemove(idx: number) {
     const prevItems = items
     const newItems = items.filter((_, i) => i !== idx)
-    // Optimistic: update UI immediately
     setItems(newItems)
+    saveNotes(newItems, prevItems)
+  }
+
+  function handleEditSave(idx: number) {
+    const text = editText.trim()
+    if (!text) return
+    const prevItems = items
+    const newItems = items.map((item, i) => i === idx ? { ...item, text } : item)
+    setItems(newItems)
+    setEditingIdx(null)
+    setEditText('')
     saveNotes(newItems, prevItems)
   }
 
@@ -1281,6 +1306,13 @@ function NotesCard({ menteeId, initialNotes }: { menteeId: string; initialNotes:
     }
   }
 
+  function formatNoteDate(iso: string) {
+    if (!iso) return ''
+    try {
+      return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+    } catch { return '' }
+  }
+
   return (
     <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
       <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
@@ -1288,28 +1320,57 @@ function NotesCard({ menteeId, initialNotes }: { menteeId: string; initialNotes:
         <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Observações</h3>
         {saving && <Loader2 className="h-3 w-3 animate-spin text-muted-foreground ml-auto" />}
       </div>
-      <div className="p-3 space-y-2.5">
-        <div className="flex flex-wrap gap-1.5 min-h-[32px]">
-          {items.map((note, idx) => (
-            <span
-              key={idx}
-              className="inline-flex items-center gap-1 rounded-full bg-accent/10 border border-accent/20 px-2.5 py-0.5 text-[11px] font-medium text-foreground"
-            >
-              {note}
-              <button
-                type="button"
-                onClick={() => handleRemove(idx)}
-                className="text-muted-foreground hover:text-destructive transition-colors ml-0.5"
-              >
-                ×
-              </button>
-            </span>
-          ))}
-          {items.length === 0 && (
-            <p className="text-[11px] text-muted-foreground/40 italic">Adicione observações abaixo</p>
-          )}
-        </div>
-        <div className="flex items-center gap-1.5">
+      <div className="p-3 space-y-2">
+        {items.length === 0 && (
+          <p className="text-[11px] text-muted-foreground/40 italic py-1">Adicione observações abaixo</p>
+        )}
+        {items.map((note, idx) => (
+          <div key={idx} className="group rounded-md border border-border/50 bg-muted/30 px-2.5 py-1.5">
+            {editingIdx === idx ? (
+              <div className="flex items-center gap-1.5">
+                <Input
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleEditSave(idx) } if (e.key === 'Escape') setEditingIdx(null) }}
+                  className="h-7 text-xs flex-1"
+                  autoFocus
+                />
+                <Button size="sm" variant="outline" className="h-7 px-2 shrink-0" onClick={() => handleEditSave(idx)}>
+                  <Check className="h-3 w-3" />
+                </Button>
+                <Button size="sm" variant="ghost" className="h-7 px-2 shrink-0" onClick={() => setEditingIdx(null)}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-[11px] text-foreground leading-relaxed flex-1 whitespace-pre-wrap">{note.text}</p>
+                <div className="flex items-center gap-1 shrink-0">
+                  {note.date && (
+                    <span className="text-[9px] text-muted-foreground/50 tabular">{formatNoteDate(note.date)}</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => { setEditingIdx(idx); setEditText(note.text) }}
+                    className="opacity-0 group-hover:opacity-100 p-0.5 text-muted-foreground hover:text-accent transition-all"
+                    title="Editar"
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(idx)}
+                    className="opacity-0 group-hover:opacity-100 p-0.5 text-muted-foreground hover:text-destructive transition-all"
+                    title="Excluir"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+        <div className="flex items-center gap-1.5 pt-1">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}

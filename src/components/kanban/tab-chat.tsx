@@ -147,8 +147,8 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const onSessionRef = useRef(onSessionChange)
   onSessionRef.current = onSessionChange
 
-  const scrollToBottom = useCallback(() => {
-    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+  const scrollToBottom = useCallback((instant?: boolean) => {
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: instant ? 'auto' : 'smooth' }), instant ? 10 : 50)
   }, [])
 
   // ─── Load messages + instance ───
@@ -236,7 +236,15 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
     load()
   }, [menteeId, specialistId])
 
-  useEffect(() => { scrollToBottom() }, [messages, scrollToBottom])
+  const initialScrollDone = useRef(false)
+  useEffect(() => {
+    if (!initialScrollDone.current && messages.length > 0) {
+      initialScrollDone.current = true
+      scrollToBottom(true) // instant on first load
+    } else if (initialScrollDone.current) {
+      scrollToBottom() // smooth for new messages
+    }
+  }, [messages, scrollToBottom])
 
   // ─── Realtime ───
   useEffect(() => {

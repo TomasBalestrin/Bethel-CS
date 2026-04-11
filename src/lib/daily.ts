@@ -17,7 +17,6 @@ export async function createRoom(enableVideo = false): Promise<{ name: string; u
       start_video_off: !enableVideo,
       start_audio_off: false,
       enable_recording: 'cloud',
-      auto_start_recording: true,
     },
   }
 

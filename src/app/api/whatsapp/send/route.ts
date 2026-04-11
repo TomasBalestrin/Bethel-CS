@@ -104,7 +104,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: result.error || 'Falha ao enviar via WhatsApp' }, { status: 502 })
     }
 
-    console.log('[WPP Send] Success:', { menteeId, type, phone, channel, messageId: result.messageId })
+    console.log('[WPP Send] Success:', { menteeId, type, phone, channel, messageId: result.messageId, imageUrl: imageUrl?.slice(0, 120) })
 
     // 7. Save message with channel and delivery status
     await supabase.from('wpp_messages').insert({

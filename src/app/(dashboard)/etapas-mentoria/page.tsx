@@ -110,6 +110,11 @@ export default async function EtapasMentoriaPage() {
     }
   })
 
+  const funisOrigem = Array.from(new Set(menteeList.map((m) => m.funnel_origin).filter(Boolean))) as string[]
+  const closers = Array.from(new Set(menteeList.map((m) => m.closer_name).filter(Boolean))) as string[]
+  const nichos = Array.from(new Set(menteeList.map((m) => m.niche).filter(Boolean))) as string[]
+  const especialistas = (specialists as { id: string; full_name: string; role?: string }[]).filter((s) => !s.role || s.role === 'especialista')
+
   return (
     <KanbanBoard
       title="Etapas Mentoria"
@@ -119,6 +124,7 @@ export default async function EtapasMentoriaPage() {
       existingMentees={menteeList.map((m) => ({ id: m.id, full_name: m.full_name }))}
       isAdmin={userRole === 'admin'}
       specialists={specialists}
+      filterOptions={{ funisOrigem: funisOrigem.sort(), closers: closers.sort(), nichos: nichos.sort(), especialistas }}
     />
   )
 }

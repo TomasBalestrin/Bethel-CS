@@ -32,7 +32,7 @@ interface FieldDef {
   aliases: string[]
 }
 
-type ImportTab = 'mentees' | 'update_mentees' | 'action_plan' | 'stages' | 'delivery_events' | 'delivery_participations'
+export type ImportTab = 'mentees' | 'update_mentees' | 'action_plan' | 'stages' | 'delivery_events' | 'delivery_participations'
 type ImportStep = 'upload' | 'mapping' | 'preview' | 'importing' | 'done'
 
 interface ImportResult {
@@ -191,14 +191,17 @@ const TABS: { key: ImportTab; label: string; icon: typeof Users; description: st
 interface BulkImportDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  specialists: { id: string; full_name: string }[]
-  isAdmin: boolean
+  specialists?: { id: string; full_name: string }[]
+  isAdmin?: boolean
+  initialTab?: ImportTab
+  visibleTabs?: ImportTab[]
 }
 
-export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: BulkImportDialogProps) {
+export function BulkImportDialog({ open, onOpenChange, specialists = [], isAdmin = false, initialTab, visibleTabs }: BulkImportDialogProps) {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [activeTab, setActiveTab] = useState<ImportTab>('mentees')
+  const effectiveInitialTab = initialTab ?? (visibleTabs ? visibleTabs[0] : 'mentees')
+  const [activeTab, setActiveTab] = useState<ImportTab>(effectiveInitialTab)
   const [step, setStep] = useState<ImportStep>('upload')
   const [fileName, setFileName] = useState('')
   const [headers, setHeaders] = useState<string[]>([])
@@ -230,6 +233,7 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
     setAiExtracting(false)
     setAiResult(null)
     setAiError(null)
+    setActiveTab(effectiveInitialTab)
   }
 
   function switchTab(tab: ImportTab) {
@@ -388,7 +392,7 @@ export function BulkImportDialog({ open, onOpenChange, specialists, isAdmin }: B
         {/* Tab selector */}
         {step === 'upload' && (
           <div className="flex gap-1 p-1 rounded-lg bg-muted/50 shrink-0">
-            {TABS.map((tab) => {
+            {(visibleTabs ? TABS.filter((t) => visibleTabs.includes(t.key)) : TABS).map((tab) => {
               const Icon = tab.icon
               return (
                 <button

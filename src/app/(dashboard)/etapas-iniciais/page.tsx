@@ -71,8 +71,10 @@ export default async function EtapasIniciaisPage() {
     menteeIds.length > 0
       ? supabase.from('wpp_messages').select('mentee_id, sent_at').in('mentee_id', menteeIds).order('sent_at', { ascending: false })
       : Promise.resolve({ data: [] as { mentee_id: string; sent_at: string }[] }),
-    getCachedSpecialists(),
+    supabase.from('profiles').select('id, full_name, role').order('full_name'),
   ])
+
+  const allProfiles = (specialists ?? []) as { id: string; full_name: string; role: string }[]
 
   // Build stats maps
   const attendanceMap = new Map<string, number>()
@@ -114,7 +116,7 @@ export default async function EtapasIniciaisPage() {
   const funisOrigem = Array.from(new Set(menteeList.map((m) => m.funnel_origin).filter(Boolean))) as string[]
   const closers = Array.from(new Set(menteeList.map((m) => m.closer_name).filter(Boolean))) as string[]
   const nichos = Array.from(new Set(menteeList.map((m) => m.niche).filter(Boolean))) as string[]
-  const especialistas = (specialists as { id: string; full_name: string; role?: string }[]).filter((s) => !s.role || s.role === 'especialista')
+  const especialistas = allProfiles.filter((s) => s.role === 'especialista')
 
   return (
     <KanbanBoard
@@ -124,7 +126,7 @@ export default async function EtapasIniciaisPage() {
       initialMentees={menteesWithStats}
       existingMentees={menteeList.map((m) => ({ id: m.id, full_name: m.full_name }))}
       isAdmin={userRole === 'admin'}
-      specialists={specialists}
+      specialists={allProfiles}
       filterOptions={{ funisOrigem: funisOrigem.sort(), closers: closers.sort(), nichos: nichos.sort(), especialistas }}
     />
   )

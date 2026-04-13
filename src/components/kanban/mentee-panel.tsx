@@ -127,7 +127,6 @@ interface MenteePanelProps {
 }
 
 export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDeleted, onMenteeUpdated, onTransitionToMentorship }: MenteePanelProps) {
-  const [userRole, setUserRole] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -141,12 +140,6 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-      setUserRole(profile?.role ?? null)
 
       // Fetch full mentee data (all 53 fields) for the detail panel
       if (menteeProp) {
@@ -208,7 +201,6 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
 
   if (!mentee) return null
 
-  const isAdmin = userRole === 'admin'
   const priorityLabel = `Prioridade ${mentee.priority_level}`
   const isLoading = !fullData
 
@@ -258,28 +250,26 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
             </span>
           </div>
         </div>
-        {isAdmin && (
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setEditing((e) => !e)}
-              className="text-xs h-8 px-2.5"
-            >
-              <Pencil className="h-3 w-3 mr-1" />
-              {editing ? 'Cancelar' : 'Editar'}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setDeleteOpen(true)}
-              className="text-xs h-8 px-2.5 text-destructive border-destructive/30 hover:bg-destructive/5"
-            >
-              <Trash2 className="h-3 w-3 mr-1" />
-              <span className="hidden sm:inline">Excluir</span>
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEditing((e) => !e)}
+            className="text-xs h-8 px-2.5"
+          >
+            <Pencil className="h-3 w-3 mr-1" />
+            {editing ? 'Cancelar' : 'Editar'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDeleteOpen(true)}
+            className="text-xs h-8 px-2.5 text-destructive border-destructive/30 hover:bg-destructive/5"
+          >
+            <Trash2 className="h-3 w-3 mr-1" />
+            <span className="hidden sm:inline">Excluir</span>
+          </Button>
+        </div>
       </div>
 
       {/* Content */}
@@ -307,7 +297,6 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
           editing={editing}
           setEditing={setEditing}
           onMenteeUpdated={onMenteeUpdated}
-          isAdmin={isAdmin}
           onTransitionToMentorship={onTransitionToMentorship}
         />
         )}
@@ -342,12 +331,11 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
 }
 
 // ─── Scrollable Tabs ───
-function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTransitionToMentorship }: {
+function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, onTransitionToMentorship }: {
   mentee: MenteeWithStats
   editing: boolean
   setEditing: (v: boolean) => void
   onMenteeUpdated?: (mentee: MenteeWithStats) => void
-  isAdmin: boolean
   onTransitionToMentorship?: (mentee: MenteeWithStats) => void
 }) {
   const tabsRef = useRef<HTMLDivElement>(null)
@@ -453,7 +441,6 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
             editing={editing}
             setEditing={setEditing}
             onMenteeUpdated={onMenteeUpdated}
-            isAdmin={isAdmin}
             onTransitionToMentorship={onTransitionToMentorship}
           />
         </ErrorBoundary></TabsContent>
@@ -645,12 +632,11 @@ function formatBRL(v: number) {
 }
 
 // ─── Tab 1: Info Geral ───
-function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTransitionToMentorship }: {
+function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, onTransitionToMentorship }: {
   mentee: MenteeWithStats
   editing: boolean
   setEditing: (v: boolean) => void
   onMenteeUpdated?: (mentee: MenteeWithStats) => void
-  isAdmin: boolean
   onTransitionToMentorship?: (mentee: MenteeWithStats) => void
 }) {
   const [saving] = useState(false)
@@ -870,7 +856,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
             <Clock className="h-3 w-3" /> {mentee.contract_validity}
           </span>
         )}
-        {isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship && (
+        {mentee.kanban_type === 'initial' && onTransitionToMentorship && (
           <Button
             variant="outline"
             size="sm"

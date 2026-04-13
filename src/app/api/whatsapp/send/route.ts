@@ -87,6 +87,21 @@ export async function POST(request: NextRequest) {
     if (!type || type === 'text') {
       result = await sendTextMessage(phone, signedMessage, nextrackUUID, quotedMessageId || undefined)
     } else {
+      // Verify the media URL is publicly accessible (NextTrack downloads via http.Get)
+      if (imageUrl) {
+        try {
+          const checkRes = await fetch(imageUrl, { method: 'HEAD', cache: 'no-store' })
+          if (!checkRes.ok) {
+            console.error('[WPP Send] Media URL not publicly accessible:', checkRes.status, imageUrl.slice(0, 120))
+            return NextResponse.json({ error: `URL da mídia não está pública (${checkRes.status})` }, { status: 502 })
+          }
+          console.log('[WPP Send] Media URL OK:', checkRes.status, 'Content-Type:', checkRes.headers.get('content-type'), 'size:', checkRes.headers.get('content-length'))
+        } catch (err) {
+          console.error('[WPP Send] Media URL HEAD failed:', err)
+          return NextResponse.json({ error: `Erro ao verificar URL da mídia: ${String(err)}` }, { status: 502 })
+        }
+      }
+
       result = await sendMediaMessage(
         phone,
         type as 'image' | 'audio' | 'video' | 'document',

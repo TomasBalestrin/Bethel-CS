@@ -451,7 +451,6 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTr
             editing={editing}
             setEditing={setEditing}
             onMenteeUpdated={onMenteeUpdated}
-            isAdmin={isAdmin}
             onTransitionToMentorship={onTransitionToMentorship}
           />
         </ErrorBoundary></TabsContent>
@@ -643,12 +642,11 @@ function formatBRL(v: number) {
 }
 
 // ─── Tab 1: Info Geral ───
-function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTransitionToMentorship }: {
+function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, onTransitionToMentorship }: {
   mentee: MenteeWithStats
   editing: boolean
   setEditing: (v: boolean) => void
   onMenteeUpdated?: (mentee: MenteeWithStats) => void
-  isAdmin: boolean
   onTransitionToMentorship?: (mentee: MenteeWithStats) => void
 }) {
   const [saving] = useState(false)

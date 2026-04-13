@@ -94,6 +94,23 @@ function VideoCallPortal({ roomUrl, token, menteeName, menteeLink }: {
         } catch (e) {
           console.error('[CallPortal/Video] Failed to enable audio/subscribe:', e)
         }
+        // Explicitly start cloud recording — room-level setting only enables capability
+        try {
+          const startRec = (frame as unknown as { startRecording?: () => Promise<unknown> | unknown }).startRecording
+          if (typeof startRec === 'function') {
+            const result = startRec.call(frame)
+            if (result && typeof (result as Promise<unknown>).then === 'function') {
+              (result as Promise<unknown>)
+                .then(() => console.log('[CallPortal/Video] Recording started'))
+                .catch((err: unknown) => console.error('[CallPortal/Video] startRecording failed:', err))
+            } else {
+              console.log('[CallPortal/Video] Recording start requested (sync)')
+            }
+          }
+        } catch (err) {
+          console.error('[CallPortal/Video] startRecording exception:', err)
+          // Never propagate — call continues even if recording fails
+        }
       })
 
       frame.on('participant-updated', (ev: { participant?: { local?: boolean; tracks?: { audio?: { state?: string } } } } | undefined) => {

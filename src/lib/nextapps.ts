@@ -244,18 +244,41 @@ export async function sendMediaMessage(
 
     // Per NextTrack docs: all media types use /send endpoint with imageUrl field
     const url = `${BASE_URL}/api/chats/instances/${instanceUUID}/send`
+
+    // Download the file and convert to base64 (NextTrack's http.Get to Supabase may be blocked)
+    let base64Data: string | null = null
+    try {
+      const fileRes = await fetch(mediaUrl)
+      if (fileRes.ok) {
+        const buffer = await fileRes.arrayBuffer()
+        const b64 = Buffer.from(buffer).toString('base64')
+        const mime = mimeType || fileRes.headers.get('content-type') || 'application/octet-stream'
+        base64Data = `data:${mime};base64,${b64}`
+        console.log('[NextTrack] downloaded media, size:', buffer.byteLength, 'mime:', mime)
+      }
+    } catch (err) {
+      console.error('[NextTrack] failed to download media for base64:', err)
+    }
+
     const body: Record<string, unknown> = {
       phone,
       type,
       imageUrl: mediaUrl,
     }
+    // Also send base64 as fallback (some APIs prefer one or the other)
+    if (base64Data) {
+      body.base64 = base64Data
+      body.imageBase64 = base64Data
+      body.media = base64Data
+    }
 
     if (caption) body.message = caption
+    if (caption) body.caption = caption
     if (fileName) body.fileName = fileName
     if (mimeType) body.mimeType = mimeType
     if (quotedMsg) body.quotedMsg = quotedMsg
 
-    console.log('[NextTrack] sendMediaMessage →', { phone, type, mediaUrl: mediaUrl.slice(0, 120), instanceUUID })
+    console.log('[NextTrack] sendMediaMessage →', { phone, type, hasBase64: !!base64Data, mediaUrl: mediaUrl.slice(0, 120), instanceUUID })
 
     const res = await authFetch(url, {
       method: 'POST',

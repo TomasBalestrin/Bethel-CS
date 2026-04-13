@@ -27,12 +27,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Plus, Rocket, ChevronRight, Search } from 'lucide-react'
+import { Plus, Rocket, ChevronRight, Search, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { KanbanColumn } from './kanban-column'
 import { MenteeCard } from './mentee-card'
 import { CreateMenteeDialog } from './create-mentee-dialog'
 import { MenteePanel } from './mentee-panel'
+import { BulkImportDialog } from './bulk-import-dialog'
 import { moveMentee, transitionToMentorship } from '@/lib/actions/mentee-actions'
 import { useUnreadCounts } from '@/hooks/use-unread-counts'
 import { MenteeFilters, EMPTY_FILTERS, type MenteeFilterValues } from '@/components/mentee-filters'
@@ -75,6 +76,7 @@ export function KanbanBoard({
   }, [initialMentees])
 
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [selectedMentee, setSelectedMentee] = useState<MenteeWithStats | null>(null)
   const [panelOpen, setPanelOpen] = useState(false)
 
@@ -235,10 +237,18 @@ export function KanbanBoard({
           <h1 className="font-heading text-xl sm:text-2xl font-bold text-foreground">
             {title}
           </h1>
-          <Button onClick={() => setDialogOpen(true)} className="hidden sm:inline-flex">
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Mentorado
-          </Button>
+          <div className="flex items-center gap-2">
+            {kanbanType === 'exit' && (
+              <Button variant="outline" onClick={() => setImportOpen(true)} className="hidden sm:inline-flex">
+                <Upload className="mr-2 h-4 w-4" />
+                Importar
+              </Button>
+            )}
+            <Button onClick={() => setDialogOpen(true)} className="hidden sm:inline-flex">
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Mentorado
+            </Button>
+          </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <div className="relative flex-1 max-w-sm">
@@ -334,6 +344,15 @@ export function KanbanBoard({
         isAdmin={isAdmin}
         specialists={specialists}
       />
+
+      {kanbanType === 'exit' && (
+        <BulkImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          initialTab="stages"
+          visibleTabs={['stages']}
+        />
+      )}
 
       <MenteePanel
         mentee={selectedMentee}

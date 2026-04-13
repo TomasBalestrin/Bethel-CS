@@ -31,12 +31,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true })
     }
 
+    const downloadUrl = recording.download_url || recording.download_link || recording.url
+    if (!downloadUrl) {
+      console.warn('[Daily Webhook] No download URL in payload — skipping update')
+      return NextResponse.json({ ok: true, skipped: 'no download_url' })
+    }
+
     const supabase = createAdminClient()
 
     const { data: updated, error: updateError } = await supabase
       .from('call_records')
       .update({
-        recording_url: recording.download_url,
+        recording_url: downloadUrl,
         recording_status: 'ready',
         duration_seconds: recording.duration || null,
       })

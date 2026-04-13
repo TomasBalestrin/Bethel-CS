@@ -1427,6 +1427,12 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                         )}
                       </div>
                     )}
+                    {call.recording_status === 'ready' && !call.recording_url && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Link da gravação perdido</span>
+                        <RetryRecordingButton callId={call.id} onSuccess={() => setCallRecords((prev) => prev.map((c) => c.id === call.id ? { ...c, recording_status: 'ready' } : c))} />
+                      </div>
+                    )}
                     {call.recording_status === 'processing' && (
                       <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <Loader2 className="h-3 w-3 animate-spin" /> Processando gravação...

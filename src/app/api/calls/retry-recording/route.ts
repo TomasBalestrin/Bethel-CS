@@ -17,12 +17,13 @@ export async function POST(request: NextRequest) {
 
   const { data: call } = await supabase
     .from('call_records')
-    .select('daily_room_name, recording_status')
+    .select('daily_room_name, recording_status, recording_url')
     .eq('id', callId)
     .single()
 
   if (!call) return NextResponse.json({ error: 'Ligação não encontrada' }, { status: 404 })
-  if (call.recording_status === 'ready') {
+  // Allow retry even if status is 'ready' when URL is missing (recovery from stale state)
+  if (call.recording_status === 'ready' && call.recording_url) {
     return NextResponse.json({ status: 'ready', message: 'Gravação já está disponível' })
   }
 
@@ -32,6 +33,12 @@ export async function POST(request: NextRequest) {
 
     if (recordings.length > 0) {
       const rec = recordings[0]
+      if (!rec.download_url) {
+        return NextResponse.json({
+          status: 'not_ready',
+          message: 'Gravação encontrada mas ainda sendo processada pelo Daily — tente novamente em 1-2 minutos',
+        })
+      }
       await supabase
         .from('call_records')
         .update({

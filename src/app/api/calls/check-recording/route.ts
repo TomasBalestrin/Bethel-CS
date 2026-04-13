@@ -36,6 +36,12 @@ export async function POST(request: NextRequest) {
 
     if (recordings.length > 0) {
       const rec = recordings[0]
+      // Only mark as 'ready' if we actually have a download URL
+      // Daily may return the recording before processing is complete (without download_link)
+      if (!rec.download_url) {
+        console.log('[check-recording] Recording found but download_url missing — still processing')
+        return NextResponse.json({ status: 'pending' })
+      }
       await supabase
         .from('call_records')
         .update({

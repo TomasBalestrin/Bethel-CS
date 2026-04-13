@@ -69,7 +69,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Nenhuma instância WhatsApp conectada' }, { status: 404 })
     }
 
-    const nextrackUUID = instance.instance_id
+    // Prefer NextTrack UUID from env; fallback to Whatsmeow ID only if not configured
+    const nextrackUUID = process.env.NEXTRACK_INSTANCE_UUID || process.env.NEXTAPPS_INSTANCE_ID || instance.instance_id
+    console.log('[WPP Send] Using instanceUUID:', nextrackUUID, 'source:', process.env.NEXTRACK_INSTANCE_UUID ? 'env NEXTRACK_INSTANCE_UUID' : process.env.NEXTAPPS_INSTANCE_ID ? 'env NEXTAPPS_INSTANCE_ID' : 'wpp_instances.instance_id (Whatsmeow)')
 
     // 4. Format phone — Brazilian numbers must be 55 + DDD (2) + 9 + 8 digits = 13 digits
     let phone = mentee.phone.replace(/\D/g, '')

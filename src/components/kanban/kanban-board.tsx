@@ -210,7 +210,11 @@ export function KanbanBoard({
         if (unreadA > 0 && unreadB === 0) return -1
         if (unreadA === 0 && unreadB > 0) return 1
 
-        // 2. By last message (most recent first)
+        // 2. Active attendance session (Em atendimento) next
+        if (a.has_active_session && !b.has_active_session) return -1
+        if (!a.has_active_session && b.has_active_session) return 1
+
+        // 3. By last message (most recent first)
         const lastA = lastMessageMap[a.id] || ''
         const lastB = lastMessageMap[b.id] || ''
         if (lastA || lastB) {
@@ -220,7 +224,7 @@ export function KanbanBoard({
           if (lastA < lastB) return 1
         }
 
-        // 3. By created_at DESC
+        // 4. By created_at DESC
         return b.created_at > a.created_at ? 1 : -1
       })
 

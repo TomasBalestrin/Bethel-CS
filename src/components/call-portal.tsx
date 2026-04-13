@@ -86,6 +86,30 @@ function VideoCallPortal({ roomUrl, token, menteeName, menteeLink }: {
 
       frame.on('joined-meeting', () => {
         console.log('[CallPortal/Video] Joined meeting — cloud recording enabled at room level')
+        // Force audio on and subscribe to remote tracks automatically
+        try {
+          frame.setLocalAudio(true)
+          frame.setSubscribeToTracksAutomatically(true)
+          console.log('[CallPortal/Video] Audio enabled, auto-subscribe on')
+        } catch (e) {
+          console.error('[CallPortal/Video] Failed to enable audio/subscribe:', e)
+        }
+      })
+
+      frame.on('participant-updated', (ev: { participant?: { local?: boolean; tracks?: { audio?: { state?: string } } } } | undefined) => {
+        if (ev?.participant && !ev.participant.local) {
+          const audioState = ev.participant.tracks?.audio?.state
+          console.log('[CallPortal/Video] Remote participant audio state:', audioState)
+        }
+      })
+
+      frame.on('camera-error', (ev: unknown) => {
+        console.error('[CallPortal/Video] Camera/mic error:', ev)
+        toast.error('Erro no microfone/câmera. Verifique as permissões do navegador.')
+      })
+
+      frame.on('error', (ev: unknown) => {
+        console.error('[CallPortal/Video] Daily error:', ev)
       })
 
       frame.on('left-meeting', () => {

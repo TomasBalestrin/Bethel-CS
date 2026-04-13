@@ -12,6 +12,14 @@ export async function updateMentee(menteeId: string, data: MenteeUpdate) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autenticado' }
 
+  // Log phone change for debugging
+  if (data.phone !== undefined) {
+    const { data: current } = await supabase.from('mentees').select('phone, full_name').eq('id', menteeId).single()
+    if (current && current.phone !== data.phone) {
+      console.log('[updateMentee] Phone changed for', current.full_name, ':', current.phone, '→', data.phone)
+    }
+  }
+
   const { error } = await supabase
     .from('mentees')
     .update({ ...data, updated_at: new Date().toISOString() })

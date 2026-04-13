@@ -88,16 +88,17 @@ export async function POST(request: NextRequest) {
       result = await sendTextMessage(phone, signedMessage, nextrackUUID, quotedMessageId || undefined)
     } else {
       // Verify the media URL is publicly accessible (NextTrack downloads via http.Get)
+      let mediaCheckInfo = ''
       if (imageUrl) {
         try {
           const checkRes = await fetch(imageUrl, { method: 'HEAD', cache: 'no-store' })
+          mediaCheckInfo = `status=${checkRes.status} type=${checkRes.headers.get('content-type')} size=${checkRes.headers.get('content-length')}`
           if (!checkRes.ok) {
-            console.error('[WPP Send] Media URL not publicly accessible:', checkRes.status, imageUrl.slice(0, 120))
+            console.error('[WPP Send] Media URL not publicly accessible:', checkRes.status, imageUrl)
             return NextResponse.json({ error: `URL da mídia não está pública (${checkRes.status})` }, { status: 502 })
           }
-          console.log('[WPP Send] Media URL OK:', checkRes.status, 'Content-Type:', checkRes.headers.get('content-type'), 'size:', checkRes.headers.get('content-length'))
         } catch (err) {
-          console.error('[WPP Send] Media URL HEAD failed:', err)
+          console.error('[WPP Send] Media URL HEAD failed:', err, 'url:', imageUrl)
           return NextResponse.json({ error: `Erro ao verificar URL da mídia: ${String(err)}` }, { status: 502 })
         }
       }
@@ -112,6 +113,9 @@ export async function POST(request: NextRequest) {
         nextrackUUID,
         quotedMessageId || undefined
       )
+
+      // Consolidated log: media check + NextTrack result
+      console.log('[WPP Send] MEDIA', { type, success: result.success, messageId: result.messageId, error: result.error, mediaCheck: mediaCheckInfo, urlFull: imageUrl })
     }
 
     if (!result.success) {

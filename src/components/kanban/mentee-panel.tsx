@@ -127,7 +127,6 @@ interface MenteePanelProps {
 }
 
 export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDeleted, onMenteeUpdated, onTransitionToMentorship }: MenteePanelProps) {
-  const [userRole, setUserRole] = useState<string | null>(null)
   const [editing, setEditing] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -141,12 +140,6 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-      setUserRole(profile?.role ?? null)
 
       // Fetch full mentee data (all 53 fields) for the detail panel
       if (menteeProp) {
@@ -208,7 +201,6 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
 
   if (!mentee) return null
 
-  const isAdmin = userRole === 'admin'
   const priorityLabel = `Prioridade ${mentee.priority_level}`
   const isLoading = !fullData
 
@@ -305,7 +297,6 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
           editing={editing}
           setEditing={setEditing}
           onMenteeUpdated={onMenteeUpdated}
-          isAdmin={isAdmin}
           onTransitionToMentorship={onTransitionToMentorship}
         />
         )}
@@ -340,12 +331,11 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
 }
 
 // ─── Scrollable Tabs ───
-function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTransitionToMentorship }: {
+function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, onTransitionToMentorship }: {
   mentee: MenteeWithStats
   editing: boolean
   setEditing: (v: boolean) => void
   onMenteeUpdated?: (mentee: MenteeWithStats) => void
-  isAdmin: boolean
   onTransitionToMentorship?: (mentee: MenteeWithStats) => void
 }) {
   const tabsRef = useRef<HTMLDivElement>(null)

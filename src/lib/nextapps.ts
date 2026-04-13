@@ -143,9 +143,17 @@ async function authFetch(url: string, options: RequestInit = {}): Promise<Respon
     ...options.headers,
   }
 
-  let res = await fetch(url, { ...options, headers })
+  // Add 15s timeout to prevent hanging requests that cause browser "failed to fetch"
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 15000)
+  let res: Response
+  try {
+    res = await fetch(url, { ...options, headers, signal: controller.signal })
+  } finally {
+    clearTimeout(timeoutId)
+  }
 
-  // Retry once on 401
+  // Retry once on 401 (also with timeout)
   if (res.status === 401) {
     cachedAccessToken = ''
     cachedExpiresAt = 0
@@ -153,10 +161,17 @@ async function authFetch(url: string, options: RequestInit = {}): Promise<Respon
     await supabase.from('system_tokens' as never).delete().eq('key' as never, 'nextapps_access' as never)
 
     const newToken = await getToken()
-    res = await fetch(url, {
-      ...options,
-      headers: { ...headers, Authorization: `Bearer ${newToken}` },
-    })
+    const retryController = new AbortController()
+    const retryTimeoutId = setTimeout(() => retryController.abort(), 15000)
+    try {
+      res = await fetch(url, {
+        ...options,
+        headers: { ...headers, Authorization: `Bearer ${newToken}` },
+        signal: retryController.signal,
+      })
+    } finally {
+      clearTimeout(retryTimeoutId)
+    }
   }
 
   return res
@@ -245,19 +260,30 @@ export async function sendMediaMessage(
     // Per NextTrack docs: all media types use /send endpoint with imageUrl field
     const url = `${BASE_URL}/api/chats/instances/${instanceUUID}/send`
 
-    // Download the file and convert to base64 (NextTrack's http.Get to Supabase may be blocked)
+    // Download the file for base64 (with timeout and size limit to avoid hanging the request)
+    // MAX 2MB to prevent huge JSON payloads that may exceed Vercel limits
+    const MAX_SIZE = 2 * 1024 * 1024 // 2MB
+    const DOWNLOAD_TIMEOUT = 5000 // 5 seconds
     let base64Data: string | null = null
     try {
-      const fileRes = await fetch(mediaUrl)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT)
+      const fileRes = await fetch(mediaUrl, { signal: controller.signal })
+      clearTimeout(timeoutId)
       if (fileRes.ok) {
-        const buffer = await fileRes.arrayBuffer()
-        const b64 = Buffer.from(buffer).toString('base64')
-        const mime = mimeType || fileRes.headers.get('content-type') || 'application/octet-stream'
-        base64Data = `data:${mime};base64,${b64}`
-        console.log('[NextTrack] downloaded media, size:', buffer.byteLength, 'mime:', mime)
+        const contentLength = Number(fileRes.headers.get('content-length') || '0')
+        if (contentLength > 0 && contentLength <= MAX_SIZE) {
+          const buffer = await fileRes.arrayBuffer()
+          const b64 = Buffer.from(buffer).toString('base64')
+          const mime = mimeType || fileRes.headers.get('content-type') || 'application/octet-stream'
+          base64Data = `data:${mime};base64,${b64}`
+          console.log('[NextTrack] downloaded media, size:', buffer.byteLength, 'mime:', mime)
+        } else {
+          console.log('[NextTrack] skipping base64 (size:', contentLength, 'bytes > 2MB or unknown), using URL only')
+        }
       }
     } catch (err) {
-      console.error('[NextTrack] failed to download media for base64:', err)
+      console.error('[NextTrack] download failed, continuing with URL only:', err)
     }
 
     const body: Record<string, unknown> = {
@@ -265,11 +291,9 @@ export async function sendMediaMessage(
       type,
       imageUrl: mediaUrl,
     }
-    // Also send base64 as fallback (some APIs prefer one or the other)
+    // Send base64 ONLY if available (single field to avoid triplicating payload)
     if (base64Data) {
       body.base64 = base64Data
-      body.imageBase64 = base64Data
-      body.media = base64Data
     }
 
     if (caption) body.message = caption

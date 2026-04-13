@@ -735,6 +735,35 @@ export async function bulkImportStages(input: BulkStageInput): Promise<BulkImpor
     stageMap.set(norm, { id: s.id, type: s.type as KanbanType })
   })
 
+  // Extra aliases for common "Situação" values → map to exit stages
+  const stageAliases: Record<string, string> = {
+    // Em Processo de Cancelamento
+    'em processo de cancelamento': 'em processo de cancelamento',
+    'processando cancelamento': 'em processo de cancelamento',
+    'cancelando': 'em processo de cancelamento',
+    'solicitou cancelamento': 'em processo de cancelamento',
+    // Pendência Financeira
+    'pendencia financeira': 'pendencia financeira',
+    'pendência financeira': 'pendencia financeira',
+    'inadimplente': 'pendencia financeira',
+    'inadimplencia': 'pendencia financeira',
+    'atraso': 'pendencia financeira',
+    // Pausa
+    'pausa': 'pausa',
+    'pausado': 'pausa',
+    'pausada': 'pausa',
+    // Vai Iniciar Depois
+    'vai iniciar depois': 'vai iniciar depois',
+    'aguardando inicio': 'vai iniciar depois',
+    'aguardando início': 'vai iniciar depois',
+    'inicio posterior': 'vai iniciar depois',
+    'início posterior': 'vai iniciar depois',
+    // Cancelados
+    'cancelado': 'cancelados',
+    'cancelada': 'cancelados',
+    'cancelados': 'cancelados',
+  }
+
   const errors: BulkImportResult['errors'] = []
   let created = 0
 
@@ -757,7 +786,11 @@ export async function bulkImportStages(input: BulkStageInput): Promise<BulkImpor
     if (!menteeId) { errors.push({ row: rowNum, name: matchValue, error: 'Mentorado não encontrado' }); continue }
 
     const stageNorm = stageName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
-    const stage = stageMap.get(stageName.toLowerCase().trim()) ?? stageMap.get(stageNorm)
+    // Try direct match, then normalized, then alias map
+    const aliasTarget = stageAliases[stageNorm] ?? stageAliases[stageName.toLowerCase().trim()]
+    const stage = stageMap.get(stageName.toLowerCase().trim())
+      ?? stageMap.get(stageNorm)
+      ?? (aliasTarget ? stageMap.get(aliasTarget) : undefined)
 
     if (!stage) { errors.push({ row: rowNum, name: matchValue, error: `Etapa "${stageName}" não encontrada` }); continue }
 
@@ -773,6 +806,7 @@ export async function bulkImportStages(input: BulkStageInput): Promise<BulkImpor
   revalidatePath('/mentorados')
   revalidatePath('/etapas-iniciais')
   revalidatePath('/etapas-mentoria')
+  revalidatePath('/saidas')
   return { total: input.rows.length, created, errors }
 }
 

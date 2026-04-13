@@ -117,6 +117,23 @@ export const CallInterface = memo(function CallInterface({
       updateRemoteCount()
       // Ensure audio is active
       call!.setLocalAudio(true)
+      // Explicitly start cloud recording — room-level setting only enables capability
+      try {
+        const startRec = (call as unknown as { startRecording?: () => Promise<unknown> | unknown }).startRecording
+        if (typeof startRec === 'function') {
+          const result = startRec.call(call)
+          if (result && typeof (result as Promise<unknown>).then === 'function') {
+            (result as Promise<unknown>)
+              .then(() => console.log('[Call] Recording started'))
+              .catch((err: unknown) => console.error('[Call] startRecording failed:', err))
+          } else {
+            console.log('[Call] Recording start requested (sync)')
+          }
+        }
+      } catch (err) {
+        console.error('[Call] startRecording exception:', err)
+        // Never propagate — call continues even if recording fails
+      }
     })
     call.on('participant-joined', () => updateRemoteCount())
     call.on('participant-updated', (ev) => {

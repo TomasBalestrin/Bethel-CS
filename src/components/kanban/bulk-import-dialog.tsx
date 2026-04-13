@@ -118,7 +118,7 @@ const ACTION_PLAN_FIELDS: FieldDef[] = [
 
 const STAGE_FIELDS: FieldDef[] = [
   { key: '__match_value', label: 'Nome / Telefone (Identificação)', required: true, type: 'text', aliases: ['nome', 'nome completo', 'name', 'telefone', 'whatsapp', 'phone'] },
-  { key: '__stage_name', label: 'Nome da Etapa', required: true, type: 'text', aliases: ['etapa', 'stage', 'fase', 'funil', 'status', 'etapa atual', 'estagio'] },
+  { key: '__stage_name', label: 'Nome da Etapa / Situação', required: true, type: 'text', aliases: ['etapa', 'stage', 'fase', 'funil', 'status', 'etapa atual', 'estagio', 'situacao', 'situação', 'situacao atual', 'situação atual'] },
 ]
 
 // ─── Field Definitions: Delivery Events ───────────────────────────────────

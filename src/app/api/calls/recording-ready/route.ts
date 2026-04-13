@@ -5,17 +5,19 @@ const DAILY_WEBHOOK_SECRET = process.env.DAILY_WEBHOOK_SECRET || ''
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('[Daily Webhook] ═══ INCOMING ═══ secretConfigured:', !!DAILY_WEBHOOK_SECRET)
+
     // Verify webhook authenticity via shared secret header
     if (DAILY_WEBHOOK_SECRET) {
       const authHeader = request.headers.get('authorization') || ''
       if (authHeader !== `Bearer ${DAILY_WEBHOOK_SECRET}`) {
-        console.warn('[Daily Webhook] Invalid authorization header')
+        console.warn('[Daily Webhook] Invalid authorization header — got:', authHeader.slice(0, 30))
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
     }
 
     const body = await request.json()
-    console.log('[Daily Webhook] Received:', JSON.stringify(body).slice(0, 500))
+    console.log('[Daily Webhook] Body:', JSON.stringify(body).slice(0, 500))
 
     const action = body.action || body.type
     if (action !== 'recording-ready' && action !== 'recording.ready-to-download') {
@@ -31,7 +33,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = createAdminClient()
 
-    await supabase
+    const { data: updated, error: updateError } = await supabase
       .from('call_records')
       .update({
         recording_url: recording.download_url,
@@ -39,9 +41,12 @@ export async function POST(request: NextRequest) {
         duration_seconds: recording.duration || null,
       })
       .eq('daily_room_name', roomName)
-      .in('recording_status', ['pending', 'processing'])
+      .in('recording_status', ['pending', 'processing', 'failed', 'unavailable'])
+      .select('id')
 
-    return NextResponse.json({ ok: true })
+    console.log('[Daily Webhook] Updated records for room', roomName, ':', updated?.length ?? 0, updateError ? `error: ${updateError.message}` : '')
+
+    return NextResponse.json({ ok: true, updated: updated?.length ?? 0 })
   } catch (err) {
     console.error('[Daily Webhook] Error:', err)
     return NextResponse.json({ ok: true })

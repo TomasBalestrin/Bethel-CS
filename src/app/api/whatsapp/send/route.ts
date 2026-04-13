@@ -71,9 +71,19 @@ export async function POST(request: NextRequest) {
 
     const nextrackUUID = instance.instance_id
 
-    // 4. Format phone
+    // 4. Format phone — Brazilian numbers must be 55 + DDD (2) + 9 + 8 digits = 13 digits
     let phone = mentee.phone.replace(/\D/g, '')
-    if (!phone.startsWith('55')) phone = '55' + phone
+    if (phone.length === 10 || phone.length === 11) {
+      // Number without country code: add 55 prefix
+      phone = '55' + phone
+    } else if (phone.length === 12 || phone.length === 13) {
+      // Already has country code (12 = old 8-digit mobile, 13 = new 9-digit mobile)
+      if (!phone.startsWith('55')) phone = '55' + phone
+    } else {
+      // Other lengths: just ensure 55 prefix exists
+      if (!phone.startsWith('55')) phone = '55' + phone
+    }
+    console.log('[WPP Send] Phone formatted:', mentee.phone, '→', phone, 'length:', phone.length)
 
     // 5. Build signed message with channel signature
     let signedMessage = message || ''
@@ -124,6 +134,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('[WPP Send] Success:', { menteeId, type, phone, channel, messageId: result.messageId, imageUrl: imageUrl?.slice(0, 120) })
+    if (imageUrl) console.log('[WPP Send] FULL imageUrl:', imageUrl)
 
     // 7. Save message with channel and delivery status
     await supabase.from('wpp_messages').insert({

@@ -258,28 +258,26 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
             </span>
           </div>
         </div>
-        {isAdmin && (
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setEditing((e) => !e)}
-              className="text-xs h-8 px-2.5"
-            >
-              <Pencil className="h-3 w-3 mr-1" />
-              {editing ? 'Cancelar' : 'Editar'}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setDeleteOpen(true)}
-              className="text-xs h-8 px-2.5 text-destructive border-destructive/30 hover:bg-destructive/5"
-            >
-              <Trash2 className="h-3 w-3 mr-1" />
-              <span className="hidden sm:inline">Excluir</span>
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setEditing((e) => !e)}
+            className="text-xs h-8 px-2.5"
+          >
+            <Pencil className="h-3 w-3 mr-1" />
+            {editing ? 'Cancelar' : 'Editar'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDeleteOpen(true)}
+            className="text-xs h-8 px-2.5 text-destructive border-destructive/30 hover:bg-destructive/5"
+          >
+            <Trash2 className="h-3 w-3 mr-1" />
+            <span className="hidden sm:inline">Excluir</span>
+          </Button>
+        </div>
       </div>
 
       {/* Content */}
@@ -870,7 +868,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, isAdmin, onTran
             <Clock className="h-3 w-3" /> {mentee.contract_validity}
           </span>
         )}
-        {isAdmin && mentee.kanban_type === 'initial' && onTransitionToMentorship && (
+        {mentee.kanban_type === 'initial' && onTransitionToMentorship && (
           <Button
             variant="outline"
             size="sm"

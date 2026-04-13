@@ -12,14 +12,6 @@ export async function updateMentee(menteeId: string, data: MenteeUpdate) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autenticado' }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') return { error: 'Sem permissão' }
-
   const { error } = await supabase
     .from('mentees')
     .update({ ...data, updated_at: new Date().toISOString() })
@@ -36,14 +28,6 @@ export async function deleteMentee(menteeId: string) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: 'Não autenticado' }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .single()
-
-  if (profile?.role !== 'admin') return { error: 'Sem permissão' }
 
   // Use admin client to bypass RLS for cascade deletion
   const admin = createAdminClient()

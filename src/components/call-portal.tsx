@@ -141,7 +141,7 @@ function VideoCallPortal({ roomUrl, token, menteeName, menteeLink }: {
           let attempts = 0
           const recordingPoll = setInterval(async () => {
             attempts++
-            if (attempts > 40) {
+            if (attempts > 90) {
               clearInterval(recordingPoll)
               // Mark as failed in DB
               fetch('/api/calls/check-recording', {
@@ -167,7 +167,7 @@ function VideoCallPortal({ roomUrl, token, menteeName, menteeLink }: {
                 toast.error('Falha na gravação da ligação')
               }
             } catch { /* network error, retry */ }
-          }, 15000)
+          }, 20000)
         }
         joinedRef.current = null
         if (callFrameRef.current) {
@@ -241,7 +241,7 @@ function VoiceCallPortal({ roomUrl, token, callId, menteeName, menteeLink }: {
     let attempts = 0
     const recordingPoll = setInterval(async () => {
       attempts++
-      if (attempts > 40) {
+      if (attempts > 90) {
         clearInterval(recordingPoll)
         fetch('/api/calls/check-recording', {
           method: 'POST',
@@ -266,7 +266,7 @@ function VoiceCallPortal({ roomUrl, token, callId, menteeName, menteeLink }: {
           toast.error('Falha na gravação da ligação')
         }
       } catch { /* network error, retry */ }
-    }, 15000)
+    }, 20000)
 
     endCall()
   }, [callId, endCall])

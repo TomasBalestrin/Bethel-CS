@@ -1433,13 +1433,19 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                       </span>
                     )}
                     {call.recording_status === 'unavailable' && (
-                      <span className="text-xs text-muted-foreground">Gravação indisponível</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Gravação indisponível</span>
+                        <RetryRecordingButton callId={call.id} onSuccess={() => setCallRecords((prev) => prev.map((c) => c.id === call.id ? { ...c, recording_status: 'ready' } : c))} />
+                      </div>
                     )}
                     {call.recording_status === 'pending' && (
                       <span className="text-xs text-muted-foreground">Aguardando gravação...</span>
                     )}
                     {call.recording_status === 'failed' && (
-                      <span className="text-xs text-destructive">Gravação falhou</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-destructive">Gravação falhou</span>
+                        <RetryRecordingButton callId={call.id} onSuccess={() => setCallRecords((prev) => prev.map((c) => c.id === call.id ? { ...c, recording_status: 'ready' } : c))} />
+                      </div>
                     )}
 
                     {/* Transcription */}
@@ -1695,4 +1701,45 @@ function MessageContent({ msg, menteeName }: { msg: WppMessage; menteeName: stri
 
   // Default: plain text
   return <p className="whitespace-pre-wrap break-words">{content}</p>
+}
+
+// ─── Retry Recording Button — only shown for failed/unavailable calls ───
+function RetryRecordingButton({ callId, onSuccess }: { callId: string; onSuccess: () => void }) {
+  const [loading, setLoading] = useState(false)
+
+  async function handleRetry() {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/calls/retry-recording', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ callId }),
+      })
+      const data = await res.json()
+      if (res.ok && data.status === 'ready') {
+        toast.success('Gravação recuperada!')
+        onSuccess()
+      } else if (data.status === 'not_found') {
+        toast.error(data.message || 'Gravação não encontrada no Daily')
+      } else {
+        toast.error(data.error || 'Erro ao tentar recuperar')
+      }
+    } catch (err) {
+      toast.error('Erro de rede ao tentar recuperar')
+      console.error('[RetryRecording]', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleRetry}
+      disabled={loading}
+      className="text-[10px] rounded-md border border-accent/40 px-2 py-0.5 text-accent hover:bg-accent/5 disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      {loading ? 'Tentando...' : 'Tentar recuperar'}
+    </button>
+  )
 }

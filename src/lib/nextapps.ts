@@ -143,9 +143,17 @@ async function authFetch(url: string, options: RequestInit = {}): Promise<Respon
     ...options.headers,
   }
 
-  let res = await fetch(url, { ...options, headers })
+  // Add 15s timeout to prevent hanging requests that cause browser "failed to fetch"
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 15000)
+  let res: Response
+  try {
+    res = await fetch(url, { ...options, headers, signal: controller.signal })
+  } finally {
+    clearTimeout(timeoutId)
+  }
 
-  // Retry once on 401
+  // Retry once on 401 (also with timeout)
   if (res.status === 401) {
     cachedAccessToken = ''
     cachedExpiresAt = 0
@@ -153,10 +161,17 @@ async function authFetch(url: string, options: RequestInit = {}): Promise<Respon
     await supabase.from('system_tokens' as never).delete().eq('key' as never, 'nextapps_access' as never)
 
     const newToken = await getToken()
-    res = await fetch(url, {
-      ...options,
-      headers: { ...headers, Authorization: `Bearer ${newToken}` },
-    })
+    const retryController = new AbortController()
+    const retryTimeoutId = setTimeout(() => retryController.abort(), 15000)
+    try {
+      res = await fetch(url, {
+        ...options,
+        headers: { ...headers, Authorization: `Bearer ${newToken}` },
+        signal: retryController.signal,
+      })
+    } finally {
+      clearTimeout(retryTimeoutId)
+    }
   }
 
   return res

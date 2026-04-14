@@ -1725,10 +1725,13 @@ function RetryRecordingButton({ callId, onSuccess }: { callId: string; onSuccess
       if (res.ok && data.status === 'ready') {
         toast.success('Gravação recuperada!')
         onSuccess()
+      } else if (data.status === 'not_ready') {
+        toast.info(data.message || 'Gravação ainda processando — tente em 1-2 minutos')
       } else if (data.status === 'not_found') {
         toast.error(data.message || 'Gravação não encontrada no Daily')
       } else {
-        toast.error(data.error || 'Erro ao tentar recuperar')
+        console.error('[RetryRecording] Response:', res.status, data)
+        toast.error(data.error || `Erro ${res.status} ao tentar recuperar`)
       }
     } catch (err) {
       toast.error('Erro de rede ao tentar recuperar')

@@ -705,7 +705,7 @@ export async function bulkImportActionPlans(input: BulkActionPlanInput): Promise
 // ─── Bulk Import: Stage Assignments ──────────────────────────────────────────
 
 interface BulkStageInput {
-  rows: { matchValue: string; stageName: string }[]
+  rows: { matchValue: string; matchPhone?: string; stageName: string }[]
   matchField: 'full_name' | 'phone' | 'email'
 }
 
@@ -768,19 +768,26 @@ export async function bulkImportStages(input: BulkStageInput): Promise<BulkImpor
   let created = 0
 
   for (let i = 0; i < input.rows.length; i++) {
-    const { matchValue, stageName } = input.rows[i]
+    const { matchValue, matchPhone, stageName } = input.rows[i]
     const rowNum = i + 2
 
-    if (!matchValue.trim()) { errors.push({ row: rowNum, name: '', error: 'Campo de identificação vazio' }); continue }
+    if (!matchValue.trim() && !matchPhone?.trim()) { errors.push({ row: rowNum, name: '', error: 'Campo de identificação vazio (nome ou telefone)' }); continue }
     if (!stageName.trim()) { errors.push({ row: rowNum, name: matchValue, error: 'Nome da etapa vazio' }); continue }
 
+    // Try primary match (matchValue), then fallback to phone if provided
     let menteeId: string | undefined
-    if (input.matchField === 'full_name') {
-      menteeId = nameMap.get(matchValue.toLowerCase().trim())
-    } else if (input.matchField === 'phone') {
-      menteeId = phoneMap.get(matchValue.replace(/\D/g, ''))
-    } else {
-      menteeId = emailMap.get(matchValue.toLowerCase().trim())
+    if (matchValue.trim()) {
+      if (input.matchField === 'full_name') {
+        menteeId = nameMap.get(matchValue.toLowerCase().trim())
+      } else if (input.matchField === 'phone') {
+        menteeId = phoneMap.get(matchValue.replace(/\D/g, ''))
+      } else {
+        menteeId = emailMap.get(matchValue.toLowerCase().trim())
+      }
+    }
+    // Fallback: try phone column if primary didn't match
+    if (!menteeId && matchPhone?.trim()) {
+      menteeId = phoneMap.get(matchPhone.replace(/\D/g, ''))
     }
 
     if (!menteeId) { errors.push({ row: rowNum, name: matchValue, error: 'Mentorado não encontrado' }); continue }

@@ -117,7 +117,8 @@ const ACTION_PLAN_FIELDS: FieldDef[] = [
 // ─── Field Definitions: Stages ──────────────────────────────────────────────
 
 const STAGE_FIELDS: FieldDef[] = [
-  { key: '__match_value', label: 'Nome / Telefone (Identificação)', required: true, type: 'text', aliases: ['nome', 'nome completo', 'name', 'telefone', 'whatsapp', 'phone'] },
+  { key: '__match_value', label: 'Nome (Identificação primária)', required: true, type: 'text', aliases: ['nome', 'nome completo', 'name', 'mentorado'] },
+  { key: '__match_phone', label: 'Telefone (Identificação secundária)', required: false, type: 'text', aliases: ['telefone', 'whatsapp', 'phone', 'cel', 'celular', 'tel'] },
   { key: '__stage_name', label: 'Nome da Etapa / Situação', required: true, type: 'text', aliases: ['etapa', 'stage', 'fase', 'funil', 'status', 'etapa atual', 'estagio', 'situacao', 'situação', 'situacao atual', 'situação atual'] },
 ]
 
@@ -316,6 +317,7 @@ export function BulkImportDialog({ open, onOpenChange, specialists = [], isAdmin
         const out = getMappedRow(raw)
         return {
           matchValue: String(out.__match_value ?? ''),
+          matchPhone: out.__match_phone ? String(out.__match_phone) : undefined,
           stageName: String(out.__stage_name ?? ''),
         }
       })

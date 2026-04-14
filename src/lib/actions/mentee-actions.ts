@@ -707,6 +707,7 @@ export async function bulkImportActionPlans(input: BulkActionPlanInput): Promise
 interface BulkStageInput {
   rows: { matchValue: string; matchPhone?: string; stageName: string }[]
   matchField: 'full_name' | 'phone' | 'email'
+  createIfMissing?: boolean // if true, create mentee when not found (used in Saídas import)
 }
 
 export async function bulkImportStages(input: BulkStageInput): Promise<BulkImportResult> {
@@ -790,16 +791,50 @@ export async function bulkImportStages(input: BulkStageInput): Promise<BulkImpor
       menteeId = phoneMap.get(matchPhone.replace(/\D/g, ''))
     }
 
-    if (!menteeId) { errors.push({ row: rowNum, name: matchValue, error: 'Mentorado não encontrado' }); continue }
-
+    // Resolve the target stage first (needed for both update and create paths)
     const stageNorm = stageName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim()
-    // Try direct match, then normalized, then alias map
     const aliasTarget = stageAliases[stageNorm] ?? stageAliases[stageName.toLowerCase().trim()]
     const stage = stageMap.get(stageName.toLowerCase().trim())
       ?? stageMap.get(stageNorm)
       ?? (aliasTarget ? stageMap.get(aliasTarget) : undefined)
 
     if (!stage) { errors.push({ row: rowNum, name: matchValue, error: `Etapa "${stageName}" não encontrada` }); continue }
+
+    // If mentee not found and createIfMissing is enabled, create a minimal mentee
+    if (!menteeId && input.createIfMissing) {
+      const phoneDigits = (matchPhone || '').replace(/\D/g, '')
+      // Phone is required by schema — use placeholder unique value if missing
+      const phoneToUse = phoneDigits || `000000000000${Date.now()}${i}`
+      const menteeStatus = stage.type === 'exit' && stageName.toLowerCase().includes('cancelad') ? 'cancelado' : 'ativo'
+      const { data: newMentee, error: createError } = await supabase
+        .from('mentees')
+        .insert({
+          full_name: matchValue.trim(),
+          phone: phoneToUse,
+          product_name: 'Importado',
+          start_date: new Date().toISOString().slice(0, 10),
+          status: menteeStatus,
+          kanban_type: stage.type,
+          current_stage_id: stage.id,
+          priority_level: 1,
+          created_by: user.id,
+        })
+        .select('id')
+        .single()
+
+      if (createError || !newMentee) {
+        errors.push({ row: rowNum, name: matchValue, error: `Erro ao criar: ${createError?.message || 'desconhecido'}` })
+        continue
+      }
+
+      // Cache newly created mentee for subsequent rows
+      nameMap.set(matchValue.toLowerCase().trim(), newMentee.id)
+      if (phoneDigits) phoneMap.set(phoneDigits, newMentee.id)
+      created++
+      continue
+    }
+
+    if (!menteeId) { errors.push({ row: rowNum, name: matchValue, error: 'Mentorado não encontrado' }); continue }
 
     const { error } = await supabase
       .from('mentees')

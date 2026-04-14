@@ -124,9 +124,10 @@ interface MenteePanelProps {
   onMenteeDeleted?: (menteeId: string) => void
   onMenteeUpdated?: (mentee: MenteeWithStats) => void
   onTransitionToMentorship?: (mentee: MenteeWithStats) => void
+  specialistName?: string
 }
 
-export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDeleted, onMenteeUpdated, onTransitionToMentorship }: MenteePanelProps) {
+export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDeleted, onMenteeUpdated, onTransitionToMentorship, specialistName }: MenteePanelProps) {
   const [editing, setEditing] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -233,6 +234,11 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
             >
               {priorityLabel}
             </Badge>
+            {specialistName && (
+              <Badge variant="default" className="font-semibold">
+                {specialistName}
+              </Badge>
+            )}
           </div>
           <span className="text-sm text-muted-foreground hidden md:inline">{mentee.product_name}</span>
           <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground ml-2">

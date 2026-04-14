@@ -359,6 +359,7 @@ export function KanbanBoard({
         mentee={selectedMentee}
         open={panelOpen}
         onOpenChange={setPanelOpen}
+        specialistName={selectedMentee?.created_by ? specialistNameMap.get(selectedMentee.created_by) : undefined}
         onMenteeDeleted={(id) => {
           setMentees((prev) => prev.filter((m) => m.id !== id))
           setSelectedMentee(null)

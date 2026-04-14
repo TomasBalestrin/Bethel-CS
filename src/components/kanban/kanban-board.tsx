@@ -351,6 +351,7 @@ export function KanbanBoard({
           onOpenChange={setImportOpen}
           initialTab="stages"
           visibleTabs={['stages']}
+          createIfMissing={true}
         />
       )}
 

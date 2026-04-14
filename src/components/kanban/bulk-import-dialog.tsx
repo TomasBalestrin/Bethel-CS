@@ -196,9 +196,10 @@ interface BulkImportDialogProps {
   isAdmin?: boolean
   initialTab?: ImportTab
   visibleTabs?: ImportTab[]
+  createIfMissing?: boolean // if true, stages import creates missing mentees
 }
 
-export function BulkImportDialog({ open, onOpenChange, specialists = [], isAdmin = false, initialTab, visibleTabs }: BulkImportDialogProps) {
+export function BulkImportDialog({ open, onOpenChange, specialists = [], isAdmin = false, initialTab, visibleTabs, createIfMissing = false }: BulkImportDialogProps) {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const effectiveInitialTab = initialTab ?? (visibleTabs ? visibleTabs[0] : 'mentees')
@@ -321,7 +322,7 @@ export function BulkImportDialog({ open, onOpenChange, specialists = [], isAdmin
           stageName: String(out.__stage_name ?? ''),
         }
       })
-      res = await bulkImportStages({ rows: mapped, matchField })
+      res = await bulkImportStages({ rows: mapped, matchField, createIfMissing })
     } else if (activeTab === 'delivery_events') {
       const mapped = rows.map((raw) => {
         const out = getMappedRow(raw)

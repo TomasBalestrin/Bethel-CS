@@ -299,7 +299,14 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   async function uploadFile(file: File | Blob, filename: string): Promise<string | null> {
     const supabase = createClient()
     const ext = filename.split('.').pop() || 'bin'
-    const path = `${menteeId}/${Date.now()}_${filename}`
+    // Sanitize filename: remove accents, replace non-alphanumeric with underscore
+    // Supabase Storage requires ASCII-safe paths
+    const safeName = filename
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // remove diacritics
+      .replace(/[^a-zA-Z0-9._-]/g, '_') // replace other chars with underscore
+      .replace(/_+/g, '_') // collapse multiple underscores
+    const path = `${menteeId}/${Date.now()}_${safeName}`
 
     const { error } = await supabase.storage
       .from('chat-attachments')
@@ -1674,7 +1681,8 @@ function MessageContent({ msg, menteeName }: { msg: WppMessage; menteeName: stri
     const urlParts = mediaUrl.split('/')
     const rawName = decodeURIComponent(urlParts[urlParts.length - 1] || 'arquivo')
     // Strip timestamp prefix (e.g., "1776097710736_filename.pdf" → "filename.pdf")
-    const name = rawName.replace(/^\d+_/, '')
+    // Also replace underscores with spaces for display (from sanitized upload)
+    const name = rawName.replace(/^\d+_/, '').replace(/_/g, ' ')
     const ext = name.split('.').pop()?.toLowerCase() || ''
     const isPdf = ext === 'pdf'
     return (

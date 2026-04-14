@@ -33,7 +33,7 @@ interface TabChatProps {
   menteeName: string
   specialistId: string | null
   onUnreadCountChange?: (count: number) => void
-  onSessionChange?: (active: boolean) => void
+  onSessionChange?: (active: boolean, channel: string) => void
   channel?: string
   signatureName?: string
 }
@@ -192,11 +192,12 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           .limit(20)
         if (calls) setCallRecords(calls)
 
-        // Check for active attendance session
+        // Check for active attendance session for THIS channel only (isolated per channel)
         const { data: activeSess } = await supabase
           .from('attendance_sessions')
           .select('id, started_at')
           .eq('mentee_id', menteeId)
+          .eq('channel', channel)
           .is('ended_at', null)
           .order('started_at', { ascending: false })
           .limit(1)
@@ -903,7 +904,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                   setSessionStart(prevStart)
                   toast.error('Erro ao finalizar atendimento')
                 } else {
-                  onSessionRef.current?.(false)
+                  onSessionRef.current?.(false, channel)
                   // Auto-generate summary after ending session
                   handleSummarize()
                 }
@@ -929,7 +930,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                 if (sess) {
                   setActiveSession(sess.id)
                   setSessionStart(new Date(sess.started_at))
-                  onSessionRef.current?.(true)
+                  onSessionRef.current?.(true, channel)
                   toast.success('Atendimento iniciado')
                 }
               }}

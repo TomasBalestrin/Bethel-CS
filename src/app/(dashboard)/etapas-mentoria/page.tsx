@@ -66,8 +66,8 @@ export default async function EtapasMentoriaPage() {
       ? supabase.from('revenue_records').select('mentee_id, sale_value').in('mentee_id', menteeIds)
       : Promise.resolve({ data: [] as { mentee_id: string; sale_value: number }[] }),
     menteeIds.length > 0
-      ? supabase.from('attendance_sessions').select('mentee_id').in('mentee_id', menteeIds).is('ended_at', null)
-      : Promise.resolve({ data: [] as { mentee_id: string }[] }),
+      ? supabase.from('attendance_sessions').select('mentee_id, channel, specialist_id').in('mentee_id', menteeIds).is('ended_at', null)
+      : Promise.resolve({ data: [] as { mentee_id: string; channel: string; specialist_id: string }[] }),
     menteeIds.length > 0
       ? supabase.from('wpp_messages').select('mentee_id, sent_at').in('mentee_id', menteeIds).order('sent_at', { ascending: false })
       : Promise.resolve({ data: [] as { mentee_id: string; sent_at: string }[] }),
@@ -91,7 +91,15 @@ export default async function EtapasMentoriaPage() {
     revenueMap.set(r.mentee_id, (revenueMap.get(r.mentee_id) ?? 0) + Number(r.sale_value))
   })
 
-  const activeSessionSet = new Set(activeSessions?.map((s) => s.mentee_id) ?? [])
+  // Build map: menteeId → [{ channel, specialist_name }, ...] from active sessions
+  const profileNameMap = new Map(allProfiles.map((p) => [p.id, p.full_name]))
+  const activeSessionsMap = new Map<string, Array<{ channel: string; specialist_name: string }>>()
+  activeSessions?.forEach((s) => {
+    const name = profileNameMap.get(s.specialist_id) ?? 'Especialista'
+    const arr = activeSessionsMap.get(s.mentee_id) ?? []
+    arr.push({ channel: s.channel || 'principal', specialist_name: name })
+    activeSessionsMap.set(s.mentee_id, arr)
+  })
 
   const lastContactMap = new Map<string, string>()
   lastMessages?.forEach((m) => {
@@ -102,12 +110,14 @@ export default async function EtapasMentoriaPage() {
   const menteesWithStats: MenteeWithStats[] = menteeList.map((m) => {
     const lastContact = lastContactMap.get(m.id)
     const daysSince = lastContact ? Math.floor((now - new Date(lastContact).getTime()) / 86400000) : undefined
+    const sessions = activeSessionsMap.get(m.id)
     return {
       ...m,
       attendance_count: attendanceMap.get(m.id) ?? 0,
       indication_count: indicationMap.get(m.id) ?? 0,
       revenue_total: revenueMap.get(m.id) ?? 0,
-      has_active_session: activeSessionSet.has(m.id),
+      has_active_session: !!sessions?.length,
+      active_sessions: sessions,
       days_since_contact: daysSince,
     }
   })

@@ -23,6 +23,17 @@ const LEVEL_LABELS: Record<number, string> = {
   5: 'Urgente',
 }
 
+const CHANNEL_LABELS: Record<string, string> = {
+  principal: 'Principal',
+  comercial: 'Comercial',
+  marketing: 'Marketing',
+  gestao: 'Gestão',
+}
+
+function formatChannelLabel(ch: string): string {
+  return CHANNEL_LABELS[ch] ?? ch
+}
+
 interface MenteeCardProps {
   mentee: MenteeWithStats
   unreadCount?: number
@@ -117,15 +128,27 @@ export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, sp
           )}
         </div>
 
-        {/* Active session indicator */}
+        {/* Active session indicator — show specialist name(s) + channel */}
         {mentee.has_active_session && (
-          <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-success/10 px-2 py-1">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
-            </span>
-            <Headphones size={10} className="text-success" />
-            <span className="text-[10px] font-semibold text-success">Em atendimento</span>
+          <div className="mt-2 rounded-lg bg-success/10 px-2 py-1">
+            <div className="flex items-center gap-1.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-success" />
+              </span>
+              <Headphones size={10} className="text-success" />
+              <span className="text-[10px] font-semibold text-success">Em atendimento</span>
+            </div>
+            {mentee.active_sessions && mentee.active_sessions.length > 0 && (
+              <div className="mt-0.5 pl-4 flex flex-wrap gap-x-2 gap-y-0.5">
+                {mentee.active_sessions.map((s, i) => (
+                  <span key={i} className="text-[10px] text-success/90">
+                    {s.specialist_name}
+                    <span className="text-success/60"> · {formatChannelLabel(s.channel)}</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

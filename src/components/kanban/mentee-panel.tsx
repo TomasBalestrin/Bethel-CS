@@ -472,7 +472,15 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, onTransitionT
             menteeName={mentee.full_name}
             specialistId={mentee.created_by}
             onUnreadCountChange={(count: number) => setChatUnreads((prev) => ({ ...prev, [chat.channel]: count === -1 ? (prev[chat.channel] ?? 0) + 1 : count }))}
-            onSessionChange={(active) => onMenteeUpdated?.({ ...mentee, has_active_session: active })}
+            onSessionChange={(active, activeChannel) => {
+              // Update active_sessions list for this channel specifically
+              const current = mentee.active_sessions ?? []
+              const filtered = current.filter((s) => s.channel !== activeChannel)
+              const updated = active
+                ? [...filtered, { channel: activeChannel, specialist_name: specialistName ?? 'Especialista' }]
+                : filtered
+              onMenteeUpdated?.({ ...mentee, active_sessions: updated, has_active_session: updated.length > 0 })
+            }}
             channel={chat.channel}
             signatureName={chat.signature}
           /></ErrorBoundary>

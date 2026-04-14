@@ -1296,6 +1296,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
               ref={fileInputRef}
               type="file"
               className="hidden"
+              accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,application/*"
               onChange={(e) => {
                 const file = e.target.files?.[0]
                 if (file) setAttachedFile(file)
@@ -1667,6 +1668,38 @@ function MessageContent({ msg, menteeName }: { msg: WppMessage; menteeName: stri
     return <video controls src={mediaUrl} className="max-w-full rounded-lg" />
   }
 
+  // Document (PDF, DOC, etc.)
+  if (msg.message_type === 'document' && mediaUrl) {
+    // Extract filename from URL (last path segment after last underscore, or whole segment)
+    const urlParts = mediaUrl.split('/')
+    const rawName = decodeURIComponent(urlParts[urlParts.length - 1] || 'arquivo')
+    // Strip timestamp prefix (e.g., "1776097710736_filename.pdf" → "filename.pdf")
+    const name = rawName.replace(/^\d+_/, '')
+    const ext = name.split('.').pop()?.toLowerCase() || ''
+    const isPdf = ext === 'pdf'
+    return (
+      <div className="flex items-start gap-2 min-w-[200px]">
+        <FileDown className="h-6 w-6 text-accent shrink-0 mt-0.5" />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium truncate" title={name}>{name}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <a href={mediaUrl} target="_blank" rel="noopener noreferrer" download={name}
+              className="text-xs text-accent hover:underline inline-flex items-center gap-1">
+              <FileDown className="h-3 w-3" /> Baixar
+            </a>
+            {isPdf && (
+              <a href={mediaUrl} target="_blank" rel="noopener noreferrer"
+                className="text-xs text-accent hover:underline inline-flex items-center gap-1">
+                <ExternalLink className="h-3 w-3" /> Abrir
+              </a>
+            )}
+          </div>
+        </div>
+        {content && <p className="whitespace-pre-wrap break-words mt-2">{content}</p>}
+      </div>
+    )
+  }
+
   // File attachment (text message with 📎)
   if (content.startsWith('📎')) {
     const lines = content.split('\n')
@@ -1701,7 +1734,7 @@ function MessageContent({ msg, menteeName }: { msg: WppMessage; menteeName: stri
   }
 
   // Unsupported media type with no text
-  if (!['text', 'image', 'audio', 'video'].includes(msg.message_type) && !content) {
+  if (!['text', 'image', 'audio', 'video', 'document'].includes(msg.message_type) && !content) {
     return <p className="italic text-muted-foreground text-xs">(mídia não suportada)</p>
   }
 

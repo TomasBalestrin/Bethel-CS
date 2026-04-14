@@ -304,6 +304,7 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
           setEditing={setEditing}
           onMenteeUpdated={onMenteeUpdated}
           onTransitionToMentorship={onTransitionToMentorship}
+          specialistName={specialistName}
         />
         )}
       </div>
@@ -337,12 +338,13 @@ export function MenteePanel({ mentee: menteeProp, open, onOpenChange, onMenteeDe
 }
 
 // ─── Scrollable Tabs ───
-function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, onTransitionToMentorship }: {
+function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, onTransitionToMentorship, specialistName }: {
   mentee: MenteeWithStats
   editing: boolean
   setEditing: (v: boolean) => void
   onMenteeUpdated?: (mentee: MenteeWithStats) => void
   onTransitionToMentorship?: (mentee: MenteeWithStats) => void
+  specialistName?: string
 }) {
   const tabsRef = useRef<HTMLDivElement>(null)
   const [showOverflow, setShowOverflow] = useState(false)

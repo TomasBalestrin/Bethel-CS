@@ -95,8 +95,9 @@ export default async function EtapasIniciaisPage() {
   // Build map: menteeId → [{ channel, specialist_name }, ...] from active sessions
   const profileNameMap = new Map(allProfiles.map((p) => [p.id, p.full_name]))
   const activeSessionsMap = new Map<string, Array<{ channel: string; specialist_name: string }>>()
-  activeSessions?.forEach((s) => {
-    const name = profileNameMap.get(s.specialist_id) ?? 'Especialista'
+  const activeSessionsArr = (activeSessions ?? []) as unknown as Array<{ mentee_id: string; channel?: string; specialist_id?: string }>
+  activeSessionsArr.forEach((s) => {
+    const name = s.specialist_id ? profileNameMap.get(s.specialist_id) ?? 'Especialista' : 'Especialista'
     const arr = activeSessionsMap.get(s.mentee_id) ?? []
     arr.push({ channel: s.channel || 'principal', specialist_name: name })
     activeSessionsMap.set(s.mentee_id, arr)

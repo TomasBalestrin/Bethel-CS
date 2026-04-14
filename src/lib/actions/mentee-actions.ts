@@ -763,6 +763,20 @@ export async function bulkImportStages(input: BulkStageInput): Promise<BulkImpor
     'cancelado': 'cancelados',
     'cancelada': 'cancelados',
     'cancelados': 'cancelados',
+    // Encerrados (mentoria finalizada)
+    'encerrado': 'encerrados',
+    'encerrada': 'encerrados',
+    'encerrados': 'encerrados',
+    'encerradas': 'encerrados',
+    'finalizado': 'encerrados',
+    'finalizada': 'encerrados',
+    'finalizados': 'encerrados',
+    'concluido': 'encerrados',
+    'concluída': 'encerrados',
+    'concluído': 'encerrados',
+    'concluida': 'encerrados',
+    'mentoria encerrada': 'encerrados',
+    'mentoria finalizada': 'encerrados',
   }
 
   const errors: BulkImportResult['errors'] = []
@@ -805,7 +819,12 @@ export async function bulkImportStages(input: BulkStageInput): Promise<BulkImpor
       const phoneDigits = (matchPhone || '').replace(/\D/g, '')
       // Phone is required by schema — use placeholder unique value if missing
       const phoneToUse = phoneDigits || `000000000000${Date.now()}${i}`
-      const menteeStatus = stage.type === 'exit' && stageName.toLowerCase().includes('cancelad') ? 'cancelado' : 'ativo'
+      const stageLower = stageName.toLowerCase()
+      const menteeStatus = stage.type === 'exit' && stageLower.includes('cancelad')
+        ? 'cancelado'
+        : stage.type === 'exit' && (stageLower.includes('encerrad') || stageLower.includes('finalizad') || stageLower.includes('conclu'))
+          ? 'concluido'
+          : 'ativo'
       const { data: newMentee, error: createError } = await supabase
         .from('mentees')
         .insert({

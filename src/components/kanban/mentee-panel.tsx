@@ -1451,13 +1451,27 @@ function ActionPlanResponseView({ data, editing, draft, onDraftChange }: {
   const keys = Object.keys(ACTION_PLAN_LABELS)
   const source = editing ? (draft ?? data) : data
 
+  // These revenue fields should ALWAYS render so the operator can see what's
+  // missing at a glance (and edit the plan to fill it in). Everything else is
+  // still hidden when empty, to keep the view clean.
+  const ALWAYS_SHOW_KEYS = new Set([
+    'faturamento_mes1',
+    'faturamento_mes2',
+    'faturamento_mes3',
+    'faturamento_medio',
+  ])
+
+  const isEmpty = (v: unknown) =>
+    v === undefined || v === null || v === '' || v === 0 ||
+    (Array.isArray(v) && v.length === 0)
+
   return (
     <div className="space-y-0 divide-y divide-border/60">
       {keys.map((key) => {
         const value = source[key]
-        // When NOT editing, skip empty values so the view stays clean.
+        // When NOT editing, skip empty values — unless the key is always-visible.
         // When editing, always render so the user can fill blank fields.
-        if (!editing && (value === undefined || value === null || value === '' || value === 0)) return null
+        if (!editing && !ALWAYS_SHOW_KEYS.has(key) && isEmpty(value)) return null
         const label = ACTION_PLAN_LABELS[key]
         const isPill = PILL_KEYS.has(key)
         const isCurrency = CURRENCY_KEYS.has(key)
@@ -1502,7 +1516,11 @@ function ActionPlanResponseView({ data, editing, draft, onDraftChange }: {
                 ))}
               </div>
             ) : isCurrency ? (
-              <p className="text-sm text-foreground font-semibold tabular">R$ {(Number(value) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              isEmpty(value) ? (
+                <p className="text-sm text-muted-foreground italic">—</p>
+              ) : (
+                <p className="text-sm text-foreground font-semibold tabular">R$ {(Number(value) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+              )
             ) : (
               <p className="text-sm text-foreground whitespace-pre-wrap">{String(value)}</p>
             )}

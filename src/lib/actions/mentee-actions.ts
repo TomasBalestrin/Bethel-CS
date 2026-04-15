@@ -728,13 +728,46 @@ function parseRevenueValue(val: unknown): number | null {
 
 // Parse dates: accepts YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, or Date objects
 function parseDate(val: unknown): string | null {
-  if (!val) return null
-  if (val instanceof Date) return val.toISOString().slice(0, 10)
+  if (val === null || val === undefined || val === '') return null
+  if (val instanceof Date) {
+    const y = val.getUTCFullYear()
+    const m = String(val.getUTCMonth() + 1).padStart(2, '0')
+    const d = String(val.getUTCDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+  // Excel serial-number dates (what xlsx.sheet_to_json returns for date cells
+  // when cellDates: false). Any reasonable calendar date is between ~20000
+  // (1954-10) and ~80000 (2119-02), so we detect by range.
+  if (typeof val === 'number' && val > 10000 && val < 100000) {
+    const ms = Math.round((val - 25569) * 86400000)
+    const date = new Date(ms)
+    const y = date.getUTCFullYear()
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+    const d = String(date.getUTCDate()).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
   const s = String(val).trim()
   if (!s) return null
+  // Numeric string that is actually an Excel serial ("45748")
+  if (/^\d{5,6}$/.test(s)) {
+    const num = Number(s)
+    if (num > 10000 && num < 100000) {
+      const ms = Math.round((num - 25569) * 86400000)
+      const date = new Date(ms)
+      const y = date.getUTCFullYear()
+      const m = String(date.getUTCMonth() + 1).padStart(2, '0')
+      const d = String(date.getUTCDate()).padStart(2, '0')
+      return `${y}-${m}-${d}`
+    }
+  }
   // ISO yyyy-mm-dd
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10)
-  // dd/mm/yyyy or dd-mm-yyyy
+  // yyyy/mm/dd
+  const iso2 = s.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})/)
+  if (iso2) {
+    return `${iso2[1]}-${iso2[2].padStart(2, '0')}-${iso2[3].padStart(2, '0')}`
+  }
+  // dd/mm/yyyy or dd-mm-yyyy (also tolerates time portion after)
   const m = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/)
   if (m) {
     const d = m[1].padStart(2, '0')

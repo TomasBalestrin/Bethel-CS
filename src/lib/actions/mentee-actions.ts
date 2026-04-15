@@ -983,15 +983,24 @@ export async function bulkImportStages(input: BulkStageInput): Promise<BulkImpor
 
     if (!menteeId) { errors.push({ row: rowNum, name: matchValue, error: 'Mentorado não encontrado' }); continue }
 
-    // ── Path 2: mentee exists → update only NULL/empty fields (non-destructive) ──
+    // ── Path 2: mentee exists → merge spreadsheet values (non-destructive) ──
+    // Rule: fields that are currently NULL/empty in the DB get filled. Exception:
+    // date fields (start_date, end_date, birth_date) ALWAYS overwrite when a
+    // value comes in the spreadsheet — this lets re-imports fix previously-wrong
+    // dates (e.g. rows where start_date was defaulted to the import day when
+    // the Excel serial wasn't being parsed correctly).
+    const DATE_OVERRIDE_KEYS = new Set(['start_date', 'end_date', 'birth_date'])
     const existing = menteeById.get(menteeId) || {}
     const updateData: Record<string, unknown> = {
       current_stage_id: stage.id,
       kanban_type: stage.type,
       updated_at: new Date().toISOString(),
     }
-    // Only fill fields that are currently null/empty in DB
     for (const [k, v] of Object.entries(parsedFields)) {
+      if (DATE_OVERRIDE_KEYS.has(k)) {
+        updateData[k] = v // always overwrite dates when spreadsheet has a value
+        continue
+      }
       const existingVal = existing[k]
       if (existingVal === null || existingVal === undefined || existingVal === '') {
         updateData[k] = v

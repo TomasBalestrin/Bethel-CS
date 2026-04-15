@@ -789,9 +789,11 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, onTransitionToM
             <Select value={String(form.priority_level)} onValueChange={(v) => setForm({ ...form, priority_level: Number(v) })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <SelectItem key={n} value={String(n)}>P{n}</SelectItem>
-                ))}
+                <SelectItem value="1">1 — Pagou o mínimo</SelectItem>
+                <SelectItem value="2">2 — Valor alto, pagamento próximo</SelectItem>
+                <SelectItem value="3">3 — Pagou tudo</SelectItem>
+                <SelectItem value="4">4 — Pagou tudo + indicou +1</SelectItem>
+                <SelectItem value="5">5 — Pagou tudo + indicou +5</SelectItem>
               </SelectContent>
             </Select>
           </div>

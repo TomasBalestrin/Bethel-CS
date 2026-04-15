@@ -47,21 +47,33 @@ export async function POST(request: NextRequest) {
     .update({ transcription_status: 'processing' })
     .eq('id', callId)
 
+  const t0 = Date.now()
+  const log = (stage: string, extra?: Record<string, unknown>) =>
+    console.log('[Transcribe]', `[+${Math.round((Date.now() - t0) / 1000)}s]`, stage, extra ?? '')
+
   try {
-    console.log('[Transcribe] Downloading recording:', call.recording_url)
+    log('start', { callId, url: call.recording_url })
 
     // Download the recording audio
     const audioRes = await fetch(call.recording_url)
     if (!audioRes.ok) {
-      throw new Error(`Failed to download recording: ${audioRes.status}`)
+      throw new Error(`Failed to download recording: HTTP ${audioRes.status} ${audioRes.statusText}`)
     }
 
     const audioBuffer = await audioRes.arrayBuffer()
+    const sizeMB = audioBuffer.byteLength / 1024 / 1024
+    log('downloaded', { bytes: audioBuffer.byteLength, sizeMB: sizeMB.toFixed(2) })
+
+    // Whisper hard limit: 25 MB per file. Refuse with a clear message instead
+    // of blindly hitting the API and getting a cryptic 413 later.
+    const WHISPER_LIMIT_MB = 25
+    if (sizeMB > WHISPER_LIMIT_MB) {
+      throw new Error(`Gravação tem ${sizeMB.toFixed(1)} MB — acima do limite de ${WHISPER_LIMIT_MB} MB do Whisper. Ligações longas precisam ser divididas.`)
+    }
+
     const audioFile = new File([audioBuffer], 'recording.mp4', { type: 'audio/mp4' })
+    log('sending to Whisper')
 
-    console.log('[Transcribe] Sending to Whisper API, size:', audioBuffer.byteLength)
-
-    // Transcribe with Whisper
     const transcription = await openai.audio.transcriptions.create({
       file: audioFile,
       model: 'whisper-1',
@@ -69,9 +81,9 @@ export async function POST(request: NextRequest) {
       response_format: 'text',
     })
 
-    console.log('[Transcribe] Success, length:', transcription.length)
+    log('whisper done', { transcriptLen: transcription.length })
 
-    // Save transcription
+    // Save transcription FIRST so the UI shows "ready" even if summary fails
     await supabase
       .from('call_records')
       .update({
@@ -79,6 +91,7 @@ export async function POST(request: NextRequest) {
         transcription_status: 'ready',
       })
       .eq('id', callId)
+    log('transcription saved → status=ready')
 
     // Auto-generate summary from transcription
     try {
@@ -139,10 +152,12 @@ Seja conciso e objetivo. Foque no que é útil para o especialista na próxima c
       console.error('[Transcribe] Auto-summary failed (non-blocking):', summaryErr)
     }
 
+    log('all done')
     return NextResponse.json({ status: 'ready', transcription })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    console.error('[Transcribe] Error:', message)
+    const stack = err instanceof Error ? err.stack : undefined
+    console.error('[Transcribe] FAILED after', Math.round((Date.now() - t0) / 1000), 's:', message, stack)
 
     await supabase
       .from('call_records')

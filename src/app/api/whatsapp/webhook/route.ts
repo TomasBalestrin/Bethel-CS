@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ─── Message received ───
-    if (event === 'message_received' || event === 'messages.upsert' || event === 'message' || event === 'new_message') {
+    if (event === 'message_received' || event === 'messages.upsert' || event === 'message' || event === 'new_message' || event === 'message_sent' || event === 'outgoing_message') {
       const phone = data.phone as string
       if (!phone) {
         console.log('[WPP Webhook] SKIP: no phone in data')
@@ -159,11 +159,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
-      // Skip messages already sent via our API (avoid duplicates)
-      if (data.fromApi === true) {
-        console.log('[WPP Webhook] SKIP: message sent via API (fromApi)')
-        return NextResponse.json({ ok: true })
-      }
+      // NOTE: we used to skip fromApi=true here, but some providers flag every
+      // outgoing message (including messages typed on the specialist's phone)
+      // as fromApi=true, which was causing phone-origin messages to never
+      // appear in the chat. Deduplication now relies exclusively on messageId
+      // below — if the same messageId is already in wpp_messages, we skip;
+      // otherwise we insert. This handles both cases correctly:
+      //   - API-sent: /api/whatsapp/send inserts first with messageId, webhook
+      //     arrives later and the messageId check dedupes it away.
+      //   - Phone-sent: not inserted yet, messageId missing → we insert now.
 
       // 1. Find specialist by instance
       const whatsmeowId = (data.instanceId || instanceId) as string

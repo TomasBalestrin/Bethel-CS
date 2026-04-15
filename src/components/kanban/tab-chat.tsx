@@ -1404,6 +1404,36 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           <DialogHeader>
             <DialogTitle>Histórico de Ligações — {menteeName}</DialogTitle>
             <DialogDescription>{callRecords.length} ligação{callRecords.length !== 1 ? 'ões' : ''} registrada{callRecords.length !== 1 ? 's' : ''}</DialogDescription>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={async () => {
+                  toast.info('Buscando gravações travadas no Daily...')
+                  try {
+                    const res = await fetch('/api/calls/recover-stuck-recordings', { method: 'POST' })
+                    const data = await res.json()
+                    if (res.ok) {
+                      toast.success(data.message || `${data.recovered} gravações recuperadas`)
+                      // Reload call records
+                      const supabase = createClient()
+                      const { data: calls } = await supabase
+                        .from('call_records')
+                        .select('*')
+                        .eq('mentee_id', menteeId)
+                        .order('started_at', { ascending: false })
+                      if (calls) setCallRecords(calls as unknown as CallRecord[])
+                    } else {
+                      toast.error(data.error || 'Erro ao recuperar gravações')
+                    }
+                  } catch {
+                    toast.error('Erro de rede')
+                  }
+                }}
+                className="text-[10px] text-accent hover:underline self-start mt-1"
+              >
+                🔧 Recuperar gravações travadas (admin)
+              </button>
+            )}
           </DialogHeader>
 
           <div className="overflow-y-auto max-h-[55vh] space-y-0">

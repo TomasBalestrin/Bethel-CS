@@ -150,7 +150,13 @@ export default async function EtapasMentoriaPage() {
   // anyone who can attend a channel = specialists (Principal) + users assigned to a department (Comercial/Marketing/Gestão)
   const DEPT_LABEL: Record<string, string> = { comercial: 'Comercial', marketing: 'Marketing', gestao: 'Gestão' }
   const attendantIds = new Set<string>()
+  // Any profile that OWNS at least one mentee is a "Principal" attendant,
+  // regardless of role. Carla may be role='admin' but still owns mentees —
+  // she must appear in the attendant filter.
+  menteeList.forEach((m) => { if (m.created_by) attendantIds.add(m.created_by) })
+  // Also include role='especialista' profiles even if they have no mentees yet
   especialistas.forEach((s) => attendantIds.add(s.id))
+  // And dept-assigned users for non-Principal channels
   deptAssignments.forEach((d) => attendantIds.add(d.user_id))
   const userDepts = new Map<string, string[]>()
   deptAssignments.forEach((d) => {
@@ -158,12 +164,15 @@ export default async function EtapasMentoriaPage() {
     arr.push(DEPT_LABEL[d.department] ?? d.department)
     userDepts.set(d.user_id, arr)
   })
+  const ownerIds = new Set<string>()
+  menteeList.forEach((m) => { if (m.created_by) ownerIds.add(m.created_by) })
   const attendants = Array.from(attendantIds)
     .map((id) => {
       const profile = allProfiles.find((p) => p.id === id)
       if (!profile) return null
       const channels: string[] = []
-      if (profile.role === 'especialista') channels.push('Principal')
+      // "Principal" applies to anyone who owns at least one mentee OR has the especialista role
+      if (profile.role === 'especialista' || ownerIds.has(id)) channels.push('Principal')
       const depts = userDepts.get(id) ?? []
       channels.push(...depts)
       return { id, full_name: profile.full_name, channels }

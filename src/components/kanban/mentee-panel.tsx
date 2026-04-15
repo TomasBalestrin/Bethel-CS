@@ -350,6 +350,56 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, onTransitionT
   const [chatUnreads, setChatUnreads] = useState<Record<string, number>>({ principal: 0, comercial: 0, marketing: 0, gestao: 0 })
   const [activeTab, setActiveTab] = useState('info')
 
+  // ─── Channel signatures (dynamic from department_assignments) ───
+  // Principal: "Canal do Especialista <Nome do dono>"
+  // Comercial: "Consultora <Nome assignee>"
+  // Marketing: "Consultor <Nome assignee>"
+  // Gestão:    "Consultora <Nome assignee>"
+  const [deptNames, setDeptNames] = useState<Record<string, string>>({ comercial: '', marketing: '', gestao: '' })
+  useEffect(() => {
+    const supabase = createClient()
+    let cancelled = false
+    ;(async () => {
+      const { data: assignments } = await supabase
+        .from('department_assignments')
+        .select('user_id, department')
+      const userIds = Array.from(new Set((assignments ?? []).map((a) => a.user_id)))
+      if (userIds.length === 0) return
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds)
+      if (cancelled) return
+      const nameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name as string]))
+      const byDept: Record<string, string> = { comercial: '', marketing: '', gestao: '' }
+      ;(assignments ?? []).forEach((a) => {
+        if (!byDept[a.department]) {
+          const fullName = nameById.get(a.user_id) ?? ''
+          byDept[a.department] = fullName.split(' ')[0] ?? '' // first name only
+        }
+      })
+      setDeptNames(byDept)
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  function buildSignature(channel: string): string {
+    if (channel === 'principal') {
+      const ownerFirst = (specialistName ?? '').split(' ')[0]
+      return ownerFirst ? `Canal do Especialista ${ownerFirst}` : 'Canal do Especialista'
+    }
+    const titleByChannel: Record<string, string> = {
+      comercial: 'Consultora',
+      marketing: 'Consultor',
+      gestao: 'Consultora',
+    }
+    const title = titleByChannel[channel] ?? ''
+    const name = deptNames[channel] ?? ''
+    if (title && name) return `${title} ${name}`
+    if (name) return name
+    return title
+  }
+
   // Fetch unread counts per channel on mount
   useEffect(() => {
     const supabase = createClient()
@@ -461,10 +511,10 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, onTransitionT
       </ScrollArea>
       {/* Chat tabs — outside ScrollArea (each manages its own scroll) */}
       {[
-        { value: 'chat-principal', channel: 'principal', signature: 'Canal do especialista' },
-        { value: 'chat-comercial', channel: 'comercial', signature: 'Hannah' },
-        { value: 'chat-marketing', channel: 'marketing', signature: 'Matheus' },
-        { value: 'chat-gestao', channel: 'gestao', signature: 'Keyth' },
+        { value: 'chat-principal', channel: 'principal' },
+        { value: 'chat-comercial', channel: 'comercial' },
+        { value: 'chat-marketing', channel: 'marketing' },
+        { value: 'chat-gestao', channel: 'gestao' },
       ].map((chat) => (
         <TabsContent key={chat.value} value={chat.value} className={`flex-1 overflow-hidden ${activeTab !== chat.value ? 'hidden' : ''}`}>
           <ErrorBoundary><TabChat
@@ -483,7 +533,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, onTransitionT
               onMenteeUpdated?.({ ...mentee, active_sessions: updated, has_active_session: updated.length > 0 })
             }}
             channel={chat.channel}
-            signatureName={chat.signature}
+            signatureName={buildSignature(chat.channel)}
           /></ErrorBoundary>
         </TabsContent>
       ))}

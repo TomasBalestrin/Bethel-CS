@@ -60,8 +60,10 @@ export async function createTask(data: {
   description?: string
   notes?: string
   due_date?: string
+  due_at?: string
   mentee_id?: string
   column_id?: string
+  assigned_to?: string
 }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -79,7 +81,7 @@ export async function createTask(data: {
     if (firstCol) columnId = firstCol.id
   }
 
-  const { data: task, error } = await supabase.from('tasks').insert({
+  const insertData: Record<string, unknown> = {
     title: data.title,
     description: data.description || null,
     notes: data.notes || null,
@@ -87,7 +89,12 @@ export async function createTask(data: {
     mentee_id: data.mentee_id || null,
     column_id: columnId,
     created_by: user.id,
-  }).select().single()
+  }
+  if (data.due_at) insertData.due_at = data.due_at
+  if (data.assigned_to) insertData.assigned_to = data.assigned_to
+  else insertData.assigned_to = user.id // default to creator
+
+  const { data: task, error } = await supabase.from('tasks').insert(insertData).select().single()
 
   if (error) return { error: error.message, task: null }
   revalidatePath('/tarefas')
@@ -99,8 +106,10 @@ export async function updateTask(id: string, data: {
   description?: string | null
   notes?: string | null
   due_date?: string | null
+  due_at?: string | null
   column_id?: string | null
   completed_at?: string | null
+  assigned_to?: string | null
 }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()

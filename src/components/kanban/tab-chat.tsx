@@ -105,8 +105,11 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
   const [taskTitle, setTaskTitle] = useState('')
   const [taskDesc, setTaskDesc] = useState('')
   const [taskDueDate, setTaskDueDate] = useState('')
+  const [taskDueTime, setTaskDueTime] = useState('18:00')
+  const [taskAssignedTo, setTaskAssignedTo] = useState<string>('')
   const [taskNotes, setTaskNotes] = useState('')
   const [taskLoading] = useState(false)
+  const [profilesList, setProfilesList] = useState<{ id: string; full_name: string }[]>([])
 
   // Message windowing
   const [visibleLimit, setVisibleLimit] = useState(80)
@@ -943,7 +946,18 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
             size="sm"
             variant="outline"
             className="h-8 gap-1.5 text-xs"
-            onClick={() => setTaskFormOpen(true)}
+            onClick={async () => {
+              setTaskFormOpen(true)
+              // Load profiles list + pre-select default assignee (mentee's specialist or current user)
+              if (profilesList.length === 0) {
+                const supabase = createClient()
+                const { data } = await supabase.from('profiles').select('id, full_name').order('full_name')
+                if (data) setProfilesList(data)
+              }
+              if (!taskAssignedTo) {
+                setTaskAssignedTo(specialistId || '')
+              }
+            }}
           >
             <ClipboardCheck className="h-3 w-3" />
             <span className="hidden sm:inline">Tarefa</span>
@@ -1585,7 +1599,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
       </Dialog>
 
       {/* Create task dialog */}
-      <Dialog open={taskFormOpen} onOpenChange={(open) => { if (!open) { setTaskFormOpen(false); setTaskTitle(''); setTaskDesc(''); setTaskDueDate(''); setTaskNotes('') } }}>
+      <Dialog open={taskFormOpen} onOpenChange={(open) => { if (!open) { setTaskFormOpen(false); setTaskTitle(''); setTaskDesc(''); setTaskDueDate(''); setTaskDueTime('18:00'); setTaskNotes('') } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Nova tarefa para {menteeName}</DialogTitle>
@@ -1593,10 +1607,17 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           </DialogHeader>
           <form onSubmit={async (e) => {
             e.preventDefault()
-            // Optimistic: close dialog immediately
-            const savedTitle = taskTitle; const savedDesc = taskDesc; const savedNotes = taskNotes; const savedDueDate = taskDueDate
+            // Build due_at from date + time (local Brasília TZ -03:00)
+            const savedTitle = taskTitle
+            const savedDesc = taskDesc
+            const savedNotes = taskNotes
+            const savedDueDate = taskDueDate
+            const savedDueTime = taskDueTime || '18:00'
+            const savedAssigned = taskAssignedTo || undefined
+            const savedDueAt = savedDueDate ? `${savedDueDate}T${savedDueTime}:00-03:00` : undefined
+
             setTaskFormOpen(false)
-            setTaskTitle(''); setTaskDesc(''); setTaskDueDate(''); setTaskNotes('')
+            setTaskTitle(''); setTaskDesc(''); setTaskDueDate(''); setTaskDueTime('18:00'); setTaskNotes('')
             toast.success('Tarefa criada')
 
             const res = await createTask({
@@ -1604,6 +1625,8 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
               description: savedDesc || undefined,
               notes: savedNotes || undefined,
               due_date: savedDueDate || undefined,
+              due_at: savedDueAt,
+              assigned_to: savedAssigned,
               mentee_id: menteeId,
             })
             if (res.error) {
@@ -1619,8 +1642,27 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
               <Textarea value={taskDesc} onChange={(e) => setTaskDesc(e.target.value)} className="min-h-[80px] resize-y" placeholder="Descreva a tarefa..." />
             </div>
             <div className="space-y-1">
-              <Label>Data de entrega</Label>
-              <Input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} />
+              <Label>Responsável</Label>
+              <select
+                value={taskAssignedTo}
+                onChange={(e) => setTaskAssignedTo(e.target.value)}
+                className="w-full h-9 rounded-md border border-border bg-background px-3 text-sm"
+              >
+                <option value="">— Selecione —</option>
+                {profilesList.map((p) => (
+                  <option key={p.id} value={p.id}>{p.full_name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label>Data de entrega</Label>
+                <Input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Horário</Label>
+                <Input type="time" value={taskDueTime} onChange={(e) => setTaskDueTime(e.target.value)} />
+              </div>
             </div>
             <div className="space-y-1">
               <Label>Observações</Label>

@@ -289,7 +289,10 @@ export async function POST(request: NextRequest) {
 
       if (insertErr) {
         console.error('[WPP Webhook] INSERT FAILED:', insertErr.message, insertErr.details, insertErr.hint)
-        return NextResponse.json({ ok: true })
+        // Return 500 so NextTrack retries the webhook delivery. Previously this
+        // returned 200 which caused messages to be silently lost whenever a DB
+        // change introduced a schema mismatch.
+        return NextResponse.json({ error: insertErr.message }, { status: 500 })
       }
 
       console.log('[WPP Webhook] INSERT SUCCESS ✓')

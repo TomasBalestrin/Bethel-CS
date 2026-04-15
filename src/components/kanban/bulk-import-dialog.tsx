@@ -114,12 +114,38 @@ const ACTION_PLAN_FIELDS: FieldDef[] = [
   { key: 'num_colaboradores', label: 'Nº de colaboradores', required: false, type: 'text', aliases: ['numero de colaboradores', 'n de colaboradores'] },
 ]
 
-// ─── Field Definitions: Stages ──────────────────────────────────────────────
+// ─── Field Definitions: Stages (Gestão de Saídas — accepts ALL mentee fields) ──
+// Identification + stage are required. All other mentee fields are optional and
+// used to create/update the mentee in the Saídas kanban.
 
 const STAGE_FIELDS: FieldDef[] = [
+  // Identification
   { key: '__match_value', label: 'Nome (Identificação primária)', required: true, type: 'text', aliases: ['nome', 'nome completo', 'name', 'mentorado'] },
   { key: '__match_phone', label: 'Telefone (Identificação secundária)', required: false, type: 'text', aliases: ['telefone', 'whatsapp', 'phone', 'cel', 'celular', 'tel'] },
-  { key: '__stage_name', label: 'Nome da Etapa / Situação', required: true, type: 'text', aliases: ['etapa', 'stage', 'fase', 'funil', 'status', 'etapa atual', 'estagio', 'situacao', 'situação', 'situacao atual', 'situação atual'] },
+  { key: '__stage_name', label: 'Nome da Etapa / Situação', required: true, type: 'text', aliases: ['etapa', 'stage', 'fase', 'funil', 'etapa atual', 'estagio', 'situacao', 'situação', 'situacao atual', 'situação atual'] },
+  // Contact / identity
+  { key: 'email', label: 'Email', required: false, type: 'text', aliases: ['email', 'e-mail', 'mail', 'e mail'] },
+  { key: 'instagram', label: '@Instagram', required: false, type: 'text', aliases: ['instagram', '@instagram', 'insta', 'ig', '@'] },
+  { key: 'cpf', label: 'CPF', required: false, type: 'text', aliases: ['cpf', 'documento', 'doc'] },
+  { key: 'city', label: 'Cidade', required: false, type: 'text', aliases: ['cidade', 'city', 'municipio', 'município'] },
+  { key: 'state', label: 'Estado (UF)', required: false, type: 'state', aliases: ['estado', 'uf', 'state', 'uf estado'] },
+  { key: 'birth_date', label: 'Aniversário', required: false, type: 'date', aliases: ['aniversario', 'aniversário', 'nascimento', 'data nascimento', 'dt nascimento', 'birthday', 'birth date'] },
+  // Mentoria
+  { key: 'product_name', label: 'Produto Contratado', required: false, type: 'text', aliases: ['produto', 'product', 'produto contratado', 'plano', 'mentoria', 'tipo de produto'] },
+  { key: 'start_date', label: 'Data de Entrada', required: false, type: 'date', aliases: ['entrada', 'inicio', 'início', 'start', 'data entrada', 'data início', 'start date', 'data de entrada', 'data inicio'] },
+  { key: 'end_date', label: 'Data de Encerramento', required: false, type: 'date', aliases: ['encerramento', 'fim', 'end', 'data fim', 'validade', 'data encerramento', 'end date', 'data de encerramento'] },
+  { key: 'contract_validity', label: 'Período do Contrato', required: false, type: 'text', aliases: ['período', 'periodo', 'contract validity', 'duração', 'duracao', 'vigencia', 'vigência'] },
+  { key: 'closer_name', label: 'Closer (Vendedor)', required: false, type: 'text', aliases: ['closer', 'vendedor', 'seller', 'vendedor que vendeu', 'consultor', 'closer responsável'] },
+  { key: 'specialist_name', label: 'Especialista Responsável', required: false, type: 'text', aliases: ['especialista', 'especialista responsável', 'especialista responsavel', 'specialist', 'cs responsável', 'cs responsavel', 'responsável', 'responsavel'] },
+  { key: 'source', label: 'Tráfego / Origem', required: false, type: 'text', aliases: ['trafego', 'tráfego', 'trafego com movi', 'tráfego com movi', 'origem', 'source', 'movi'] },
+  // Negócio
+  { key: 'niche', label: 'Nicho', required: false, type: 'text', aliases: ['nicho', 'niche', 'segmento', 'área de atuação'] },
+  { key: 'faturamento_antes_mentoria', label: 'Faturamento Mês 1', required: false, type: 'number', aliases: ['faturamento inicial', 'fat inicial', 'faturamento antes', 'receita inicial', 'fat antes mentoria', 'faturamento antes da mentoria', 'fat 1', 'fat 1 mes', 'fat 1. mes', 'fat 1 mês', 'fat. 1 mes'] },
+  { key: 'faturamento_mes_anterior', label: 'Faturamento Mês 2', required: false, type: 'number', aliases: ['faturamento mês anterior', 'fat mês anterior', 'fat mes anterior', 'faturamento mes anterior', 'fat 2', 'fat 2 mes', 'fat. 2 mes', 'fat 2 mês', 'fat. 2 mês'] },
+  { key: 'faturamento_atual', label: 'Faturamento Mês 3', required: false, type: 'number', aliases: ['faturamento atual', 'fat atual', 'faturamento hoje', 'receita atual', 'fat 3', 'fat 3 mes', 'fat 3 mês', 'fat. 3 mes'] },
+  { key: 'webhook_notes', label: 'Integrações (Nextrack/Unia)', required: false, type: 'text', aliases: ['nextrack', 'unia', 'integração', 'integracao', 'integracoes'] },
+  // Observações
+  { key: 'notes', label: 'Observações', required: false, type: 'text', aliases: ['observações', 'observacoes', 'obs', 'notes', 'anotações', 'notas'] },
 ]
 
 // ─── Field Definitions: Delivery Events ───────────────────────────────────
@@ -316,10 +342,19 @@ export function BulkImportDialog({ open, onOpenChange, specialists = [], isAdmin
     } else if (activeTab === 'stages') {
       const mapped = rows.map((raw) => {
         const out = getMappedRow(raw)
+        // Extract ALL extra mentee fields (non-__* keys) so the backend can
+        // create/update the mentee with full data in the Saídas import.
+        const extraFields: Record<string, string | number> = {}
+        for (const [k, v] of Object.entries(out)) {
+          if (!k.startsWith('__') && v !== '' && v !== undefined && v !== null) {
+            extraFields[k] = v
+          }
+        }
         return {
           matchValue: String(out.__match_value ?? ''),
           matchPhone: out.__match_phone ? String(out.__match_phone) : undefined,
           stageName: String(out.__stage_name ?? ''),
+          fields: extraFields,
         }
       })
       res = await bulkImportStages({ rows: mapped, matchField, createIfMissing })

@@ -705,9 +705,45 @@ export async function bulkImportActionPlans(input: BulkActionPlanInput): Promise
 // ─── Bulk Import: Stage Assignments ──────────────────────────────────────────
 
 interface BulkStageInput {
-  rows: { matchValue: string; matchPhone?: string; stageName: string }[]
+  rows: {
+    matchValue: string
+    matchPhone?: string
+    stageName: string
+    fields?: Record<string, string | number> // extra mentee fields (from full import)
+  }[]
   matchField: 'full_name' | 'phone' | 'email'
   createIfMissing?: boolean // if true, create mentee when not found (used in Saídas import)
+}
+
+// Parse BRL-formatted revenue strings (R$ 50.000,00) or raw numbers into numeric value
+function parseRevenueValue(val: unknown): number | null {
+  if (val === null || val === undefined || val === '') return null
+  if (typeof val === 'number') return val
+  const cleaned = String(val)
+    .replace(/[R$\s.]/g, '')
+    .replace(',', '.')
+  const num = parseFloat(cleaned)
+  return isNaN(num) ? null : num
+}
+
+// Parse dates: accepts YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, or Date objects
+function parseDate(val: unknown): string | null {
+  if (!val) return null
+  if (val instanceof Date) return val.toISOString().slice(0, 10)
+  const s = String(val).trim()
+  if (!s) return null
+  // ISO yyyy-mm-dd
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10)
+  // dd/mm/yyyy or dd-mm-yyyy
+  const m = s.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/)
+  if (m) {
+    const d = m[1].padStart(2, '0')
+    const mo = m[2].padStart(2, '0')
+    let y = m[3]
+    if (y.length === 2) y = '20' + y
+    return `${y}-${mo}-${d}`
+  }
+  return null
 }
 
 export async function bulkImportStages(input: BulkStageInput): Promise<BulkImportResult> {
@@ -715,18 +751,31 @@ export async function bulkImportStages(input: BulkStageInput): Promise<BulkImpor
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { total: input.rows.length, created: 0, errors: [{ row: 0, name: '', error: 'Não autenticado' }] }
 
-  const { data: mentees } = await supabase.from('mentees').select('id, full_name, phone, email')
+  const { data: mentees } = await supabase.from('mentees').select('*')
   const { data: stages } = await supabase.from('kanban_stages').select('id, name, type')
+  // Load profiles to resolve specialist_name (text) → created_by (uuid)
+  const { data: profiles } = await supabase.from('profiles').select('id, full_name')
 
   if (!mentees || !stages) return { total: input.rows.length, created: 0, errors: [{ row: 0, name: '', error: 'Erro ao carregar dados' }] }
 
   const nameMap = new Map<string, string>()
   const phoneMap = new Map<string, string>()
   const emailMap = new Map<string, string>()
+  const menteeById = new Map<string, Record<string, unknown>>()
   mentees.forEach((m) => {
     nameMap.set(m.full_name.toLowerCase().trim(), m.id)
     if (m.phone) phoneMap.set(m.phone.replace(/\D/g, ''), m.id)
     if (m.email) emailMap.set(m.email.toLowerCase().trim(), m.id)
+    menteeById.set(m.id, m as Record<string, unknown>)
+  })
+
+  // Build specialist name lookup (case-insensitive, first word or full match)
+  const specialistByName = new Map<string, string>()
+  profiles?.forEach((p) => {
+    if (!p.full_name) return
+    specialistByName.set(p.full_name.toLowerCase().trim(), p.id)
+    const firstName = p.full_name.split(' ')[0].toLowerCase().trim()
+    if (firstName && !specialistByName.has(firstName)) specialistByName.set(firstName, p.id)
   })
 
   const stageMap = new Map<string, { id: string; type: KanbanType }>()
@@ -814,30 +863,71 @@ export async function bulkImportStages(input: BulkStageInput): Promise<BulkImpor
 
     if (!stage) { errors.push({ row: rowNum, name: matchValue, error: `Etapa "${stageName}" não encontrada` }); continue }
 
-    // If mentee not found and createIfMissing is enabled, create a minimal mentee
+    // Build mentee fields from CSV extra columns (merged with defaults)
+    const csvFields = input.rows[i].fields || {}
+    const parsedFields: Record<string, unknown> = {}
+
+    // Text fields
+    const textKeys = ['email', 'instagram', 'cpf', 'city', 'state', 'product_name', 'contract_validity', 'closer_name', 'source', 'niche', 'webhook_notes', 'notes']
+    textKeys.forEach((k) => {
+      const v = csvFields[k]
+      if (v !== undefined && v !== null && String(v).trim() !== '') {
+        parsedFields[k] = String(v).trim()
+      }
+    })
+
+    // Date fields
+    const dateKeys = ['start_date', 'end_date', 'birth_date']
+    dateKeys.forEach((k) => {
+      const v = parseDate(csvFields[k])
+      if (v) parsedFields[k] = v
+    })
+
+    // Revenue (numeric)
+    const revenueKeys = ['faturamento_antes_mentoria', 'faturamento_mes_anterior', 'faturamento_atual']
+    revenueKeys.forEach((k) => {
+      const v = parseRevenueValue(csvFields[k])
+      if (v !== null) parsedFields[k] = v
+    })
+
+    // Specialist name → created_by uuid
+    const specName = csvFields.specialist_name
+    if (specName) {
+      const specKey = String(specName).toLowerCase().trim()
+      const specId = specialistByName.get(specKey) ?? specialistByName.get(specKey.split(' ')[0])
+      if (specId) parsedFields.created_by = specId
+    }
+
+    // Determine mentee status based on stage name
+    const stageLower = stageName.toLowerCase()
+    const menteeStatus = stage.type === 'exit' && stageLower.includes('cancelad')
+      ? 'cancelado'
+      : stage.type === 'exit' && (stageLower.includes('encerrad') || stageLower.includes('finalizad') || stageLower.includes('conclu'))
+        ? 'concluido'
+        : 'ativo'
+
+    // ── Path 1: mentee not found → create if allowed ──
     if (!menteeId && input.createIfMissing) {
       const phoneDigits = (matchPhone || '').replace(/\D/g, '')
-      // Phone is required by schema — use placeholder unique value if missing
       const phoneToUse = phoneDigits || `000000000000${Date.now()}${i}`
-      const stageLower = stageName.toLowerCase()
-      const menteeStatus = stage.type === 'exit' && stageLower.includes('cancelad')
-        ? 'cancelado'
-        : stage.type === 'exit' && (stageLower.includes('encerrad') || stageLower.includes('finalizad') || stageLower.includes('conclu'))
-          ? 'concluido'
-          : 'ativo'
+
+      const insertData: Record<string, unknown> = {
+        product_name: parsedFields.product_name || 'Importado',
+        start_date: parsedFields.start_date || new Date().toISOString().slice(0, 10),
+        priority_level: 1,
+        created_by: parsedFields.created_by || user.id,
+        ...parsedFields, // overrides product_name/start_date/created_by if present
+        // Force these fields regardless of CSV
+        full_name: matchValue.trim(),
+        phone: phoneToUse,
+        status: menteeStatus,
+        kanban_type: stage.type,
+        current_stage_id: stage.id,
+      }
+
       const { data: newMentee, error: createError } = await supabase
         .from('mentees')
-        .insert({
-          full_name: matchValue.trim(),
-          phone: phoneToUse,
-          product_name: 'Importado',
-          start_date: new Date().toISOString().slice(0, 10),
-          status: menteeStatus,
-          kanban_type: stage.type,
-          current_stage_id: stage.id,
-          priority_level: 1,
-          created_by: user.id,
-        })
+        .insert(insertData as never)
         .select('id')
         .single()
 
@@ -846,7 +936,6 @@ export async function bulkImportStages(input: BulkStageInput): Promise<BulkImpor
         continue
       }
 
-      // Cache newly created mentee for subsequent rows
       nameMap.set(matchValue.toLowerCase().trim(), newMentee.id)
       if (phoneDigits) phoneMap.set(phoneDigits, newMentee.id)
       created++
@@ -855,9 +944,24 @@ export async function bulkImportStages(input: BulkStageInput): Promise<BulkImpor
 
     if (!menteeId) { errors.push({ row: rowNum, name: matchValue, error: 'Mentorado não encontrado' }); continue }
 
+    // ── Path 2: mentee exists → update only NULL/empty fields (non-destructive) ──
+    const existing = menteeById.get(menteeId) || {}
+    const updateData: Record<string, unknown> = {
+      current_stage_id: stage.id,
+      kanban_type: stage.type,
+      updated_at: new Date().toISOString(),
+    }
+    // Only fill fields that are currently null/empty in DB
+    for (const [k, v] of Object.entries(parsedFields)) {
+      const existingVal = existing[k]
+      if (existingVal === null || existingVal === undefined || existingVal === '') {
+        updateData[k] = v
+      }
+    }
+
     const { error } = await supabase
       .from('mentees')
-      .update({ current_stage_id: stage.id, kanban_type: stage.type, updated_at: new Date().toISOString() })
+      .update(updateData as never)
       .eq('id', menteeId)
 
     if (error) { errors.push({ row: rowNum, name: matchValue, error: error.message }); continue }

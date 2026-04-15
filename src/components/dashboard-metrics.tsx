@@ -30,6 +30,7 @@ import {
   ChevronRight,
 } from 'lucide-react'
 import { MenteeFilters, EMPTY_FILTERS, type MenteeFilterValues } from '@/components/mentee-filters'
+import { UpcomingTasksCard } from '@/components/upcoming-tasks-card'
 
 interface DashboardMetricsProps {
   userName: string
@@ -46,6 +47,7 @@ interface DashboardMetricsProps {
     funisOrigem: string[]
     closers: string[]
     nichos: string[]
+    produtos?: string[]
   }
   section2: {
     totalMentees: number
@@ -252,6 +254,9 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
 
   return (
     <div className="space-y-6">
+      {/* Upcoming tasks alert (auto-hides when no tasks) */}
+      <UpcomingTasksCard />
+
       {/* Birthday Banner */}
       {props.birthdayMentees.length > 0 && (
         <section className="rounded-xl border border-accent/30 bg-accent/10 p-4 shadow-sm animate-fade-in">

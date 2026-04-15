@@ -50,7 +50,7 @@ interface KanbanBoardProps {
   existingMentees: { id: string; full_name: string }[]
   isAdmin?: boolean
   specialists?: { id: string; full_name: string }[]
-  filterOptions?: { funisOrigem: string[]; closers: string[]; nichos: string[]; especialistas?: { id: string; full_name: string }[] }
+  filterOptions?: { funisOrigem: string[]; closers: string[]; nichos: string[]; produtos?: string[]; especialistas?: { id: string; full_name: string }[] }
 }
 
 export function KanbanBoard({
@@ -184,6 +184,7 @@ export function KanbanBoard({
     if (advFilters.funilOrigem && m.funnel_origin !== advFilters.funilOrigem) return false
     if (advFilters.closer && m.closer_name !== advFilters.closer) return false
     if (advFilters.especialista && m.created_by !== advFilters.especialista) return false
+    if (advFilters.produto && m.product_name !== advFilters.produto) return false
     if (advFilters.nicho && m.niche !== advFilters.nicho) return false
     if (advFilters.estado && m.state !== advFilters.estado) return false
     if (advFilters.fatInicialMin && (m.faturamento_antes_mentoria ?? 0) < Number(advFilters.fatInicialMin)) return false

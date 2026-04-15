@@ -80,6 +80,8 @@ export function TasksBoard({ columns, tasks: initialTasks, mentees, attachments:
   const [description, setDescription] = useState('')
   const [notes, setNotes] = useState('')
   const [dueDate, setDueDate] = useState('')
+  const [dueTime, setDueTime] = useState('18:00')
+  const [assignedTo, setAssignedTo] = useState('')
   const [menteeId, setMenteeId] = useState('')
   const [columnId, setColumnId] = useState('')
   const [taskFiles, setTaskFiles] = useState<File[]>([])
@@ -91,7 +93,7 @@ export function TasksBoard({ columns, tasks: initialTasks, mentees, attachments:
   const [editColName, setEditColName] = useState('')
 
   function resetForm() {
-    setTitle(''); setDescription(''); setNotes(''); setDueDate(''); setMenteeId(''); setColumnId(''); setTaskFiles([])
+    setTitle(''); setDescription(''); setNotes(''); setDueDate(''); setDueTime('18:00'); setAssignedTo(''); setMenteeId(''); setColumnId(''); setTaskFiles([])
     setEditingTask(null)
   }
 
@@ -101,6 +103,16 @@ export function TasksBoard({ columns, tasks: initialTasks, mentees, attachments:
     setDescription(task.description ?? '')
     setNotes(task.notes ?? '')
     setDueDate(task.due_date ?? '')
+    const dueAtRaw = (task as unknown as { due_at?: string | null }).due_at
+    if (dueAtRaw) {
+      const d = new Date(dueAtRaw)
+      const hh = String(d.getHours()).padStart(2, '0')
+      const mm = String(d.getMinutes()).padStart(2, '0')
+      setDueTime(`${hh}:${mm}`)
+    } else {
+      setDueTime('18:00')
+    }
+    setAssignedTo((task as unknown as { assigned_to?: string | null }).assigned_to ?? '')
     setMenteeId(task.mentee_id ?? '')
     setColumnId(task.column_id ?? '')
     setShowForm(true)
@@ -119,16 +131,21 @@ export function TasksBoard({ columns, tasks: initialTasks, mentees, attachments:
 
     let newTaskId: string | null = null
 
+    const dueAt = dueDate ? `${dueDate}T${dueTime || '18:00'}:00-03:00` : null
+
     if (editingTask) {
       const res = await updateTask(editingTask.id, {
         title, description: description || null, notes: notes || null,
-        due_date: dueDate || null, column_id: columnId || null,
+        due_date: dueDate || null, due_at: dueAt, column_id: columnId || null,
+        assigned_to: assignedTo || null,
       })
       if (res.error) { toast.error(res.error); setLoading(false); return }
       setTasks((prev) => prev.map((t) => t.id === editingTask.id ? { ...t, title, description, notes, due_date: dueDate, column_id: columnId } : t))
     } else {
       const res = await createTask({
         title, description, notes, due_date: dueDate,
+        due_at: dueAt ?? undefined,
+        assigned_to: assignedTo || undefined,
         mentee_id: menteeId || undefined, column_id: columnId || undefined,
       })
       if (res.error) { toast.error(res.error); setLoading(false); return }
@@ -301,6 +318,23 @@ export function TasksBoard({ columns, tasks: initialTasks, mentees, attachments:
               <div className="space-y-1">
                 <Label>Data de entrega</Label>
                 <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Horário</Label>
+                <Input type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Responsável</Label>
+                <Select value={assignedTo} onValueChange={setAssignedTo}>
+                  <SelectTrigger><SelectValue placeholder="— Selecione —" /></SelectTrigger>
+                  <SelectContent>
+                    {specialists.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1">
                 <Label>Coluna</Label>

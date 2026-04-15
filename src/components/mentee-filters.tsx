@@ -52,6 +52,7 @@ export interface MenteeFilterValues {
   funilOrigem: string
   closer: string
   especialista: string
+  produto: string
   mesAniversario: string
   numColaboradores: string
   estado: string
@@ -68,6 +69,7 @@ export const EMPTY_FILTERS: MenteeFilterValues = {
   funilOrigem: '',
   closer: '',
   especialista: '',
+  produto: '',
   mesAniversario: '',
   numColaboradores: '',
   estado: '',
@@ -84,6 +86,7 @@ interface MenteeFiltersProps {
     funisOrigem: string[]
     closers: string[]
     nichos: string[]
+    produtos?: string[]
     especialistas?: { id: string; full_name: string }[]
   }
 }
@@ -259,6 +262,22 @@ export function MenteeFilters({ filters, onFilterChange, onClearAll, options }: 
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Produto contratado */}
+            {options.produtos && options.produtos.length > 0 && (
+              <div className="space-y-1">
+                <Label className="text-xs">Produto</Label>
+                <Select value={filters.produto || '__all__'} onValueChange={(v) => onFilterChange('produto', v === '__all__' ? '' : v)}>
+                  <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Todos</SelectItem>
+                    {options.produtos.map((p) => (
+                      <SelectItem key={p} value={p}>{p}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Mês de início da mentoria */}
             <div className="space-y-1">

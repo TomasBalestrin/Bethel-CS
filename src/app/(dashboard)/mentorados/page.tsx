@@ -77,6 +77,7 @@ export default async function MentoradosPage() {
   const funisOrigem = Array.from(new Set(allMenteesData.map((m) => m.funnel_origin).filter(Boolean))) as string[]
   const closers = Array.from(new Set(allMenteesData.map((m) => m.closer_name).filter(Boolean))) as string[]
   const nichos = Array.from(new Set(allMenteesData.map((m) => m.niche).filter(Boolean))) as string[]
+  const produtos = Array.from(new Set(allMenteesData.map((m) => m.product_name).filter(Boolean))) as string[]
 
   const colaboradoresMap: Record<string, string> = {}
   actionPlans?.forEach((ap) => {
@@ -96,7 +97,7 @@ export default async function MentoradosPage() {
       isAdmin={userRole === 'admin'}
       specialists={allProfiles}
       stages={stages ?? []}
-      filterOptions={{ funisOrigem: funisOrigem.sort(), closers: closers.sort(), nichos: nichos.sort(), especialistas: especialistasOnly }}
+      filterOptions={{ funisOrigem: funisOrigem.sort(), closers: closers.sort(), nichos: nichos.sort(), produtos: produtos.sort(), especialistas: especialistasOnly }}
       colaboradoresMap={colaboradoresMap}
     />
   )

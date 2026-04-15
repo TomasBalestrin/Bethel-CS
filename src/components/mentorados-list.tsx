@@ -48,7 +48,7 @@ interface MentoradosListProps {
   isAdmin?: boolean
   specialists?: { id: string; full_name: string }[]
   stages?: Stage[]
-  filterOptions?: { funisOrigem: string[]; closers: string[]; nichos: string[]; especialistas?: { id: string; full_name: string }[] }
+  filterOptions?: { funisOrigem: string[]; closers: string[]; nichos: string[]; produtos?: string[]; especialistas?: { id: string; full_name: string }[] }
   colaboradoresMap?: Record<string, string>
 }
 
@@ -154,6 +154,9 @@ export function MentoradosList({
 
     // Especialista
     if (advFilters.especialista && m.created_by !== advFilters.especialista) return false
+
+    // Produto
+    if (advFilters.produto && m.product_name !== advFilters.produto) return false
 
     // Mês de aniversário
     if (advFilters.mesAniversario && m.birth_date) {

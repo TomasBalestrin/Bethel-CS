@@ -795,6 +795,12 @@ export async function bulkImportStages(input: BulkStageInput): Promise<BulkImpor
     // Pendência Financeira
     'pendencia financeira': 'pendencia financeira',
     'pendência financeira': 'pendencia financeira',
+    'pendencias financeiras': 'pendencia financeira',
+    'pendências financeiras': 'pendencia financeira',
+    'pendencia': 'pendencia financeira',
+    'pendência': 'pendencia financeira',
+    'pendencias': 'pendencia financeira',
+    'pendências': 'pendencia financeira',
     'inadimplente': 'pendencia financeira',
     'inadimplencia': 'pendencia financeira',
     'atraso': 'pendencia financeira',

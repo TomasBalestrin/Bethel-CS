@@ -1576,7 +1576,24 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                     {/* Transcription */}
                     <p className="text-xs text-muted-foreground mt-1">Transcrição:</p>
                     {call.transcription_status === 'ready' && call.transcription ? (
-                      <p className="text-xs text-foreground whitespace-pre-line bg-muted/50 rounded p-2 max-h-40 overflow-y-auto">{call.transcription}</p>
+                      <div className="relative group">
+                        <p className="text-xs text-foreground whitespace-pre-line bg-muted/50 rounded p-2 pr-16 max-h-40 overflow-y-auto">{call.transcription}</p>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(call.transcription || '')
+                              toast.success('Transcrição copiada')
+                            } catch {
+                              toast.error('Não foi possível copiar')
+                            }
+                          }}
+                          className="absolute top-1.5 right-1.5 text-[10px] px-2 py-0.5 rounded bg-background border border-border text-muted-foreground hover:text-accent hover:border-accent/40 transition-colors"
+                          title="Copiar transcrição"
+                        >
+                          Copiar
+                        </button>
+                      </div>
                     ) : call.transcription_status === 'processing' ? (
                       <div className="flex items-center gap-2">
                         <span className="flex items-center gap-1.5 text-xs text-muted-foreground">

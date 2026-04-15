@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -60,14 +60,27 @@ interface TasksBoardProps {
 }
 
 function isOverdue(task: Task): boolean {
-  if (!task.due_date || task.completed_at) return false
-  return new Date(task.due_date) < new Date(new Date().toISOString().split('T')[0])
+  const completedAt = (task as unknown as { completed_at?: string | null }).completed_at
+  if (completedAt) return false
+  const dueAt = (task as unknown as { due_at?: string | null }).due_at
+  if (dueAt) return new Date(dueAt).getTime() < Date.now()
+  if (!task.due_date) return false
+  // No time set → treat day as due at 18:00 local (consistent with TaskCard fallback)
+  return new Date(`${task.due_date}T18:00:00-03:00`).getTime() < Date.now()
 }
 
 export function TasksBoard({ columns, tasks: initialTasks, mentees, attachments: initialAttachments, specialists, isAdmin }: TasksBoardProps) {
   const router = useRouter()
   const [tasks, setTasks] = useState(initialTasks)
   const [attachments] = useState(initialAttachments)
+
+  // Tick every minute so task urgency (normal → due_soon → overdue) updates
+  // without needing a manual refresh.
+  const [, setNowTick] = useState(0)
+  useEffect(() => {
+    const id = setInterval(() => setNowTick((n) => n + 1), 60 * 1000)
+    return () => clearInterval(id)
+  }, [])
   const [specialistFilter, setSpecialistFilter] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -513,24 +526,64 @@ function TaskCard({ task, mentees, onDetail, isOverdue: overdue }: {
 }) {
   const menteeName = task.mentee_id ? mentees.find((m) => m.id === task.mentee_id)?.full_name : null
 
+  // Resolve the effective deadline: prefer due_at (precise timestamp) and fall
+  // back to due_date @ 18:00 local for legacy rows. Then derive visual urgency.
+  const dueAtRaw = (task as unknown as { due_at?: string | null }).due_at
+  const completedAt = (task as unknown as { completed_at?: string | null }).completed_at
+  const dueTs: number | null = dueAtRaw
+    ? new Date(dueAtRaw).getTime()
+    : task.due_date
+      ? new Date(`${task.due_date}T18:00:00-03:00`).getTime()
+      : null
+
+  let urgency: 'overdue' | 'due_soon' | 'normal' = 'normal'
+  if (dueTs && !completedAt) {
+    const now = Date.now()
+    if (now > dueTs) urgency = 'overdue'
+    else if (dueTs - now <= 60 * 60 * 1000) urgency = 'due_soon' // <= 1h
+  }
+  // Respect the caller's isOverdue hint (board groups overdue tasks separately)
+  if (overdue) urgency = 'overdue'
+
+  // Format date + time for display
+  let dueLabel: string | null = null
+  if (dueAtRaw) {
+    const d = new Date(dueAtRaw)
+    dueLabel = `${d.toLocaleDateString('pt-BR')} às ${d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+  } else if (task.due_date) {
+    dueLabel = new Date(task.due_date).toLocaleDateString('pt-BR')
+  }
+
+  const cardClass =
+    urgency === 'overdue'
+      ? 'border-red-600/50 bg-red-600/15 hover:border-red-600/70'
+      : urgency === 'due_soon'
+      ? 'border-red-400/50 bg-red-400/10 hover:border-red-400/70'
+      : 'border-border bg-background hover:border-accent/30'
+
+  const dueClass =
+    urgency === 'overdue'
+      ? 'text-red-700 font-semibold'
+      : urgency === 'due_soon'
+      ? 'text-red-600 font-medium'
+      : 'text-muted-foreground'
+
   return (
     <div
       onClick={() => onDetail(task)}
-      className={`cursor-pointer rounded-lg border p-3 text-sm transition-all hover:shadow-md ${
-        overdue
-          ? 'border-destructive/30 bg-destructive/5 hover:border-destructive/50'
-          : 'border-border bg-background hover:border-accent/30'
-      }`}
+      className={`cursor-pointer rounded-lg border p-3 text-sm transition-all hover:shadow-md ${cardClass}`}
     >
       <p className="font-medium text-foreground leading-tight">{task.title}</p>
       {task.description && (
         <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{task.description}</p>
       )}
       <div className="flex items-center gap-2 mt-2 flex-wrap">
-        {task.due_date && (
-          <span className={`inline-flex items-center gap-1 text-[10px] ${overdue ? 'text-destructive font-medium' : 'text-muted-foreground'}`}>
+        {dueLabel && (
+          <span className={`inline-flex items-center gap-1 text-[10px] ${dueClass}`}>
             <Calendar className="h-3 w-3" />
-            {new Date(task.due_date).toLocaleDateString('pt-BR')}
+            {dueLabel}
+            {urgency === 'overdue' && ' · atrasada'}
+            {urgency === 'due_soon' && ' · em breve'}
           </span>
         )}
         {menteeName && (

@@ -158,6 +158,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   const funisOrigemOptions = Array.from(new Set(allMenteesForOptions.map((m) => m.funnel_origin).filter(Boolean))) as string[]
   const closerOptions = Array.from(new Set(allMenteesForOptions.map((m) => m.closer_name).filter(Boolean))) as string[]
   const nichoOptions = Array.from(new Set(allMenteesForOptions.map((m) => m.niche).filter(Boolean))) as string[]
+  const produtoOptions = Array.from(new Set(allMenteesForOptions.map((m) => m.product_name).filter(Boolean))) as string[]
 
   // Birthday list
   const today = new Date()
@@ -431,6 +432,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         funilOrigem: searchParams.funilOrigem ?? '',
         closer: searchParams.closer ?? '',
         especialista: '',
+        produto: '',
         mesAniversario: searchParams.mesAniversario ?? '',
         numColaboradores: searchParams.numColaboradores ?? '',
         estado: searchParams.estado ?? '',
@@ -438,7 +440,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         dataInicio: searchParams.dataInicio ?? '',
         dataTermino: searchParams.dataTermino ?? '',
       }}
-      filterOptions={{ funisOrigem: funisOrigemOptions.sort(), closers: closerOptions.sort(), nichos: nichoOptions.sort() }}
+      filterOptions={{ funisOrigem: funisOrigemOptions.sort(), closers: closerOptions.sort(), nichos: nichoOptions.sort(), produtos: produtoOptions.sort() }}
       section2={{ totalMentees, fitMentees, totalIndications }}
       section3={{
         totalFaturamentoAtual,

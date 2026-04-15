@@ -126,6 +126,7 @@ export default async function EtapasMentoriaPage() {
   const funisOrigem = Array.from(new Set(menteeList.map((m) => m.funnel_origin).filter(Boolean))) as string[]
   const closers = Array.from(new Set(menteeList.map((m) => m.closer_name).filter(Boolean))) as string[]
   const nichos = Array.from(new Set(menteeList.map((m) => m.niche).filter(Boolean))) as string[]
+  const produtos = Array.from(new Set(menteeList.map((m) => m.product_name).filter(Boolean))) as string[]
   const especialistas = allProfiles.filter((s) => s.role === 'especialista')
 
   return (
@@ -137,7 +138,7 @@ export default async function EtapasMentoriaPage() {
       existingMentees={menteeList.map((m) => ({ id: m.id, full_name: m.full_name }))}
       isAdmin={userRole === 'admin'}
       specialists={allProfiles}
-      filterOptions={{ funisOrigem: funisOrigem.sort(), closers: closers.sort(), nichos: nichos.sort(), especialistas }}
+      filterOptions={{ funisOrigem: funisOrigem.sort(), closers: closers.sort(), nichos: nichos.sort(), produtos: produtos.sort(), especialistas }}
     />
   )
 }

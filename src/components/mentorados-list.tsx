@@ -155,6 +155,9 @@ export function MentoradosList({
     // Especialista
     if (advFilters.especialista && m.created_by !== advFilters.especialista) return false
 
+    // Produto
+    if (advFilters.produto && m.product_name !== advFilters.produto) return false
+
     // Mês de aniversário
     if (advFilters.mesAniversario && m.birth_date) {
       const month = new Date(m.birth_date).getMonth() + 1

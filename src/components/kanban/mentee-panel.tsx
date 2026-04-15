@@ -52,6 +52,7 @@ import {
 } from 'lucide-react'
 import { formatDateBR } from '@/lib/format'
 import { createClient } from '@/lib/supabase/client'
+import { NicheSelect } from '@/components/niche-select'
 import {
   Dialog,
   DialogContent,
@@ -771,6 +772,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, onTransitionToM
     seller_name: mentee.seller_name ?? '',
     funnel_origin: mentee.funnel_origin ?? '',
     status: mentee.status,
+    niche: mentee.niche ?? '',
   })
 
   function resetForm() {
@@ -792,6 +794,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, onTransitionToM
       seller_name: mentee.seller_name ?? '',
       funnel_origin: mentee.funnel_origin ?? '',
       status: mentee.status,
+      niche: mentee.niche ?? '',
     })
   }
 
@@ -820,6 +823,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, onTransitionToM
       seller_name: form.seller_name || null,
       funnel_origin: form.funnel_origin || null,
       status: form.status,
+      niche: form.niche || null,
     })
     if (result.error) {
       // Revert on error: reopen form and restore original mentee data
@@ -875,6 +879,10 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, onTransitionToM
           </div>
           <EditField label="Vendedor" value={form.seller_name} onChange={(v) => setForm({ ...form, seller_name: v })} />
           <EditField label="Funil" value={form.funnel_origin} onChange={(v) => setForm({ ...form, funnel_origin: v })} />
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Nicho</Label>
+            <NicheSelect value={form.niche} onChange={(v) => setForm({ ...form, niche: v })} />
+          </div>
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -3444,7 +3452,7 @@ function TabTestimonials({ menteeId, mentee }: { menteeId: string; mentee: Mente
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
               <Label htmlFor="test-niche">Nicho</Label>
-              <Input id="test-niche" value={niche} onChange={(e) => setNiche(e.target.value)} />
+              <NicheSelect id="test-niche" value={niche} onChange={setNiche} />
             </div>
             <div className="space-y-1">
               <Label htmlFor="test-revenue">Faixa de faturamento</Label>

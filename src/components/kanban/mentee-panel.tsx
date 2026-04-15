@@ -81,6 +81,7 @@ import {
   addIndividualSession,
   addExtraDelivery,
 } from '@/lib/actions/panel-actions'
+import { updateActionPlan } from '@/lib/actions/action-plan-actions'
 import dynamic from 'next/dynamic'
 import { ErrorBoundary } from '@/components/error-boundary'
 import type { MenteeRow, MenteeWithStats } from '@/types/kanban'
@@ -1441,14 +1442,22 @@ const ACTION_PLAN_LABELS: Record<string, string> = {
 const PILL_KEYS = new Set(['como_nos_conheceu'])
 const CURRENCY_KEYS = new Set(['faturamento_mes1', 'faturamento_mes2', 'faturamento_mes3', 'faturamento_medio'])
 
-function ActionPlanResponseView({ data }: { data: Record<string, unknown> }) {
+function ActionPlanResponseView({ data, editing, draft, onDraftChange }: {
+  data: Record<string, unknown>
+  editing?: boolean
+  draft?: Record<string, unknown>
+  onDraftChange?: (key: string, value: unknown) => void
+}) {
   const keys = Object.keys(ACTION_PLAN_LABELS)
+  const source = editing ? (draft ?? data) : data
 
   return (
     <div className="space-y-0 divide-y divide-border/60">
       {keys.map((key) => {
-        const value = data[key]
-        if (value === undefined || value === null || value === '' || value === 0) return null
+        const value = source[key]
+        // When NOT editing, skip empty values so the view stays clean.
+        // When editing, always render so the user can fill blank fields.
+        if (!editing && (value === undefined || value === null || value === '' || value === 0)) return null
         const label = ACTION_PLAN_LABELS[key]
         const isPill = PILL_KEYS.has(key)
         const isCurrency = CURRENCY_KEYS.has(key)
@@ -1458,9 +1467,37 @@ function ActionPlanResponseView({ data }: { data: Record<string, unknown> }) {
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground mb-1.5">
               {label}
             </p>
-            {isPill && Array.isArray(value) ? (
+            {editing ? (
+              isCurrency ? (
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={value != null ? String(Number(value) / 100) : ''}
+                  onChange={(e) => {
+                    const n = e.target.value === '' ? null : Math.round(Number(e.target.value) * 100)
+                    onDraftChange?.(key, n)
+                  }}
+                  placeholder="0.00"
+                />
+              ) : isPill ? (
+                <Input
+                  value={Array.isArray(value) ? (value as string[]).join(', ') : String(value ?? '')}
+                  onChange={(e) => {
+                    const arr = e.target.value.split(',').map((s) => s.trim()).filter(Boolean)
+                    onDraftChange?.(key, arr)
+                  }}
+                  placeholder="Separe por vírgula"
+                />
+              ) : (
+                <Textarea
+                  value={String(value ?? '')}
+                  onChange={(e) => onDraftChange?.(key, e.target.value)}
+                  className="min-h-[60px]"
+                />
+              )
+            ) : isPill && Array.isArray(value) ? (
               <div className="flex flex-wrap gap-1.5">
-                {value.map((v: string) => (
+                {(value as string[]).map((v: string) => (
                   <span key={v} className="inline-flex items-center rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-medium text-accent">{v}</span>
                 ))}
               </div>
@@ -1485,6 +1522,9 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
   const [attachments, setAttachments] = useState<{ name: string; url: string }[]>([])
   const [uploading, setUploading] = useState(false)
   const [viewerFile, setViewerFile] = useState<{ name: string; url: string } | null>(null)
+  const [editingPlan, setEditingPlan] = useState(false)
+  const [planDraft, setPlanDraft] = useState<Record<string, unknown>>({})
+  const [savingPlan, setSavingPlan] = useState(false)
   const supabase = createClient()
 
   useEffect(() => {
@@ -1720,26 +1760,80 @@ function TabActionPlan({ mentee }: { mentee: MenteeWithStats }) {
       {/* ── Respostas do formulário ── */}
       {plan?.submitted_at ? (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
             <Badge variant="success">
               Preenchido em {new Date(plan.submitted_at).toLocaleDateString('pt-BR')}
             </Badge>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleExportPdf}
-              disabled={exporting}
-              className="text-xs gap-1.5"
-            >
-              <FileDown className="h-3.5 w-3.5" />
-              {exporting ? 'Gerando...' : 'Exportar PDF'}
-            </Button>
+            <div className="flex items-center gap-2">
+              {editingPlan ? (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setEditingPlan(false); setPlanDraft({}) }}
+                    disabled={savingPlan}
+                    className="text-xs"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      setSavingPlan(true)
+                      const merged = { ...(planData ?? {}), ...planDraft }
+                      const result = await updateActionPlan(mentee.id, merged as Record<string, import('@/types/database').Json>)
+                      setSavingPlan(false)
+                      if (result.error) {
+                        toast.error(result.error)
+                      } else {
+                        toast.success('Plano de ação atualizado')
+                        setPlan((prev) => prev ? { ...prev, data: merged as import('@/types/database').Json, submitted_at: new Date().toISOString() } : prev)
+                        setEditingPlan(false)
+                        setPlanDraft({})
+                      }
+                    }}
+                    disabled={savingPlan}
+                    className="text-xs"
+                  >
+                    {savingPlan ? 'Salvando...' : 'Salvar'}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => { setPlanDraft({ ...(planData ?? {}) }); setEditingPlan(true) }}
+                    className="text-xs gap-1.5"
+                  >
+                    Editar respostas
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleExportPdf}
+                    disabled={exporting}
+                    className="text-xs gap-1.5"
+                  >
+                    <FileDown className="h-3.5 w-3.5" />
+                    {exporting ? 'Gerando...' : 'Exportar PDF'}
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
           <div
             id="action-plan-content"
             className="rounded-lg bg-white p-5"
           >
-            {planData && <ActionPlanResponseView data={planData} />}
+            {planData && (
+              <ActionPlanResponseView
+                data={planData}
+                editing={editingPlan}
+                draft={planDraft}
+                onDraftChange={(key, value) => setPlanDraft((prev) => ({ ...prev, [key]: value }))}
+              />
+            )}
           </div>
         </div>
       ) : (

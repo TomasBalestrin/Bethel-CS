@@ -163,10 +163,16 @@ export async function POST(request: NextRequest) {
       delivery_status: 'sent',
     })
     if (insertErr) {
+      // Unique violation on message_id means the webhook beat us to the insert
+      // (it fired and ran before our /send INSERT completed). That's fine —
+      // the row exists, treat as success.
+      const code = (insertErr as { code?: string }).code
+      const isDuplicate = code === '23505' || /duplicate key/i.test(insertErr.message || '')
+      if (isDuplicate && result.messageId) {
+        console.log('[WPP Send] Row already inserted by webhook (messageId', result.messageId, ') — treating as success')
+        return NextResponse.json({ success: true })
+      }
       console.error('[WPP Send] DB INSERT FAILED (message was sent but not saved):', insertErr.message, insertErr.details, insertErr.hint)
-      // Return 500 so the client shows the error instead of a false success.
-      // The message did reach WhatsApp, but without a DB row the chat UI is
-      // out of sync — better to tell the operator immediately.
       return NextResponse.json({ error: `Mensagem enviada mas não foi salva: ${insertErr.message}` }, { status: 500 })
     }
 

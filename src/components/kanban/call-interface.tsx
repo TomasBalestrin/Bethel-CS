@@ -13,6 +13,22 @@ interface CallInterfaceProps {
   onEnd: () => void
 }
 
+/** One <audio> per remote participant. Required for 3+ participants since a single
+ *  shared <audio> element can only play one MediaStream at a time. */
+function RemoteAudio({ track }: { track: MediaStreamTrack }) {
+  const ref = useRef<HTMLAudioElement>(null)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.srcObject = new MediaStream([track])
+    el.play().catch(() => {})
+    return () => {
+      if (el) el.srcObject = null
+    }
+  }, [track])
+  return <audio ref={ref} autoPlay playsInline />
+}
+
 export const CallInterface = memo(function CallInterface({
   roomUrl,
   token,
@@ -27,12 +43,12 @@ export const CallInterface = memo(function CallInterface({
   const [seconds, setSeconds] = useState(0)
   const [ended, setEnded] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [remoteTracks, setRemoteTracks] = useState<Map<string, MediaStreamTrack>>(new Map())
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const endedRef = useRef(false)
   const callIdRef = useRef(callId)
   const onEndRef = useRef(onEnd)
-  const audioRef = useRef<HTMLAudioElement>(null)
 
   callIdRef.current = callId
   onEndRef.current = onEnd
@@ -117,6 +133,13 @@ export const CallInterface = memo(function CallInterface({
       updateRemoteCount()
       // Ensure audio is active
       call!.setLocalAudio(true)
+      // Ensure we subscribe to audio tracks from all remote participants.
+      // Without this, additional participants beyond the first may not be heard.
+      try {
+        call!.setSubscribeToTracksAutomatically(true)
+      } catch (e) {
+        console.error('[Call] setSubscribeToTracksAutomatically failed:', e)
+      }
       // Explicitly start cloud recording — room-level setting only enables capability
       try {
         const startRec = (call as unknown as { startRecording?: () => Promise<unknown> | unknown }).startRecording
@@ -138,20 +161,34 @@ export const CallInterface = memo(function CallInterface({
     call.on('participant-joined', () => updateRemoteCount())
     call.on('participant-updated', (ev) => {
       updateRemoteCount()
-      // Attach remote audio track when available
-      if (ev?.participant && !ev.participant.local && ev.participant.tracks?.audio?.persistentTrack) {
-        const track = ev.participant.tracks.audio.persistentTrack
-        if (audioRef.current) {
-          const stream = new MediaStream([track])
-          audioRef.current.srcObject = stream
-          audioRef.current.play().catch(() => {})
-          console.log('[Call] Remote audio track attached')
+      // Track remote audio per participant — each remote gets its own <audio> element.
+      // A single shared audio element can only play one track at a time, so 3+ participants
+      // would cause older tracks to stop playing when the latest one overwrites srcObject.
+      if (!ev?.participant || ev.participant.local) return
+      const sessionId = ev.participant.session_id
+      const track = ev.participant.tracks?.audio?.persistentTrack as MediaStreamTrack | undefined
+      const audioState = ev.participant.tracks?.audio?.state
+      setRemoteTracks((prev) => {
+        const next = new Map(prev)
+        if (track && audioState === 'playable') {
+          if (next.get(sessionId) !== track) next.set(sessionId, track)
+        } else {
+          next.delete(sessionId)
         }
-      }
+        return next
+      })
     })
-    call.on('participant-left', () => {
+    call.on('participant-left', (ev) => {
       updateRemoteCount()
-      if (audioRef.current) audioRef.current.srcObject = null
+      const sessionId = ev?.participant?.session_id
+      if (sessionId) {
+        setRemoteTracks((prev) => {
+          if (!prev.has(sessionId)) return prev
+          const next = new Map(prev)
+          next.delete(sessionId)
+          return next
+        })
+      }
     })
     call.on('left-meeting', () => {
       console.log('[Call] left-meeting')
@@ -202,8 +239,11 @@ export const CallInterface = memo(function CallInterface({
 
   return (
     <div className="flex flex-col items-center justify-center h-full py-6 px-4">
-      {/* Hidden audio element for remote participant audio playback */}
-      <audio ref={audioRef} autoPlay playsInline />
+      {/* One hidden <audio> element per remote participant so everyone is audible.
+          React keys by session_id ensure playback persists when other remotes update. */}
+      {Array.from(remoteTracks.entries()).map(([sessionId, track]) => (
+        <RemoteAudio key={sessionId} track={track} />
+      ))}
       <p className="text-xs text-white/50">Ligação de voz</p>
       <h2 className="text-lg font-semibold text-white mt-1">{menteeName}</h2>
       <p className="text-3xl font-mono text-white mt-4 tabular">{formatTimer}</p>

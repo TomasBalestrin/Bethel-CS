@@ -1512,11 +1512,48 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                     {call.transcription_status === 'ready' && call.transcription ? (
                       <p className="text-xs text-foreground whitespace-pre-line bg-muted/50 rounded p-2 max-h-40 overflow-y-auto">{call.transcription}</p>
                     ) : call.transcription_status === 'processing' ? (
-                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Loader2 className="h-3 w-3 animate-spin" /> Transcrevendo...
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Transcrevendo...
+                        </span>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await fetch('/api/calls/transcribe', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ callId: call.id, force: true }),
+                              })
+                              if (res.ok) toast.success('Transcrição reiniciada')
+                              else toast.error('Erro ao reiniciar transcrição')
+                            } catch { toast.error('Erro ao reiniciar transcrição') }
+                          }}
+                          className="text-[10px] text-accent hover:underline"
+                          title="Se está travado há muito tempo, clique para reiniciar"
+                        >
+                          Reiniciar
+                        </button>
+                      </div>
                     ) : call.transcription_status === 'failed' ? (
-                      <span className="text-xs text-destructive">Falha na transcrição</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-destructive">Falha na transcrição</span>
+                        <button
+                          onClick={async () => {
+                            try {
+                              const res = await fetch('/api/calls/transcribe', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ callId: call.id, force: true }),
+                              })
+                              if (res.ok) toast.success('Transcrição reiniciada')
+                              else toast.error('Erro ao reiniciar transcrição')
+                            } catch { toast.error('Erro ao reiniciar transcrição') }
+                          }}
+                          className="text-xs text-accent hover:underline"
+                        >
+                          Tentar novamente
+                        </button>
+                      </div>
                     ) : call.recording_status === 'ready' ? (
                       <button
                         onClick={async () => {

@@ -1503,6 +1503,24 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                             autoPlay
                             src={call.recording_url}
                             className="w-full mt-2"
+                            onError={async () => {
+                              // Signed Daily URLs expire. On playback error, refresh
+                              // the URL via /retry-recording and update the DOM src so
+                              // the player can load without the user noticing.
+                              try {
+                                const res = await fetch('/api/calls/retry-recording', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ callId: call.id }),
+                                })
+                                const data = await res.json().catch(() => ({}))
+                                if (res.ok && data?.recording_url) {
+                                  setCallRecords((prev) => prev.map((c) =>
+                                    c.id === call.id ? { ...c, recording_url: data.recording_url } : c
+                                  ))
+                                }
+                              } catch { /* silent */ }
+                            }}
                           />
                         )}
                       </div>
@@ -1551,9 +1569,12 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ callId: call.id, force: true }),
                               })
+                              const payload = await res.json().catch(() => ({}))
                               if (res.ok) toast.success('Transcrição reiniciada')
-                              else toast.error('Erro ao reiniciar transcrição')
-                            } catch { toast.error('Erro ao reiniciar transcrição') }
+                              else toast.error(payload?.error ? `Erro: ${payload.error}` : 'Erro ao reiniciar transcrição')
+                            } catch (err) {
+                              toast.error(`Erro: ${err instanceof Error ? err.message : String(err)}`)
+                            }
                           }}
                           className="text-[10px] text-accent hover:underline"
                           title="Se está travado há muito tempo, clique para reiniciar"
@@ -1572,9 +1593,12 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ callId: call.id, force: true }),
                               })
+                              const payload = await res.json().catch(() => ({}))
                               if (res.ok) toast.success('Transcrição reiniciada')
-                              else toast.error('Erro ao reiniciar transcrição')
-                            } catch { toast.error('Erro ao reiniciar transcrição') }
+                              else toast.error(payload?.error ? `Erro: ${payload.error}` : 'Erro ao reiniciar transcrição')
+                            } catch (err) {
+                              toast.error(`Erro: ${err instanceof Error ? err.message : String(err)}`)
+                            }
                           }}
                           className="text-xs text-accent hover:underline"
                         >

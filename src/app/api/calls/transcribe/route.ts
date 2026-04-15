@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { getRecordings } from '@/lib/daily'
 import OpenAI from 'openai'
 
 // Transcription + summary can take ~1-3 min for long calls. Default 60s timeout
@@ -21,10 +22,10 @@ export async function POST(request: NextRequest) {
   const { callId } = body
   if (!callId) return NextResponse.json({ error: 'callId obrigatório' }, { status: 400 })
 
-  // Get the call record
+  // Get the call record — include daily_room_name so we can refresh an expired URL
   const { data: call } = await supabase
     .from('call_records')
-    .select('id, mentee_id, specialist_id, recording_url, recording_status, transcription_status')
+    .select('id, mentee_id, specialist_id, recording_url, recording_status, transcription_status, daily_room_name')
     .eq('id', callId)
     .single()
 
@@ -54,8 +55,26 @@ export async function POST(request: NextRequest) {
   try {
     log('start', { callId, url: call.recording_url })
 
-    // Download the recording audio
-    const audioRes = await fetch(call.recording_url)
+    // Download the recording audio.
+    // Daily signed URLs expire (~1h), so on 403/404 we refresh via access-link
+    // and retry once. Without this, old calls can never be transcribed because
+    // the recording_url we stored days ago is no longer valid.
+    let downloadUrl = call.recording_url
+    let audioRes = await fetch(downloadUrl)
+    if ((audioRes.status === 403 || audioRes.status === 404) && call.daily_room_name) {
+      log('URL expired, refreshing from Daily', { status: audioRes.status })
+      const recordings = await getRecordings(call.daily_room_name)
+      const fresh = recordings.find((r) => !!r.download_url)
+      if (fresh?.download_url && fresh.download_url !== downloadUrl) {
+        downloadUrl = fresh.download_url
+        await supabase
+          .from('call_records')
+          .update({ recording_url: downloadUrl })
+          .eq('id', callId)
+        log('URL refreshed, retrying download')
+        audioRes = await fetch(downloadUrl)
+      }
+    }
     if (!audioRes.ok) {
       throw new Error(`Failed to download recording: HTTP ${audioRes.status} ${audioRes.statusText}`)
     }

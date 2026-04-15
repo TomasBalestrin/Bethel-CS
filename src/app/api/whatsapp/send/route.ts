@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { sendTextMessage, sendMediaMessage } from '@/lib/nextapps'
 
 export async function POST(request: NextRequest) {
@@ -138,8 +139,15 @@ export async function POST(request: NextRequest) {
     console.log('[WPP Send] Success:', { menteeId, type, phone, channel, messageId: result.messageId, imageUrl: imageUrl?.slice(0, 120) })
     if (imageUrl) console.log('[WPP Send] FULL imageUrl:', imageUrl)
 
-    // 7. Save message with channel and delivery status
-    await supabase.from('wpp_messages').insert({
+    // 7. Save message with channel and delivery status.
+    // IMPORTANT: use the admin client to bypass the "specialist_id = auth.uid()"
+    // RLS policy. When Kennedy/any admin sends a message on a mentee owned by
+    // Aline, specialist_id is set to Aline (so the row is correctly scoped to
+    // the mentee owner), and the policy would otherwise reject the INSERT —
+    // the message would reach WhatsApp successfully but silently disappear
+    // from the chat history after a refresh.
+    const admin = createAdminClient()
+    const { error: insertErr } = await admin.from('wpp_messages').insert({
       mentee_id: menteeId,
       specialist_id: instance.specialist_id || user.id,
       instance_id: instance.instance_id,
@@ -154,6 +162,13 @@ export async function POST(request: NextRequest) {
       quoted_message_id: quotedMessageId || null,
       delivery_status: 'sent',
     })
+    if (insertErr) {
+      console.error('[WPP Send] DB INSERT FAILED (message was sent but not saved):', insertErr.message, insertErr.details, insertErr.hint)
+      // Return 500 so the client shows the error instead of a false success.
+      // The message did reach WhatsApp, but without a DB row the chat UI is
+      // out of sync — better to tell the operator immediately.
+      return NextResponse.json({ error: `Mensagem enviada mas não foi salva: ${insertErr.message}` }, { status: 500 })
+    }
 
     return NextResponse.json({ success: true })
   } catch (err) {

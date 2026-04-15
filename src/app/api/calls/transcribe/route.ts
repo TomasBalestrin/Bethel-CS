@@ -9,6 +9,59 @@ export const maxDuration = 300 // 5 minutes (Vercel Pro limit)
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' })
 
+/** Transcribe a long recording via AssemblyAI.
+ *  AssemblyAI pulls the audio from the given URL on its side, so we don't
+ *  have to upload the (potentially hundreds of MB) file from our function.
+ *  Polls for up to ~4 min — within Vercel Pro's 5-min serverless limit.
+ */
+async function transcribeWithAssemblyAI(
+  audioUrl: string,
+  apiKey: string,
+  log: (stage: string, extra?: Record<string, unknown>) => void,
+): Promise<string> {
+  // 1. Submit the transcription job
+  const submitRes = await fetch('https://api.assemblyai.com/v2/transcript', {
+    method: 'POST',
+    headers: {
+      Authorization: apiKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      audio_url: audioUrl,
+      language_code: 'pt',
+    }),
+  })
+  if (!submitRes.ok) {
+    const text = await submitRes.text().catch(() => '')
+    throw new Error(`AssemblyAI submit failed (${submitRes.status}): ${text}`)
+  }
+  const submitData = await submitRes.json() as { id: string; status?: string }
+  const id = submitData.id
+  log('assemblyai submitted', { id })
+
+  // 2. Poll until completed/error, or we run out of time
+  const pollUrl = `https://api.assemblyai.com/v2/transcript/${id}`
+  const startTs = Date.now()
+  const maxWaitMs = 4 * 60 * 1000 // 4 minutes (leaves 1 min buffer under maxDuration)
+  while (Date.now() - startTs < maxWaitMs) {
+    await new Promise((r) => setTimeout(r, 5000))
+    const pollRes = await fetch(pollUrl, { headers: { Authorization: apiKey } })
+    if (!pollRes.ok) {
+      const text = await pollRes.text().catch(() => '')
+      throw new Error(`AssemblyAI poll failed (${pollRes.status}): ${text}`)
+    }
+    const data = await pollRes.json() as { status: string; text?: string; error?: string }
+    if (data.status === 'completed') {
+      return data.text || ''
+    }
+    if (data.status === 'error') {
+      throw new Error(`AssemblyAI: ${data.error || 'falha desconhecida'}`)
+    }
+    // queued | processing → continue
+  }
+  throw new Error('AssemblyAI ainda processando após 4 min. Clique em "Tentar novamente" em 1-2 min — a transcrição vai continuar de onde parou.')
+}
+
 export async function POST(request: NextRequest) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -55,14 +108,13 @@ export async function POST(request: NextRequest) {
   try {
     log('start', { callId, url: call.recording_url })
 
-    // Download the recording audio.
-    // Daily signed URLs expire (~1h), so on 403/404 we refresh via access-link
-    // and retry once. Without this, old calls can never be transcribed because
-    // the recording_url we stored days ago is no longer valid.
+    // Make sure we have a fresh, valid Daily URL before doing anything — both
+    // the Whisper path (which downloads the file) and the AssemblyAI path
+    // (which pulls the URL on its end) need it to be live.
     let downloadUrl = call.recording_url
-    let audioRes = await fetch(downloadUrl)
-    if ((audioRes.status === 403 || audioRes.status === 404) && call.daily_room_name) {
-      log('URL expired, refreshing from Daily', { status: audioRes.status })
+    const headRes = await fetch(downloadUrl, { method: 'HEAD' })
+    if ((headRes.status === 403 || headRes.status === 404) && call.daily_room_name) {
+      log('URL expired, refreshing from Daily', { status: headRes.status })
       const recordings = await getRecordings(call.daily_room_name)
       const fresh = recordings.find((r) => !!r.download_url)
       if (fresh?.download_url && fresh.download_url !== downloadUrl) {
@@ -71,36 +123,61 @@ export async function POST(request: NextRequest) {
           .from('call_records')
           .update({ recording_url: downloadUrl })
           .eq('id', callId)
-        log('URL refreshed, retrying download')
-        audioRes = await fetch(downloadUrl)
+        log('URL refreshed')
       }
     }
-    if (!audioRes.ok) {
-      throw new Error(`Failed to download recording: HTTP ${audioRes.status} ${audioRes.statusText}`)
-    }
 
-    const audioBuffer = await audioRes.arrayBuffer()
-    const sizeMB = audioBuffer.byteLength / 1024 / 1024
-    log('downloaded', { bytes: audioBuffer.byteLength, sizeMB: sizeMB.toFixed(2) })
+    // Decide route by file size: Whisper (fast, cheap) for <=25 MB;
+    // AssemblyAI (URL-based, handles up to ~2 GB) for larger files.
+    // Content-Length comes back on Daily's signed URLs.
+    const sizeHeaderRes = await fetch(downloadUrl, { method: 'HEAD' })
+    const sizeBytes = Number(sizeHeaderRes.headers.get('content-length') || '0')
+    const sizeMB = sizeBytes / 1024 / 1024
+    log('size probed', { sizeMB: sizeMB.toFixed(2) })
 
-    // Whisper hard limit: 25 MB per file. Refuse with a clear message instead
-    // of blindly hitting the API and getting a cryptic 413 later.
     const WHISPER_LIMIT_MB = 25
-    if (sizeMB > WHISPER_LIMIT_MB) {
-      throw new Error(`Gravação tem ${sizeMB.toFixed(1)} MB — acima do limite de ${WHISPER_LIMIT_MB} MB do Whisper. Ligações longas precisam ser divididas.`)
+    let transcription: string
+
+    if (sizeBytes > 0 && sizeMB > WHISPER_LIMIT_MB) {
+      // ── AssemblyAI path (large files) ──
+      const key = process.env.ASSEMBLYAI_API_KEY
+      if (!key) {
+        throw new Error(`Gravação tem ${sizeMB.toFixed(1)} MB — acima do limite de ${WHISPER_LIMIT_MB} MB do Whisper. Configure ASSEMBLYAI_API_KEY no Vercel para transcrever ligações longas automaticamente.`)
+      }
+      log('using AssemblyAI (file exceeds Whisper limit)')
+      transcription = await transcribeWithAssemblyAI(downloadUrl, key, log)
+      log('assemblyai done', { transcriptLen: transcription.length })
+    } else {
+      // ── Whisper path (small files) ──
+      const audioRes = await fetch(downloadUrl)
+      if (!audioRes.ok) {
+        throw new Error(`Failed to download recording: HTTP ${audioRes.status} ${audioRes.statusText}`)
+      }
+      const audioBuffer = await audioRes.arrayBuffer()
+      const actualMB = audioBuffer.byteLength / 1024 / 1024
+      log('downloaded', { bytes: audioBuffer.byteLength, sizeMB: actualMB.toFixed(2) })
+
+      // Sanity check: some Daily URLs don't return content-length in HEAD,
+      // so we re-check after the full download.
+      if (actualMB > WHISPER_LIMIT_MB) {
+        const key = process.env.ASSEMBLYAI_API_KEY
+        if (!key) {
+          throw new Error(`Gravação tem ${actualMB.toFixed(1)} MB — acima do limite de ${WHISPER_LIMIT_MB} MB do Whisper. Configure ASSEMBLYAI_API_KEY no Vercel para transcrever ligações longas automaticamente.`)
+        }
+        log('size over limit after download — falling back to AssemblyAI')
+        transcription = await transcribeWithAssemblyAI(downloadUrl, key, log)
+      } else {
+        const audioFile = new File([audioBuffer], 'recording.mp4', { type: 'audio/mp4' })
+        log('sending to Whisper')
+        transcription = await openai.audio.transcriptions.create({
+          file: audioFile,
+          model: 'whisper-1',
+          language: 'pt',
+          response_format: 'text',
+        })
+        log('whisper done', { transcriptLen: transcription.length })
+      }
     }
-
-    const audioFile = new File([audioBuffer], 'recording.mp4', { type: 'audio/mp4' })
-    log('sending to Whisper')
-
-    const transcription = await openai.audio.transcriptions.create({
-      file: audioFile,
-      model: 'whisper-1',
-      language: 'pt',
-      response_format: 'text',
-    })
-
-    log('whisper done', { transcriptLen: transcription.length })
 
     // Save transcription FIRST so the UI shows "ready" even if summary fails
     await supabase

@@ -30,10 +30,11 @@ export default async function TarefasPage() {
     .from('task_attachments')
     .select('*')
 
+  // Load ALL profiles so tasks can be assigned to anyone
+  // (specialists, admins, department members like Hannah/Matheus/Keyth).
   const { data: specialists } = await supabase
     .from('profiles')
     .select('id, full_name')
-    .eq('role', 'especialista')
     .order('full_name')
 
   return (

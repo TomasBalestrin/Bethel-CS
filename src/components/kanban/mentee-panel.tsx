@@ -355,7 +355,10 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, onTransitionT
   // Comercial: "Consultora <Nome assignee>"
   // Marketing: "Consultor <Nome assignee>"
   // Gestão:    "Consultora <Nome assignee>"
-  const [deptNames, setDeptNames] = useState<Record<string, string>>({ comercial: '', marketing: '', gestao: '' })
+  // deptFirstNames → first name (used in signature prefix)
+  // deptFullNames  → full name  (used on the "Em atendimento" card label)
+  const [deptFirstNames, setDeptFirstNames] = useState<Record<string, string>>({ comercial: '', marketing: '', gestao: '' })
+  const [deptFullNames, setDeptFullNames] = useState<Record<string, string>>({ comercial: '', marketing: '', gestao: '' })
   useEffect(() => {
     const supabase = createClient()
     let cancelled = false
@@ -371,14 +374,17 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, onTransitionT
         .in('id', userIds)
       if (cancelled) return
       const nameById = new Map((profiles ?? []).map((p) => [p.id, p.full_name as string]))
-      const byDept: Record<string, string> = { comercial: '', marketing: '', gestao: '' }
+      const firstByDept: Record<string, string> = { comercial: '', marketing: '', gestao: '' }
+      const fullByDept: Record<string, string> = { comercial: '', marketing: '', gestao: '' }
       ;(assignments ?? []).forEach((a) => {
-        if (!byDept[a.department]) {
+        if (!firstByDept[a.department]) {
           const fullName = nameById.get(a.user_id) ?? ''
-          byDept[a.department] = fullName.split(' ')[0] ?? '' // first name only
+          firstByDept[a.department] = fullName.split(' ')[0] ?? ''
+          fullByDept[a.department] = fullName
         }
       })
-      setDeptNames(byDept)
+      setDeptFirstNames(firstByDept)
+      setDeptFullNames(fullByDept)
     })()
     return () => { cancelled = true }
   }, [])
@@ -394,7 +400,7 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, onTransitionT
       gestao: 'Consultora',
     }
     const title = titleByChannel[channel] ?? ''
-    const name = deptNames[channel] ?? ''
+    const name = deptFirstNames[channel] ?? ''
     if (title && name) return `${title} ${name}`
     if (name) return name
     return title
@@ -524,11 +530,20 @@ function PanelTabs({ mentee, editing, setEditing, onMenteeUpdated, onTransitionT
             specialistId={mentee.created_by}
             onUnreadCountChange={(count: number) => setChatUnreads((prev) => ({ ...prev, [chat.channel]: count === -1 ? (prev[chat.channel] ?? 0) + 1 : count }))}
             onSessionChange={(active, activeChannel) => {
-              // Update active_sessions list for this channel specifically
+              // Update active_sessions list for this channel specifically.
+              // The attendant name is derived from the CHANNEL, not from who clicked:
+              //   Principal → owner specialist name
+              //   Comercial/Marketing/Gestão → the dept-assigned user's full name
               const current = mentee.active_sessions ?? []
               const filtered = current.filter((s) => s.channel !== activeChannel)
+              let attendantName = 'Responsável'
+              if (activeChannel === 'principal') {
+                attendantName = specialistName ?? 'Responsável'
+              } else if (deptFullNames[activeChannel]) {
+                attendantName = deptFullNames[activeChannel]
+              }
               const updated = active
-                ? [...filtered, { channel: activeChannel, specialist_name: specialistName ?? 'Especialista' }]
+                ? [...filtered, { channel: activeChannel, specialist_name: attendantName }]
                 : filtered
               onMenteeUpdated?.({ ...mentee, active_sessions: updated, has_active_session: updated.length > 0 })
             }}

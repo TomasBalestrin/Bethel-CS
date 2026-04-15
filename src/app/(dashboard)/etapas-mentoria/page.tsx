@@ -94,14 +94,28 @@ export default async function EtapasMentoriaPage() {
     revenueMap.set(r.mentee_id, (revenueMap.get(r.mentee_id) ?? 0) + Number(r.sale_value))
   })
 
-  // Build map: menteeId → [{ channel, specialist_name, specialist_id }, ...] from active sessions
+  // Build map: menteeId → [{ channel, specialist_name, specialist_id }, ...] from active sessions.
+  // The "attendant" shown/filtered is derived from the channel, NOT from who clicked Iniciar:
+  //   - Principal → owner of the mentee (mentee.created_by)
+  //   - Comercial/Marketing/Gestão → user assigned to that department
+  // This way any operator (admin, Kennedy, etc.) can click Iniciar, but the card/filter
+  // always shows Carla/Aline/Hannah/Matheus/Keyth as appropriate.
   const profileNameMap = new Map(allProfiles.map((p) => [p.id, p.full_name]))
+  const deptUserByChannel = new Map<string, string>()
+  deptAssignments.forEach((d) => {
+    if (!deptUserByChannel.has(d.department)) deptUserByChannel.set(d.department, d.user_id)
+  })
+  const menteeOwnerMap = new Map<string, string | null>(menteeList.map((m) => [m.id, m.created_by]))
   const activeSessionsMap = new Map<string, Array<{ channel: string; specialist_name: string; specialist_id?: string }>>()
   const activeSessionsArr = (activeSessions ?? []) as unknown as Array<{ mentee_id: string; channel?: string; specialist_id?: string }>
   activeSessionsArr.forEach((s) => {
-    const name = s.specialist_id ? profileNameMap.get(s.specialist_id) ?? 'Especialista' : 'Especialista'
+    const channel = s.channel || 'principal'
+    const attendantId = channel === 'principal'
+      ? menteeOwnerMap.get(s.mentee_id) ?? undefined
+      : deptUserByChannel.get(channel)
+    const name = attendantId ? profileNameMap.get(attendantId) ?? 'Responsável' : 'Responsável'
     const arr = activeSessionsMap.get(s.mentee_id) ?? []
-    arr.push({ channel: s.channel || 'principal', specialist_name: name, specialist_id: s.specialist_id })
+    arr.push({ channel, specialist_name: name, specialist_id: attendantId })
     activeSessionsMap.set(s.mentee_id, arr)
   })
 

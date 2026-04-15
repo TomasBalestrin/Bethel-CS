@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { LogOut } from 'lucide-react'
 import { ForwardingBadge } from '@/components/forwarding-badge'
+import { UpcomingTasksBell } from '@/components/upcoming-tasks-bell'
 import type { Profile } from '@/types/auth'
 
 interface HeaderProps {
@@ -49,7 +50,8 @@ export function Header({ profile }: HeaderProps) {
 
         {/* Notifications + Avatar */}
         <div className="flex items-center gap-1">
-          <ForwardingBadge />
+          <UpcomingTasksBell />
+        <ForwardingBadge />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex items-center min-h-[44px]">
@@ -73,6 +75,7 @@ export function Header({ profile }: HeaderProps) {
 
       {/* Desktop header */}
       <header className="hidden md:flex h-14 items-center justify-end gap-2 border-b border-border bg-card px-6">
+        <UpcomingTasksBell />
         <ForwardingBadge />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

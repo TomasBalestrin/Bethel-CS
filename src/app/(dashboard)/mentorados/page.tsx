@@ -88,7 +88,13 @@ export default async function MentoradosPage() {
   })
 
   const allProfiles = (specialists ?? []) as { id: string; full_name: string; role: string }[]
-  const especialistasOnly = allProfiles.filter((p) => p.role === 'especialista')
+  // Include anyone who is role='especialista' OR owns at least one mentee —
+  // some specialists (Carla, etc.) are registered with role='admin' but still
+  // own mentees, and they must appear in the filter.
+  const ownerIds = new Set(allMenteesData.map((m) => m.created_by).filter(Boolean) as string[])
+  const especialistasOnly = allProfiles
+    .filter((p) => p.role === 'especialista' || ownerIds.has(p.id))
+    .sort((a, b) => a.full_name.localeCompare(b.full_name))
 
   return (
     <MentoradosList

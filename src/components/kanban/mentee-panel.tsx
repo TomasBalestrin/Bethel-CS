@@ -789,11 +789,29 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, onTransitionToM
             <Select value={String(form.priority_level)} onValueChange={(v) => setForm({ ...form, priority_level: Number(v) })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <SelectItem key={n} value={String(n)}>P{n}</SelectItem>
+                {[
+                  { n: 1, label: 'Baixa', desc: 'Sem urgência — acompanhamento padrão' },
+                  { n: 2, label: 'Normal', desc: 'Mentorado em ritmo regular' },
+                  { n: 3, label: 'Média', desc: 'Demanda atenção mais frequente' },
+                  { n: 4, label: 'Alta', desc: 'Risco/oportunidade — priorizar contatos' },
+                  { n: 5, label: 'Urgente', desc: 'Atenção imediata — risco de churn ou caso crítico' },
+                ].map(({ n, label, desc }) => (
+                  <SelectItem key={n} value={String(n)}>
+                    <div className="flex flex-col">
+                      <span className="font-medium">P{n} — {label}</span>
+                      <span className="text-[11px] text-muted-foreground">{desc}</span>
+                    </div>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            <p className="text-[11px] text-muted-foreground">
+              {form.priority_level === 1 && 'Baixa: sem urgência — acompanhamento padrão.'}
+              {form.priority_level === 2 && 'Normal: mentorado em ritmo regular.'}
+              {form.priority_level === 3 && 'Média: demanda atenção mais frequente.'}
+              {form.priority_level === 4 && 'Alta: risco/oportunidade — priorizar contatos.'}
+              {form.priority_level === 5 && 'Urgente: atenção imediata — risco de churn ou caso crítico.'}
+            </p>
           </div>
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Status</Label>

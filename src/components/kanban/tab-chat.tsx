@@ -250,6 +250,27 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
     // Reset on channel/mentee change
     initialScrollDone.current = false
   }, [menteeId, channel])
+
+  // Poll call_records while any row is in 'processing' (recording or transcription).
+  // The transcribe serverless function may take 1-4 min for long calls via AssemblyAI;
+  // without this poll, the UI keeps showing "Transcrevendo..." until manual refresh.
+  useEffect(() => {
+    const hasProcessing = callRecords.some(
+      (c) => c.recording_status === 'processing' || c.transcription_status === 'processing'
+    )
+    if (!hasProcessing) return
+    const supabase = createClient()
+    const id = setInterval(async () => {
+      const { data } = await supabase
+        .from('call_records')
+        .select('id, mentee_id, duration_seconds, recording_status, recording_url, transcription, transcription_status, notes, created_at')
+        .eq('mentee_id', menteeId)
+        .order('created_at', { ascending: false })
+        .limit(20)
+      if (data) setCallRecords(data)
+    }, 15 * 1000) // 15s
+    return () => clearInterval(id)
+  }, [callRecords, menteeId])
   useEffect(() => {
     if (!initialScrollDone.current && messages.length > 0 && !loading) {
       initialScrollDone.current = true

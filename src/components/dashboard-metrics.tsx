@@ -47,6 +47,7 @@ interface DashboardMetricsProps {
     funisOrigem: string[]
     closers: string[]
     nichos: string[]
+    produtos?: string[]
   }
   section2: {
     totalMentees: number

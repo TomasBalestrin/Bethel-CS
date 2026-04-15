@@ -48,7 +48,7 @@ interface MentoradosListProps {
   isAdmin?: boolean
   specialists?: { id: string; full_name: string }[]
   stages?: Stage[]
-  filterOptions?: { funisOrigem: string[]; closers: string[]; nichos: string[]; especialistas?: { id: string; full_name: string }[] }
+  filterOptions?: { funisOrigem: string[]; closers: string[]; nichos: string[]; produtos?: string[]; especialistas?: { id: string; full_name: string }[] }
   colaboradoresMap?: Record<string, string>
 }
 

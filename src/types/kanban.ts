@@ -20,6 +20,6 @@ export interface MenteeWithStats extends MenteeSummary, Partial<Omit<MenteeRow, 
   revenue_total: number
   days_since_contact?: number
   has_active_session?: boolean
-  active_sessions?: Array<{ channel: string; specialist_name: string }>
+  active_sessions?: Array<{ channel: string; specialist_name: string; specialist_id?: string }>
 }
 

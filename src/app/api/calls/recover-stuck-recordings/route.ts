@@ -44,8 +44,8 @@ export async function POST(request: NextRequest) {
     if (!call.daily_room_name) { errorCount++; continue }
     try {
       const recordings = await getRecordings(call.daily_room_name)
-      if (recordings.length > 0 && recordings[0].download_url) {
-        const rec = recordings[0]
+      const rec = recordings.find((r) => !!r.download_url)
+      if (rec) {
         const { error: updateErr } = await supabase
           .from('call_records')
           .update({

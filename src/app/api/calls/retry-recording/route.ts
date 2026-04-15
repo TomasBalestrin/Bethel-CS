@@ -32,11 +32,12 @@ export async function POST(request: NextRequest) {
     console.log('[retry-recording] Daily returned', recordings.length, 'recordings for', call.daily_room_name)
 
     if (recordings.length > 0) {
-      const rec = recordings[0]
+      // Pick the first one with a usable download URL, falling back to the first
+      const rec = recordings.find((r) => !!r.download_url) || recordings[0]
       if (!rec.download_url) {
         return NextResponse.json({
           status: 'not_ready',
-          message: 'Gravação encontrada mas ainda sendo processada pelo Daily — tente novamente em 1-2 minutos',
+          message: `Gravação encontrada (status: ${rec.status || 'desconhecido'}) mas ainda sendo processada pelo Daily — aguarde 1-3 minutos e tente novamente`,
         })
       }
       await supabase

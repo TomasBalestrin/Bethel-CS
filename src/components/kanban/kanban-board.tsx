@@ -67,6 +67,7 @@ export function KanbanBoard({
   const [activeId, setActiveId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedSpecialist, setSelectedSpecialist] = useState<string>('all')
+  const [atendimentoFilter, setAtendimentoFilter] = useState<string>('all')
   const [advFilters, setAdvFilters] = useState<MenteeFilterValues>(EMPTY_FILTERS)
   const { unreadMap, lastMessageMap } = useUnreadCounts()
   const specialistNameMap = useMemo(() => new Map(specialists.map((s) => [s.id, s.full_name])), [specialists])
@@ -180,6 +181,12 @@ export function KanbanBoard({
       if (!m.full_name?.toLowerCase().includes(q)) return false
     }
     if (selectedSpecialist !== 'all' && m.created_by !== selectedSpecialist) return false
+    // Em atendimento filter
+    if (atendimentoFilter === 'active_all') {
+      if (!m.has_active_session) return false
+    } else if (atendimentoFilter !== 'all') {
+      if (!m.has_active_session || m.created_by !== atendimentoFilter) return false
+    }
     // Advanced filters
     if (advFilters.funilOrigem && m.funnel_origin !== advFilters.funilOrigem) return false
     if (advFilters.closer && m.closer_name !== advFilters.closer) return false
@@ -276,6 +283,20 @@ export function KanbanBoard({
               </SelectContent>
             </Select>
           )}
+          <Select value={atendimentoFilter} onValueChange={setAtendimentoFilter}>
+            <SelectTrigger className="w-full sm:w-[220px]">
+              <SelectValue placeholder="Em atendimento" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos (sem filtro)</SelectItem>
+              <SelectItem value="active_all">Em atendimento (todos)</SelectItem>
+              {specialists.length > 0 && specialists.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  Em atendimento — {s.full_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <MenteeFilters
           filters={advFilters}

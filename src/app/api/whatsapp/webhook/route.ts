@@ -237,6 +237,47 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // 3b. Deduplicate outgoing messages against our /api/whatsapp/send INSERT.
+      // NextTrack returns a different messageId in the send-text response than
+      // it emits in the webhook event, so messageId-based dedup alone misses
+      // this. Instead, for fromMe=true we look for a recent outgoing row whose
+      // content matches the webhook content (accounting for the signature
+      // prefix *...*: that /send did not store). If found, update its
+      // message_id so future status events line up, and skip the INSERT.
+      if (data.fromMe === true) {
+        const webhookContent = extractContent(data) ?? ''
+        const stripSig = (s: string) => {
+          const m = s.match(/^\*[^*\n]+\*:\s*([\s\S]+)$/)
+          return (m ? m[1] : s).trim()
+        }
+        const bareWebhook = stripSig(webhookContent)
+        if (bareWebhook) {
+          const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString()
+          const { data: recent } = await supabase
+            .from('wpp_messages')
+            .select('id, content')
+            .eq('mentee_id', mentee.id)
+            .eq('direction', 'outgoing')
+            .gte('sent_at', twoMinAgo)
+            .order('sent_at', { ascending: false })
+            .limit(20)
+          const match = (recent ?? []).find((r) => {
+            const rc = String(r.content ?? '').trim()
+            return rc && (rc === bareWebhook || stripSig(rc) === bareWebhook)
+          })
+          if (match) {
+            console.log('[WPP Webhook] SKIP: matches recent outgoing from /send route (', match.id, ')')
+            if (messageId) {
+              await supabase
+                .from('wpp_messages')
+                .update({ message_id: messageId } as never)
+                .eq('id', match.id)
+            }
+            return NextResponse.json({ ok: true })
+          }
+        }
+      }
+
       // 4. Parse message data
       const direction = data.fromMe ? 'outgoing' : 'incoming'
       type WppMessageType = 'text' | 'image' | 'audio' | 'video' | 'document' | 'location' | 'sticker'

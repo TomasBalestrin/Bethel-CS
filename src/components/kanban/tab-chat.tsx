@@ -243,7 +243,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
       }
     }
     load()
-  }, [menteeId, specialistId])
+  }, [menteeId, specialistId, channel])
 
   const initialScrollDone = useRef(false)
   useEffect(() => {
@@ -297,7 +297,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
       })
       .subscribe()
     return () => { supabase.removeChannel(realtimeChannel) }
-  }, [menteeId])
+  }, [menteeId, channel])
 
   // ─── Upload to Supabase Storage ───
   async function uploadFile(file: File | Blob, filename: string): Promise<string | null> {

@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { NicheSelect } from '@/components/niche-select'
 import {
   Select,
   SelectContent,
@@ -207,7 +208,7 @@ export function ActionPlanForm({ token, menteeName }: ActionPlanFormProps) {
           <FormCard number={3} label="Informações da empresa">
             <div className="space-y-3">
               <div className="space-y-1"><label className="text-xs font-medium text-muted-foreground">Nome da empresa</label><Input value={nomeEmpresa} onChange={(e) => setNomeEmpresa(e.target.value)} placeholder="Nome da sua empresa" /></div>
-              <div className="space-y-1"><label className="text-xs font-medium text-muted-foreground">Nicho</label><Input value={nicho} onChange={(e) => setNicho(e.target.value)} placeholder="Ex: Estética, Marketing Digital, Alimentação..." /></div>
+              <div className="space-y-1"><label className="text-xs font-medium text-muted-foreground">Nicho</label><NicheSelect value={nicho} onChange={setNicho} /></div>
               <div className="space-y-1">
                 <label className="text-xs font-medium text-muted-foreground">Número de colaboradores</label>
                 <Select value={numColaboradores} onValueChange={setNumColaboradores}><SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger><SelectContent>{EMPLOYEE_RANGES.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent></Select>

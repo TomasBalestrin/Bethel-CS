@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { NICHE_OPTIONS } from '@/components/niche-select'
 import Image from 'next/image'
 import { Badge } from '@/components/ui/badge'
 import { formatDateBR } from '@/lib/format'
@@ -66,7 +67,11 @@ export function TestimonialsList({ testimonials }: TestimonialsListProps) {
   })
 
   // Get unique filter values
-  const niches = Array.from(new Set(testimonials.map((t) => t.niche).filter(Boolean))) as string[]
+  // Niche options: predefined standard list first, then any legacy free-text
+  // values from the DB that don't match one (kept so filter still works for old data).
+  const dbNiches = Array.from(new Set(testimonials.map((t) => t.niche).filter(Boolean))) as string[]
+  const legacyNiches = dbNiches.filter((n) => !(NICHE_OPTIONS as readonly string[]).includes(n))
+  const niches = [...NICHE_OPTIONS, ...legacyNiches]
   const revenueRanges = Array.from(new Set(testimonials.map((t) => t.revenue_range).filter(Boolean))) as string[]
   const employeeCounts = Array.from(new Set(testimonials.map((t) => t.employee_count).filter(Boolean))) as string[]
 

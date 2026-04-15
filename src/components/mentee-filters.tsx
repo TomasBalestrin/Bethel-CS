@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Filter, ChevronDown, ChevronUp, X } from 'lucide-react'
 import { useState } from 'react'
+import { NICHE_OPTIONS } from '@/components/niche-select'
 
 const EMPLOYEE_RANGES = ['0 - 1', '2 - 5', '6 - 10', '11 - 20', '21 - 50', '50 - 100', 'Acima de 100']
 
@@ -249,16 +250,21 @@ export function MenteeFilters({ filters, onFilterChange, onClearAll, options }: 
               </Select>
             </div>
 
-            {/* Nicho */}
+            {/* Nicho — standardized options first, then any legacy free-text values from DB */}
             <div className="space-y-1">
               <Label className="text-xs">Nicho</Label>
               <Select value={filters.nicho || '__all__'} onValueChange={(v) => onFilterChange('nicho', v === '__all__' ? '' : v)}>
                 <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Todos" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="__all__">Todos</SelectItem>
-                  {options.nichos.map((n) => (
+                  {NICHE_OPTIONS.map((n) => (
                     <SelectItem key={n} value={n}>{n}</SelectItem>
                   ))}
+                  {options.nichos
+                    .filter((n) => !(NICHE_OPTIONS as readonly string[]).includes(n))
+                    .map((n) => (
+                      <SelectItem key={n} value={n}>{n}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

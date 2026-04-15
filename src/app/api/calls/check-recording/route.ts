@@ -35,11 +35,12 @@ export async function POST(request: NextRequest) {
     const recordings = await getRecordings(call.daily_room_name)
 
     if (recordings.length > 0) {
-      const rec = recordings[0]
+      // Pick the first recording with a usable download URL
+      const rec = recordings.find((r) => !!r.download_url) || recordings[0]
       // Only mark as 'ready' if we actually have a download URL
       // Daily may return the recording before processing is complete (without download_link)
       if (!rec.download_url) {
-        console.log('[check-recording] Recording found but download_url missing — still processing')
+        console.log('[check-recording] Recording found but download_url missing — still processing (status:', rec.status, ')')
         return NextResponse.json({ status: 'pending' })
       }
       await supabase

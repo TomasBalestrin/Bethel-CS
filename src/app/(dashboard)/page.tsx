@@ -58,7 +58,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   const dataTermino = searchParams.dataTermino || null
 
   // ─── Mentees (only fields needed for dashboard) ───
-  let menteesQuery = supabase.from('mentees').select('id, status, cliente_fit, priority_level, created_by, faturamento_atual, faturamento_antes_mentoria, funnel_origin, closer_name, birth_date, state, niche, start_date, end_date')
+  let menteesQuery = supabase.from('mentees').select('id, status, cliente_fit, priority_level, created_by, faturamento_atual, faturamento_antes_mentoria, funnel_origin, closer_name, birth_date, state, niche, start_date, end_date, product_name')
   // Specialists always see only their own mentees
   if (!isAdmin && user) {
     menteesQuery = menteesQuery.eq('created_by', user.id)

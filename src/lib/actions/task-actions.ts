@@ -94,7 +94,7 @@ export async function createTask(data: {
   if (data.assigned_to) insertData.assigned_to = data.assigned_to
   else insertData.assigned_to = user.id // default to creator
 
-  const { data: task, error } = await supabase.from('tasks').insert(insertData).select().single()
+  const { data: task, error } = await supabase.from('tasks').insert(insertData as never).select().single()
 
   if (error) return { error: error.message, task: null }
   revalidatePath('/tarefas')

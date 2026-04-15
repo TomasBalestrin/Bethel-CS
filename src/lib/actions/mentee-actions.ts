@@ -912,13 +912,8 @@ export async function bulkImportStages(input: BulkStageInput): Promise<BulkImpor
       const phoneToUse = phoneDigits || `000000000000${Date.now()}${i}`
 
       const insertData: Record<string, unknown> = {
-        full_name: matchValue.trim(),
-        phone: phoneToUse,
         product_name: parsedFields.product_name || 'Importado',
         start_date: parsedFields.start_date || new Date().toISOString().slice(0, 10),
-        status: menteeStatus,
-        kanban_type: stage.type,
-        current_stage_id: stage.id,
         priority_level: 1,
         created_by: parsedFields.created_by || user.id,
         ...parsedFields, // overrides product_name/start_date/created_by if present
@@ -932,7 +927,7 @@ export async function bulkImportStages(input: BulkStageInput): Promise<BulkImpor
 
       const { data: newMentee, error: createError } = await supabase
         .from('mentees')
-        .insert(insertData)
+        .insert(insertData as never)
         .select('id')
         .single()
 
@@ -966,7 +961,7 @@ export async function bulkImportStages(input: BulkStageInput): Promise<BulkImpor
 
     const { error } = await supabase
       .from('mentees')
-      .update(updateData)
+      .update(updateData as never)
       .eq('id', menteeId)
 
     if (error) { errors.push({ row: rowNum, name: matchValue, error: error.message }); continue }

@@ -55,6 +55,7 @@ export default async function EtapasIniciaisPage() {
     { data: activeSessions },
     { data: lastMessages },
     { data: allProfilesData },
+    { data: deptAssignmentsData },
   ] = await Promise.all([
     menteeIds.length > 0
       ? supabase.from('attendances').select('mentee_id').in('mentee_id', menteeIds)
@@ -72,9 +73,11 @@ export default async function EtapasIniciaisPage() {
       ? supabase.from('wpp_messages').select('mentee_id, sent_at').in('mentee_id', menteeIds).order('sent_at', { ascending: false })
       : Promise.resolve({ data: [] as { mentee_id: string; sent_at: string }[] }),
     supabase.from('profiles').select('id, full_name, role').order('full_name'),
+    supabase.from('department_assignments').select('user_id, department'),
   ])
 
   const allProfiles = (allProfilesData ?? []) as { id: string; full_name: string; role: string }[]
+  const deptAssignments = (deptAssignmentsData ?? []) as { user_id: string; department: string }[]
 
   // Build stats maps
   const attendanceMap = new Map<string, number>()
@@ -92,14 +95,14 @@ export default async function EtapasIniciaisPage() {
     revenueMap.set(r.mentee_id, (revenueMap.get(r.mentee_id) ?? 0) + Number(r.sale_value))
   })
 
-  // Build map: menteeId → [{ channel, specialist_name }, ...] from active sessions
+  // Build map: menteeId → [{ channel, specialist_name, specialist_id }, ...] from active sessions
   const profileNameMap = new Map(allProfiles.map((p) => [p.id, p.full_name]))
-  const activeSessionsMap = new Map<string, Array<{ channel: string; specialist_name: string }>>()
+  const activeSessionsMap = new Map<string, Array<{ channel: string; specialist_name: string; specialist_id?: string }>>()
   const activeSessionsArr = (activeSessions ?? []) as unknown as Array<{ mentee_id: string; channel?: string; specialist_id?: string }>
   activeSessionsArr.forEach((s) => {
     const name = s.specialist_id ? profileNameMap.get(s.specialist_id) ?? 'Especialista' : 'Especialista'
     const arr = activeSessionsMap.get(s.mentee_id) ?? []
-    arr.push({ channel: s.channel || 'principal', specialist_name: name })
+    arr.push({ channel: s.channel || 'principal', specialist_name: name, specialist_id: s.specialist_id })
     activeSessionsMap.set(s.mentee_id, arr)
   })
 
@@ -130,6 +133,31 @@ export default async function EtapasIniciaisPage() {
   const produtos = Array.from(new Set(menteeList.map((m) => m.product_name).filter(Boolean))) as string[]
   const especialistas = allProfiles.filter((s) => s.role === 'especialista')
 
+  // Attendant options for "Em atendimento" filter:
+  // anyone who can attend a channel = specialists (Principal) + users assigned to a department (Comercial/Marketing/Gestão)
+  const DEPT_LABEL: Record<string, string> = { comercial: 'Comercial', marketing: 'Marketing', gestao: 'Gestão' }
+  const attendantIds = new Set<string>()
+  especialistas.forEach((s) => attendantIds.add(s.id))
+  deptAssignments.forEach((d) => attendantIds.add(d.user_id))
+  const userDepts = new Map<string, string[]>()
+  deptAssignments.forEach((d) => {
+    const arr = userDepts.get(d.user_id) ?? []
+    arr.push(DEPT_LABEL[d.department] ?? d.department)
+    userDepts.set(d.user_id, arr)
+  })
+  const attendants = Array.from(attendantIds)
+    .map((id) => {
+      const profile = allProfiles.find((p) => p.id === id)
+      if (!profile) return null
+      const channels: string[] = []
+      if (profile.role === 'especialista') channels.push('Principal')
+      const depts = userDepts.get(id) ?? []
+      channels.push(...depts)
+      return { id, full_name: profile.full_name, channels }
+    })
+    .filter((a): a is { id: string; full_name: string; channels: string[] } => !!a)
+    .sort((a, b) => a.full_name.localeCompare(b.full_name))
+
   return (
     <KanbanBoard
       title="Etapas Iniciais"
@@ -139,6 +167,7 @@ export default async function EtapasIniciaisPage() {
       existingMentees={menteeList.map((m) => ({ id: m.id, full_name: m.full_name }))}
       isAdmin={userRole === 'admin'}
       specialists={allProfiles}
+      attendants={attendants}
       filterOptions={{ funisOrigem: funisOrigem.sort(), closers: closers.sort(), nichos: nichos.sort(), produtos: produtos.sort(), especialistas }}
     />
   )

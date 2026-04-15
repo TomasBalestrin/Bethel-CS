@@ -50,6 +50,8 @@ interface KanbanBoardProps {
   existingMentees: { id: string; full_name: string }[]
   isAdmin?: boolean
   specialists?: { id: string; full_name: string }[]
+  /** People who can be in attendance (specialists + dept-assigned users) — used by the "Em atendimento" filter */
+  attendants?: { id: string; full_name: string; channels: string[] }[]
   filterOptions?: { funisOrigem: string[]; closers: string[]; nichos: string[]; produtos?: string[]; especialistas?: { id: string; full_name: string }[] }
 }
 
@@ -61,6 +63,7 @@ export function KanbanBoard({
   existingMentees,
   isAdmin = false,
   specialists = [],
+  attendants = [],
   filterOptions = { funisOrigem: [], closers: [], nichos: [] },
 }: KanbanBoardProps) {
   const [mentees, setMentees] = useState<MenteeWithStats[]>(initialMentees)
@@ -181,11 +184,14 @@ export function KanbanBoard({
       if (!m.full_name?.toLowerCase().includes(q)) return false
     }
     if (selectedSpecialist !== 'all' && m.created_by !== selectedSpecialist) return false
-    // Em atendimento filter
+    // Em atendimento filter — matches by who is actually attending (session.specialist_id),
+    // not by the mentee owner. This way "Em atendimento — Hannah" returns mentees whose
+    // active session is on the Comercial channel started by Hannah, regardless of owner.
     if (atendimentoFilter === 'active_all') {
       if (!m.has_active_session) return false
     } else if (atendimentoFilter !== 'all') {
-      if (!m.has_active_session || m.created_by !== atendimentoFilter) return false
+      const sessions = m.active_sessions ?? []
+      if (!sessions.some((s) => s.specialist_id === atendimentoFilter)) return false
     }
     // Advanced filters
     if (advFilters.funilOrigem && m.funnel_origin !== advFilters.funilOrigem) return false
@@ -290,9 +296,12 @@ export function KanbanBoard({
             <SelectContent>
               <SelectItem value="all">Todos (sem filtro)</SelectItem>
               <SelectItem value="active_all">Em atendimento (todos)</SelectItem>
-              {specialists.length > 0 && specialists.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  Em atendimento — {s.full_name}
+              {attendants.length > 0 && attendants.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  Em atendimento — {a.full_name}
+                  {a.channels.length > 0 && (
+                    <span className="text-muted-foreground"> ({a.channels.join(', ')})</span>
+                  )}
                 </SelectItem>
               ))}
             </SelectContent>

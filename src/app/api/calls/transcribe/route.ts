@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import OpenAI from 'openai'
 
+// Transcription + summary can take ~1-3 min for long calls. Default 60s timeout
+// was killing the function mid-way and leaving calls stuck in 'processing'.
+export const maxDuration = 300 // 5 minutes (Vercel Pro limit)
+
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY || '' })
 
 export async function POST(request: NextRequest) {
@@ -13,7 +17,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'OPENAI_API_KEY não configurada' }, { status: 500 })
   }
 
-  const { callId } = await request.json()
+  const body = await request.json()
+  const { callId } = body
   if (!callId) return NextResponse.json({ error: 'callId obrigatório' }, { status: 400 })
 
   // Get the call record
@@ -25,7 +30,13 @@ export async function POST(request: NextRequest) {
 
   if (!call) return NextResponse.json({ error: 'Ligação não encontrada' }, { status: 404 })
   if (call.transcription_status === 'ready') return NextResponse.json({ status: 'ready' })
-  if (call.transcription_status === 'processing') return NextResponse.json({ status: 'processing' })
+  // Allow retry when force=true — used by "Transcrever" button and recovery flow
+  // to recover from previous attempts that exceeded the serverless timeout and
+  // left the row stuck in 'processing' forever.
+  const { force } = body
+  if (call.transcription_status === 'processing' && !force) {
+    return NextResponse.json({ status: 'processing' })
+  }
   if (call.recording_status !== 'ready' || !call.recording_url) {
     return NextResponse.json({ error: 'Gravação ainda não está disponível' }, { status: 400 })
   }

@@ -140,13 +140,12 @@ export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, sp
               <span className="text-[10px] font-semibold text-success">Em atendimento</span>
             </div>
             {mentee.active_sessions && mentee.active_sessions.length > 0 && (
-              <div className="mt-0.5 pl-4 flex flex-wrap gap-x-2 gap-y-0.5">
-                {mentee.active_sessions.map((s, i) => (
-                  <span key={i} className="text-[10px] text-success/90">
-                    {s.specialist_name}
-                    <span className="text-success/60"> · {formatChannelLabel(s.channel)}</span>
-                  </span>
-                ))}
+              <div className="mt-0.5 pl-4">
+                {/* Only one active attendance per mentee — show the most recent */}
+                <span className="text-[10px] text-success/90">
+                  {mentee.active_sessions[0].specialist_name}
+                  <span className="text-success/60"> · {formatChannelLabel(mentee.active_sessions[0].channel)}</span>
+                </span>
               </div>
             )}
           </div>

@@ -45,7 +45,6 @@ interface DeliveryEvent extends EntregaEvent {
 
 interface EntregasListProps {
   events: DeliveryEvent[]
-  profiles: { id: string; full_name: string }[]
 }
 
 function getMonthLabel(month: string) {
@@ -59,7 +58,7 @@ function getCurrentMonth() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 }
 
-export function EntregasList({ events, profiles }: EntregasListProps) {
+export function EntregasList({ events }: EntregasListProps) {
   const router = useRouter()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [monthFilter, setMonthFilter] = useState('')
@@ -73,7 +72,7 @@ export function EntregasList({ events, profiles }: EntregasListProps) {
     title: '',
     description: '',
     reference_month: getCurrentMonth(),
-    presenter_id: '',
+    presenter_name: '',
   })
   const [saving, setSaving] = useState(false)
 
@@ -113,7 +112,7 @@ export function EntregasList({ events, profiles }: EntregasListProps) {
       title: form.title || null,
       description: form.description || null,
       reference_month: form.reference_month || null,
-      presenter_id: form.presenter_id || null,
+      presenter_name: form.presenter_name || null,
     })
     setSaving(false)
     if (result.error) {
@@ -127,7 +126,7 @@ export function EntregasList({ events, profiles }: EntregasListProps) {
       title: '',
       description: '',
       reference_month: getCurrentMonth(),
-      presenter_id: '',
+      presenter_name: '',
     })
     setDialogOpen(false)
     router.refresh()
@@ -215,9 +214,7 @@ export function EntregasList({ events, profiles }: EntregasListProps) {
           </div>
         )}
         {filtered.map((event) => {
-          const presenterName = event.presenter_id
-            ? profiles.find((p) => p.id === event.presenter_id)?.full_name
-            : null
+          const presenterName = event.presenter_name
           return (
             <button
               key={event.id}
@@ -283,15 +280,11 @@ export function EntregasList({ events, profiles }: EntregasListProps) {
               </div>
               <div className="space-y-1">
                 <Label>Quem fez a entrega</Label>
-                <Select value={form.presenter_id || '__none__'} onValueChange={(v) => setForm({ ...form, presenter_id: v === '__none__' ? '' : v })}>
-                  <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">— Nenhum —</SelectItem>
-                    {profiles.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input
+                  value={form.presenter_name}
+                  onChange={(e) => setForm({ ...form, presenter_name: e.target.value })}
+                  placeholder="Nome de quem entregou"
+                />
               </div>
             </div>
           </div>
@@ -308,7 +301,6 @@ export function EntregasList({ events, profiles }: EntregasListProps) {
       {selectedEvent && (
         <EntregaPanel
           event={selectedEvent}
-          profiles={profiles}
           onClose={() => setSelectedEvent(null)}
         />
       )}

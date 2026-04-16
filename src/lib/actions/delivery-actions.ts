@@ -9,7 +9,7 @@ export interface DeliveryEventInput {
   reference_month?: string | null
   title?: string | null
   description?: string | null
-  presenter_id?: string | null
+  presenter_name?: string | null
 }
 
 /** Create a single delivery event (the new per-delivery panel flow). */
@@ -29,7 +29,7 @@ export async function createDeliveryEvent(input: DeliveryEventInput) {
       reference_month: input.reference_month ?? null,
       title: input.title ?? null,
       description: input.description ?? null,
-      presenter_id: input.presenter_id ?? null,
+      presenter_name: input.presenter_name ?? null,
     } as never)
     .select('*')
     .single()
@@ -50,7 +50,7 @@ export async function updateDeliveryEvent(id: string, input: Partial<DeliveryEve
   if (input.reference_month !== undefined) updates.reference_month = input.reference_month
   if (input.title !== undefined) updates.title = input.title
   if (input.description !== undefined) updates.description = input.description
-  if (input.presenter_id !== undefined) updates.presenter_id = input.presenter_id
+  if (input.presenter_name !== undefined) updates.presenter_name = input.presenter_name
 
   const { error } = await supabase
     .from('delivery_events')

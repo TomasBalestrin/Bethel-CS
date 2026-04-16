@@ -43,7 +43,7 @@ export interface EntregaEvent {
   title: string | null
   description: string | null
   reference_month: string | null
-  presenter_id: string | null
+  presenter_name: string | null
   participation_count: number
 }
 
@@ -56,11 +56,10 @@ interface Participant {
 
 interface EntregaPanelProps {
   event: EntregaEvent
-  profiles: { id: string; full_name: string }[]
   onClose: () => void
 }
 
-export function EntregaPanel({ event, profiles, onClose }: EntregaPanelProps) {
+export function EntregaPanel({ event, onClose }: EntregaPanelProps) {
   const router = useRouter()
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({
@@ -69,7 +68,7 @@ export function EntregaPanel({ event, profiles, onClose }: EntregaPanelProps) {
     title: event.title ?? '',
     description: event.description ?? '',
     reference_month: event.reference_month ?? '',
-    presenter_id: event.presenter_id ?? '',
+    presenter_name: event.presenter_name ?? '',
   })
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -113,8 +112,6 @@ export function EntregaPanel({ event, profiles, onClose }: EntregaPanelProps) {
     })()
   }, [event.id])
 
-  const presenterName = profiles.find((p) => p.id === event.presenter_id)?.full_name ?? null
-
   async function handleSave() {
     setSaving(true)
     const result = await updateDeliveryEvent(event.id, {
@@ -123,7 +120,7 @@ export function EntregaPanel({ event, profiles, onClose }: EntregaPanelProps) {
       title: form.title || null,
       description: form.description || null,
       reference_month: form.reference_month || null,
-      presenter_id: form.presenter_id || null,
+      presenter_name: form.presenter_name || null,
     })
     setSaving(false)
     if (result.error) {
@@ -289,7 +286,7 @@ export function EntregaPanel({ event, profiles, onClose }: EntregaPanelProps) {
                   title: event.title ?? '',
                   description: event.description ?? '',
                   reference_month: event.reference_month ?? '',
-                  presenter_id: event.presenter_id ?? '',
+                  presenter_name: event.presenter_name ?? '',
                 }) }}>
                   Cancelar
                 </Button>
@@ -336,15 +333,11 @@ export function EntregaPanel({ event, profiles, onClose }: EntregaPanelProps) {
                   </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Quem fez a entrega</Label>
-                    <Select value={form.presenter_id || '__none__'} onValueChange={(v) => setForm({ ...form, presenter_id: v === '__none__' ? '' : v })}>
-                      <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">— Nenhum —</SelectItem>
-                        {profiles.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Input
+                      value={form.presenter_name}
+                      onChange={(e) => setForm({ ...form, presenter_name: e.target.value })}
+                      placeholder="Nome de quem entregou"
+                    />
                   </div>
                 </div>
               </>
@@ -355,7 +348,7 @@ export function EntregaPanel({ event, profiles, onClose }: EntregaPanelProps) {
                 {event.title && <Row label="Título" value={event.title} />}
                 {event.description && <Row label="Descrição" value={event.description} multiline />}
                 {event.reference_month && <Row label="Mês de referência" value={event.reference_month} />}
-                <Row label="Quem fez a entrega" value={presenterName ?? '—'} />
+                <Row label="Quem fez a entrega" value={event.presenter_name || '—'} />
               </dl>
             )}
           </div>

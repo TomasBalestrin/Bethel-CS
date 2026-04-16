@@ -47,12 +47,14 @@ import {
 import type { Database } from '@/types/database'
 import {
   DndContext,
+  DragOverlay,
   PointerSensor,
   useSensor,
   useSensors,
   useDraggable,
   useDroppable,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core'
 
 type TaskColumn = Database['public']['Tables']['task_columns']['Row']
@@ -94,6 +96,7 @@ export function TasksBoard({ columns, tasks: initialTasks, mentees, attachments:
   // dnd-kit sensors — require 5px movement before a click counts as drag,
   // so clicking the card still opens the detail modal.
   const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [specialistFilter, setSpecialistFilter] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -284,7 +287,10 @@ export function TasksBoard({ columns, tasks: initialTasks, mentees, attachments:
       {/* Kanban Board */}
       <DndContext
         sensors={dndSensors}
+        onDragStart={(event: DragStartEvent) => setActiveDragId(String(event.active.id))}
+        onDragCancel={() => setActiveDragId(null)}
         onDragEnd={async (event: DragEndEvent) => {
+          setActiveDragId(null)
           const { active, over } = event
           if (!over) return
           const taskId = String(active.id)
@@ -347,6 +353,18 @@ export function TasksBoard({ columns, tasks: initialTasks, mentees, attachments:
           )
         })}
       </div>
+      {/* Drag preview floats above all columns, freed from the overflow-y-auto
+          container — without this, dragging out of a column just scrolls inside it. */}
+      <DragOverlay dropAnimation={null}>
+        {activeDragId
+          ? (() => {
+              const t = tasks.find((x) => x.id === activeDragId)
+              return t ? (
+                <TaskCard task={t} mentees={mentees} specialists={specialists} onDetail={() => {}} />
+              ) : null
+            })()
+          : null}
+      </DragOverlay>
       </DndContext>
 
       {/* ── Create/Edit Task Dialog ── */}
@@ -587,13 +605,13 @@ function TaskCard({ task, mentees, specialists, onDetail, isOverdue: overdue }: 
   const assignedId = (task as unknown as { assigned_to?: string | null }).assigned_to
   const assigneeName = assignedId ? specialists.find((s) => s.id === assignedId)?.full_name : null
 
-  // Draggable (dnd-kit)
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  // Draggable (dnd-kit). The visual preview is rendered by <DragOverlay> at the
+  // board level, so here we only hide the source card while it's being dragged.
+  // No translate3d — that was fighting with the column's overflow-y-auto.
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
   })
-  const dragStyle = transform
-    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, opacity: isDragging ? 0.6 : 1 }
-    : undefined
+  const dragStyle = isDragging ? { opacity: 0.4 } : undefined
 
   // Resolve the effective deadline: prefer due_at (precise timestamp) and fall
   // back to due_date @ 18:00 local for legacy rows. Then derive visual urgency.

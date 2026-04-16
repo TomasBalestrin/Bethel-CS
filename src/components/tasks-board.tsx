@@ -45,6 +45,15 @@ import {
   deleteTaskColumn,
 } from '@/lib/actions/task-actions'
 import type { Database } from '@/types/database'
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDraggable,
+  useDroppable,
+  type DragEndEvent,
+} from '@dnd-kit/core'
 
 type TaskColumn = Database['public']['Tables']['task_columns']['Row']
 type Task = Database['public']['Tables']['tasks']['Row']
@@ -81,6 +90,10 @@ export function TasksBoard({ columns, tasks: initialTasks, mentees, attachments:
     const id = setInterval(() => setNowTick((n) => n + 1), 60 * 1000)
     return () => clearInterval(id)
   }, [])
+
+  // dnd-kit sensors — require 5px movement before a click counts as drag,
+  // so clicking the card still opens the detail modal.
+  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   const [specialistFilter, setSpecialistFilter] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -269,6 +282,30 @@ export function TasksBoard({ columns, tasks: initialTasks, mentees, attachments:
       </div>
 
       {/* Kanban Board */}
+      <DndContext
+        sensors={dndSensors}
+        onDragEnd={async (event: DragEndEvent) => {
+          const { active, over } = event
+          if (!over) return
+          const taskId = String(active.id)
+          const newColumnId = String(over.id)
+          const current = tasks.find((t) => t.id === taskId)
+          if (!current || current.column_id === newColumnId) return
+          const previous = tasks
+          // Optimistic: detect if target column is "Concluídas" so completed_at updates immediately
+          const targetCol = columns.find((c) => c.id === newColumnId)
+          const isCompletedCol = (targetCol?.name || '').toLowerCase().includes('conclu')
+          setTasks((prev) => prev.map((t) => t.id === taskId
+            ? { ...t, column_id: newColumnId, completed_at: isCompletedCol ? new Date().toISOString() : null }
+            : t
+          ))
+          const result = await moveTask(taskId, newColumnId)
+          if (result.error) {
+            setTasks(previous)
+            toast.error('Erro ao mover tarefa: ' + result.error)
+          }
+        }}
+      >
       <div className="flex gap-4 overflow-x-auto pb-4" style={{ minHeight: '60vh' }}>
         {/* Overdue column (auto) */}
         {overdueTasks.length > 0 && (
@@ -280,7 +317,7 @@ export function TasksBoard({ columns, tasks: initialTasks, mentees, attachments:
             </div>
             <div className="p-2 space-y-2 max-h-[65vh] overflow-y-auto">
               {overdueTasks.map((task) => (
-                <TaskCard key={task.id} task={task} mentees={mentees} onDetail={setTaskDetail} isOverdue />
+                <TaskCard key={task.id} task={task} mentees={mentees} specialists={specialists} onDetail={setTaskDetail} isOverdue />
               ))}
             </div>
           </div>
@@ -290,14 +327,14 @@ export function TasksBoard({ columns, tasks: initialTasks, mentees, attachments:
         {columns.map((col) => {
           const colTasks = tasksByColumn(col.id)
           return (
-            <div key={col.id} className="shrink-0 w-[300px] rounded-xl border border-border bg-card">
-              <div className="flex items-center gap-2 px-4 py-3 border-b border-border" style={{ borderTopColor: col.color || undefined, borderTopWidth: col.color ? 3 : undefined }}>
+            <DroppableColumn key={col.id} id={col.id} color={col.color}>
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
                 <h3 className="font-heading font-semibold text-sm">{col.name}</h3>
                 <Badge variant="muted" className="ml-auto text-[10px]">{colTasks.length}</Badge>
               </div>
               <div className="p-2 space-y-2 max-h-[65vh] overflow-y-auto">
                 {colTasks.map((task) => (
-                  <TaskCard key={task.id} task={task} mentees={mentees} onDetail={setTaskDetail} />
+                  <TaskCard key={task.id} task={task} mentees={mentees} specialists={specialists} onDetail={setTaskDetail} />
                 ))}
                 <button
                   onClick={() => openNew(col.id)}
@@ -306,10 +343,11 @@ export function TasksBoard({ columns, tasks: initialTasks, mentees, attachments:
                   <Plus className="h-3 w-3" /> Adicionar
                 </button>
               </div>
-            </div>
+            </DroppableColumn>
           )
         })}
       </div>
+      </DndContext>
 
       {/* ── Create/Edit Task Dialog ── */}
       <Dialog open={showForm} onOpenChange={(open) => { if (!open) { resetForm(); setShowForm(false) } }}>
@@ -517,14 +555,45 @@ export function TasksBoard({ columns, tasks: initialTasks, mentees, attachments:
   )
 }
 
+// ─── Droppable Column ───
+function DroppableColumn({ id, color, children }: {
+  id: string
+  color: string | null
+  children: React.ReactNode
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id })
+  return (
+    <div
+      ref={setNodeRef}
+      className={`shrink-0 w-[300px] rounded-xl border bg-card transition-colors ${
+        isOver ? 'border-accent/70 bg-accent/5' : 'border-border'
+      }`}
+      style={{ borderTopColor: color || undefined, borderTopWidth: color ? 3 : undefined }}
+    >
+      {children}
+    </div>
+  )
+}
+
 // ─── Task Card ───
-function TaskCard({ task, mentees, onDetail, isOverdue: overdue }: {
+function TaskCard({ task, mentees, specialists, onDetail, isOverdue: overdue }: {
   task: Task
   mentees: { id: string; full_name: string }[]
+  specialists: { id: string; full_name: string }[]
   onDetail: (task: Task) => void
   isOverdue?: boolean
 }) {
   const menteeName = task.mentee_id ? mentees.find((m) => m.id === task.mentee_id)?.full_name : null
+  const assignedId = (task as unknown as { assigned_to?: string | null }).assigned_to
+  const assigneeName = assignedId ? specialists.find((s) => s.id === assignedId)?.full_name : null
+
+  // Draggable (dnd-kit)
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: task.id,
+  })
+  const dragStyle = transform
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, opacity: isDragging ? 0.6 : 1 }
+    : undefined
 
   // Resolve the effective deadline: prefer due_at (precise timestamp) and fall
   // back to due_date @ 18:00 local for legacy rows. Then derive visual urgency.
@@ -570,8 +639,12 @@ function TaskCard({ task, mentees, onDetail, isOverdue: overdue }: {
 
   return (
     <div
-      onClick={() => onDetail(task)}
-      className={`cursor-pointer rounded-lg border p-3 text-sm transition-all hover:shadow-md ${cardClass}`}
+      ref={setNodeRef}
+      style={dragStyle}
+      {...attributes}
+      {...listeners}
+      onClick={() => { if (!isDragging) onDetail(task) }}
+      className={`cursor-grab active:cursor-grabbing rounded-lg border p-3 text-sm transition-all hover:shadow-md ${cardClass}`}
     >
       <p className="font-medium text-foreground leading-tight">{task.title}</p>
       {task.description && (
@@ -586,8 +659,14 @@ function TaskCard({ task, mentees, onDetail, isOverdue: overdue }: {
             {urgency === 'due_soon' && ' · em breve'}
           </span>
         )}
+        {assigneeName && (
+          <span className="inline-flex items-center gap-1 text-[10px] font-medium text-accent">
+            <User className="h-3 w-3" />
+            {assigneeName.split(' ')[0]}
+          </span>
+        )}
         {menteeName && (
-          <span className="inline-flex items-center gap-1 text-[10px] text-accent">
+          <span className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
             <User className="h-3 w-3" />
             {menteeName}
           </span>

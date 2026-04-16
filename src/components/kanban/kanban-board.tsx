@@ -72,7 +72,7 @@ export function KanbanBoard({
   const [selectedSpecialist, setSelectedSpecialist] = useState<string>('all')
   const [atendimentoFilter, setAtendimentoFilter] = useState<string>('all')
   const [advFilters, setAdvFilters] = useState<MenteeFilterValues>(EMPTY_FILTERS)
-  const { unreadMap, lastMessageMap } = useUnreadCounts()
+  const { unreadMap } = useUnreadCounts()
   const specialistNameMap = useMemo(() => new Map(specialists.map((s) => [s.id, s.full_name])), [specialists])
 
   useEffect(() => {

@@ -250,7 +250,13 @@ export function TasksBoard({ columns, tasks: initialTasks, mentees, attachments:
 
   // Separate overdue tasks
   const overdueTasks = filteredTasks.filter(isOverdue)
-  const tasksByColumn = (colId: string) => filteredTasks.filter((t) => t.column_id === colId && !isOverdue(t))
+  // NOTE: overdue tasks are shown in BOTH the virtual "Atrasadas" column AND
+  // their real column. Previously they were excluded from the real column, so
+  // dragging a card from "Atrasadas" to "A fazer" made it visually snap back
+  // to "Atrasadas" (column_id had changed in DB, but the card was still overdue
+  // so it was filtered out of the target column). Showing it in both places
+  // keeps the "Atrasadas" warning useful AND reflects the drop target correctly.
+  const tasksByColumn = (colId: string) => filteredTasks.filter((t) => t.column_id === colId)
 
   return (
     <div className="space-y-6">

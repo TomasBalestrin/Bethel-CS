@@ -240,11 +240,17 @@ export async function POST(request: NextRequest) {
       // 3b. Deduplicate outgoing messages against our /api/whatsapp/send INSERT.
       // NextTrack returns a different messageId in the send-text response than
       // it emits in the webhook event, so messageId-based dedup alone misses
-      // this. Instead, for fromMe=true we look for a recent outgoing row whose
-      // content matches the webhook content (accounting for the signature
-      // prefix *...*: that /send did not store). If found, update its
-      // message_id so future status events line up, and skip the INSERT.
+      // this. Two sub-strategies:
+      //   (i)  TEXT: compare webhook content (after stripping the signature
+      //        prefix *...*:) against recent outgoing content.
+      //   (ii) MEDIA: when sent without caption, content is empty — instead
+      //        match on (mentee_id + direction=outgoing + same message_type +
+      //        last 60s). This is aggressive but handles the common case
+      //        where a user sends a single image/audio/video/doc that the
+      //        webhook echoes back.
       if (data.fromMe === true) {
+        const rawTypeEarly = (data.messageType as string) || 'text'
+        const isMediaEarly = rawTypeEarly && rawTypeEarly !== 'text'
         const webhookContent = extractContent(data) ?? ''
         const stripSig = (s: string) => {
           const m = s.match(/^\*[^*\n]+\*:\s*([\s\S]+)$/)
@@ -266,12 +272,38 @@ export async function POST(request: NextRequest) {
             return rc && (rc === bareWebhook || stripSig(rc) === bareWebhook)
           })
           if (match) {
-            console.log('[WPP Webhook] SKIP: matches recent outgoing from /send route (', match.id, ')')
+            console.log('[WPP Webhook] SKIP: matches recent outgoing text from /send route (', match.id, ')')
             if (messageId) {
               await supabase
                 .from('wpp_messages')
                 .update({ message_id: messageId } as never)
                 .eq('id', match.id)
+            }
+            return NextResponse.json({ ok: true })
+          }
+        }
+        if (isMediaEarly) {
+          // Media dedup: our /send stored a row with the same message_type
+          // in the last minute — very likely the same message the webhook
+          // is now echoing back. Skip to avoid showing the image/audio twice.
+          const oneMinAgo = new Date(Date.now() - 60 * 1000).toISOString()
+          const { data: recentMedia } = await supabase
+            .from('wpp_messages')
+            .select('id')
+            .eq('mentee_id', mentee.id)
+            .eq('direction', 'outgoing')
+            .eq('message_type', rawTypeEarly as 'text' | 'image' | 'audio' | 'video' | 'document' | 'location' | 'sticker')
+            .gte('sent_at', oneMinAgo)
+            .order('sent_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+          if (recentMedia) {
+            console.log('[WPP Webhook] SKIP: matches recent outgoing', rawTypeEarly, 'from /send route (', recentMedia.id, ')')
+            if (messageId) {
+              await supabase
+                .from('wpp_messages')
+                .update({ message_id: messageId } as never)
+                .eq('id', recentMedia.id)
             }
             return NextResponse.json({ ok: true })
           }

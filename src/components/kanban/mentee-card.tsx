@@ -1,6 +1,6 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import { Users, DollarSign, Star, Clock, Calendar, Headphones } from 'lucide-react'
@@ -38,10 +38,25 @@ interface MenteeCardProps {
   mentee: MenteeWithStats
   unreadCount?: number
   specialistName?: string
+  /** Timestamp ISO of the last INCOMING message — used to show the wait-time indicator. */
+  lastIncomingAt?: string
   onClick?: (mentee: MenteeWithStats) => void
 }
 
-export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, specialistName, onClick }: MenteeCardProps) {
+/** Format an elapsed duration in "Xd Yh Zmin" / "Xh Ymin" / "Xmin" / "Xs". */
+function formatDuration(ms: number): string {
+  const abs = Math.max(0, ms)
+  const totalMin = Math.floor(abs / 60000)
+  if (totalMin < 1) return `${Math.floor(abs / 1000)}s`
+  const days = Math.floor(totalMin / 1440)
+  const hours = Math.floor((totalMin % 1440) / 60)
+  const mins = totalMin % 60
+  if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`
+  if (hours > 0) return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`
+  return `${mins}min`
+}
+
+export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, specialistName, lastIncomingAt, onClick }: MenteeCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
       id: mentee.id,
@@ -63,6 +78,35 @@ export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, sp
   const isInactive = mentee.days_since_contact != null && mentee.days_since_contact >= 30
   const hasIndications = mentee.indication_count > 0
   const hasRevenue = mentee.revenue_total > 0
+
+  // Tick every 30s so the duration/wait indicators stay up-to-date without a
+  // full page refresh. Only starts the interval when this card actually has
+  // something to count (active session or unread incoming), to avoid pointless
+  // re-renders on every card in the board.
+  const activeSession = mentee.active_sessions?.[0]
+  const sessionStart = activeSession?.started_at
+  const hasWait = unreadCount > 0 && !!lastIncomingAt
+  const [, setNowTick] = useState(0)
+  useEffect(() => {
+    if (!sessionStart && !hasWait) return
+    const id = setInterval(() => setNowTick((n) => n + 1), 30 * 1000)
+    return () => clearInterval(id)
+  }, [sessionStart, hasWait])
+
+  // Elapsed time in session (only when has_active_session and started_at is present)
+  const sessionMs = sessionStart ? Date.now() - new Date(sessionStart).getTime() : 0
+  const sessionLabel = sessionStart ? formatDuration(sessionMs) : null
+
+  // Wait time for a mentee reply
+  const waitMs = lastIncomingAt ? Date.now() - new Date(lastIncomingAt).getTime() : 0
+  const waitLabel = hasWait ? formatDuration(waitMs) : null
+  const waitColorClass = !hasWait
+    ? ''
+    : waitMs >= 2 * 60 * 60 * 1000
+      ? 'text-red-700 bg-red-600/10 border-red-600/30'
+      : waitMs >= 30 * 60 * 1000
+        ? 'text-orange-600 bg-orange-500/10 border-orange-500/30'
+        : 'text-amber-700 bg-amber-500/10 border-amber-500/30'
 
   return (
     <div
@@ -138,6 +182,11 @@ export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, sp
               </span>
               <Headphones size={10} className="text-success" />
               <span className="text-[10px] font-semibold text-success">Em atendimento</span>
+              {sessionLabel && (
+                <span className="ml-auto inline-flex items-center gap-0.5 text-[10px] font-medium text-success/90 tabular">
+                  <Clock size={9} /> {sessionLabel}
+                </span>
+              )}
             </div>
             {mentee.active_sessions && mentee.active_sessions.length > 0 && (
               <div className="mt-0.5 pl-4">
@@ -148,6 +197,16 @@ export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, sp
                 </span>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Waiting-for-reply indicator: only when there's unread incoming. The
+            color progresses (amber → orange → red) as more time passes, so
+            overdue replies grab attention without flashing on fresh ones. */}
+        {waitLabel && (
+          <div className={`mt-2 rounded-md border px-2 py-1 flex items-center gap-1.5 text-[10px] font-medium ${waitColorClass}`}>
+            <Clock size={10} />
+            <span>Aguardando há {waitLabel}</span>
           </div>
         )}
 

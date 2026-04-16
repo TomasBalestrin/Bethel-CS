@@ -18,13 +18,14 @@ interface KanbanColumnProps {
   stage: KanbanStage
   mentees: MenteeWithStats[]
   unreadMap?: Record<string, number>
+  lastIncomingMap?: Record<string, string>
   specialistNameMap?: Map<string, string>
   onCardClick?: (mentee: MenteeWithStats) => void
   showAddButton?: boolean
   onAddClick?: () => void
 }
 
-export function KanbanColumn({ stage, mentees, unreadMap, specialistNameMap, onCardClick, showAddButton, onAddClick }: KanbanColumnProps) {
+export function KanbanColumn({ stage, mentees, unreadMap, lastIncomingMap, specialistNameMap, onCardClick, showAddButton, onAddClick }: KanbanColumnProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: stage.id,
   })
@@ -58,6 +59,7 @@ export function KanbanColumn({ stage, mentees, unreadMap, specialistNameMap, onC
               key={mentee.id}
               mentee={mentee}
               unreadCount={unreadMap?.[mentee.id] ?? 0}
+              lastIncomingAt={lastIncomingMap?.[mentee.id]}
               specialistName={mentee.created_by ? specialistNameMap?.get(mentee.created_by) : undefined}
               onClick={onCardClick}
             />

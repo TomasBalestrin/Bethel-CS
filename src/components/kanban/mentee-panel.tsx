@@ -1955,51 +1955,87 @@ const DELIVERY_TYPES = [
   { key: 'mkt', label: 'Mkt' },
   { key: 'extras', label: 'Entregas Extras' },
   { key: 'mentoria_individual', label: 'Mentoria Individual' },
+  { key: 'sos', label: 'SOS' },
+  { key: 'omv', label: 'OMV' },
 ]
 
+type DeliveryEventRow = { id: string; delivery_type: string; delivery_date: string; title: string | null }
+
 function CardEntregasMentoria({ menteeId, startDate }: { menteeId: string; startDate: string | null }) {
-  const [deliveryStats, setDeliveryStats] = useState<Record<string, { delivered: number; participated: number }>>({})
+  const [events, setEvents] = useState<DeliveryEventRow[]>([])
+  const [participatedIds, setParticipatedIds] = useState<Set<string>>(new Set())
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({})
   const supabase = createClient()
 
   useEffect(() => {
     async function fetchDeliveries() {
-      // Fetch all delivery events since mentee start date
-      let eventsQuery = supabase.from('delivery_events').select('id, delivery_type, delivery_date')
+      let eventsQuery = supabase.from('delivery_events').select('id, delivery_type, delivery_date, title')
       if (startDate) {
         eventsQuery = eventsQuery.gte('delivery_date', startDate)
       }
-      const { data: events } = await eventsQuery
+      const { data: evs } = await eventsQuery.order('delivery_date', { ascending: false })
 
-      // Fetch participations for this mentee
       const { data: participations } = await supabase
         .from('delivery_participations')
         .select('delivery_event_id')
         .eq('mentee_id', menteeId)
 
-      const participatedSet = new Set(participations?.map((p) => p.delivery_event_id) ?? [])
-
-      // Calculate stats per type
-      const stats: Record<string, { delivered: number; participated: number }> = {}
-      for (const dt of DELIVERY_TYPES) {
-        stats[dt.key] = { delivered: 0, participated: 0 }
-      }
-
-      events?.forEach((ev) => {
-        const type = ev.delivery_type
-        if (!stats[type]) stats[type] = { delivered: 0, participated: 0 }
-        stats[type].delivered++
-        if (participatedSet.has(ev.id)) {
-          stats[type].participated++
-        }
-      })
-
-      setDeliveryStats(stats)
+      setEvents((evs ?? []) as unknown as DeliveryEventRow[])
+      setParticipatedIds(new Set(participations?.map((p) => p.delivery_event_id) ?? []))
     }
     fetchDeliveries()
   }, [menteeId, startDate]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const totalDelivered = Object.values(deliveryStats).reduce((s, d) => s + d.delivered, 0)
-  const totalParticipated = Object.values(deliveryStats).reduce((s, d) => s + d.participated, 0)
+  const statsByType: Record<string, { delivered: number; participated: number; events: DeliveryEventRow[] }> = {}
+  for (const dt of DELIVERY_TYPES) {
+    statsByType[dt.key] = { delivered: 0, participated: 0, events: [] }
+  }
+  events.forEach((ev) => {
+    const bucket = statsByType[ev.delivery_type] ?? (statsByType[ev.delivery_type] = { delivered: 0, participated: 0, events: [] })
+    bucket.delivered++
+    bucket.events.push(ev)
+    if (participatedIds.has(ev.id)) bucket.participated++
+  })
+
+  const totalDelivered = Object.values(statsByType).reduce((s, d) => s + d.delivered, 0)
+  const totalParticipated = Object.values(statsByType).reduce((s, d) => s + d.participated, 0)
+
+  async function toggleParticipation(eventId: string, current: boolean) {
+    // Optimistic
+    setParticipatedIds((prev) => {
+      const next = new Set(prev)
+      if (current) next.delete(eventId)
+      else next.add(eventId)
+      return next
+    })
+
+    if (current) {
+      const { error } = await supabase
+        .from('delivery_participations')
+        .delete()
+        .eq('delivery_event_id', eventId)
+        .eq('mentee_id', menteeId)
+      if (error) {
+        toast.error('Erro ao desmarcar: ' + error.message)
+        setParticipatedIds((prev) => new Set(prev).add(eventId))
+      }
+    } else {
+      const { error } = await supabase
+        .from('delivery_participations')
+        .insert({ delivery_event_id: eventId, mentee_id: menteeId } as never)
+      if (error) {
+        const code = (error as { code?: string }).code
+        if (code !== '23505') {
+          toast.error('Erro ao marcar: ' + error.message)
+          setParticipatedIds((prev) => {
+            const next = new Set(prev)
+            next.delete(eventId)
+            return next
+          })
+        }
+      }
+    }
+  }
 
   return (
     <div className="p-4 space-y-4">
@@ -2013,27 +2049,56 @@ function CardEntregasMentoria({ menteeId, startDate }: { menteeId: string; start
 
       <div className="space-y-2">
         {DELIVERY_TYPES.map((dt) => {
-          const stat = deliveryStats[dt.key] ?? { delivered: 0, participated: 0 }
+          const stat = statsByType[dt.key] ?? { delivered: 0, participated: 0, events: [] }
           const pct = stat.delivered > 0 ? Math.round((stat.participated / stat.delivered) * 100) : 0
+          const isOpen = !!expanded[dt.key]
           return (
-            <div key={dt.key} className="rounded-lg border border-border bg-card p-3">
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="text-sm font-medium text-foreground">{dt.label}</p>
-                <span className="text-[10px] text-muted-foreground">{pct}%</span>
-              </div>
-              <div className="grid grid-cols-2 gap-3 text-xs">
-                <div>
-                  <span className="text-muted-foreground">Entregues: </span>
-                  <span className="font-semibold tabular">{stat.delivered}</span>
+            <div key={dt.key} className="rounded-lg border border-border bg-card">
+              <button
+                type="button"
+                onClick={() => setExpanded((prev) => ({ ...prev, [dt.key]: !prev[dt.key] }))}
+                className="w-full text-left p-3 hover:bg-muted/30 transition-colors rounded-lg"
+                disabled={stat.delivered === 0}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-sm font-medium text-foreground">{dt.label}</p>
+                  <span className="text-[10px] text-muted-foreground">{pct}%</span>
                 </div>
-                <div>
-                  <span className="text-muted-foreground">Participou: </span>
-                  <span className="font-semibold tabular text-success">{stat.participated}</span>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-muted-foreground">Entregues: </span>
+                    <span className="font-semibold tabular">{stat.delivered}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Participou: </span>
+                    <span className="font-semibold tabular text-success">{stat.participated}</span>
+                  </div>
                 </div>
-              </div>
-              {stat.delivered > 0 && (
-                <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${pct}%` }} />
+                {stat.delivered > 0 && (
+                  <div className="mt-1.5 h-1.5 rounded-full bg-muted overflow-hidden">
+                    <div className="h-full rounded-full bg-accent transition-all" style={{ width: `${pct}%` }} />
+                  </div>
+                )}
+              </button>
+              {isOpen && stat.events.length > 0 && (
+                <div className="border-t border-border px-3 py-2 space-y-1">
+                  {stat.events.map((ev) => {
+                    const checked = participatedIds.has(ev.id)
+                    return (
+                      <label key={ev.id} className="flex items-center gap-2 py-1 cursor-pointer text-xs hover:bg-muted/30 rounded px-1 -mx-1">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleParticipation(ev.id, checked)}
+                          className="h-3.5 w-3.5 rounded border-border accent-accent"
+                        />
+                        <span className={`flex-1 truncate ${checked ? 'text-foreground' : 'text-muted-foreground'}`}>
+                          {new Date(ev.delivery_date).toLocaleDateString('pt-BR')}
+                          {ev.title ? ` — ${ev.title}` : ''}
+                        </span>
+                      </label>
+                    )
+                  })}
                 </div>
               )}
             </div>

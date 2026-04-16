@@ -72,7 +72,7 @@ export function KanbanBoard({
   const [selectedSpecialist, setSelectedSpecialist] = useState<string>('all')
   const [atendimentoFilter, setAtendimentoFilter] = useState<string>('all')
   const [advFilters, setAdvFilters] = useState<MenteeFilterValues>(EMPTY_FILTERS)
-  const { unreadMap, lastMessageMap } = useUnreadCounts()
+  const { unreadMap } = useUnreadCounts()
   const specialistNameMap = useMemo(() => new Map(specialists.map((s) => [s.id, s.full_name])), [specialists])
 
   useEffect(() => {
@@ -226,21 +226,21 @@ export function KanbanBoard({
         if (unreadA > 0 && unreadB === 0) return -1
         if (unreadA === 0 && unreadB > 0) return 1
 
-        // 2. Active attendance session (Em atendimento) next
+        // 2. Em atendimento next
         if (a.has_active_session && !b.has_active_session) return -1
         if (!a.has_active_session && b.has_active_session) return 1
 
-        // 3. By last message (most recent first)
-        const lastA = lastMessageMap[a.id] || ''
-        const lastB = lastMessageMap[b.id] || ''
-        if (lastA || lastB) {
-          if (lastA && !lastB) return -1
-          if (!lastA && lastB) return 1
-          if (lastA > lastB) return -1
-          if (lastA < lastB) return 1
+        // 3. By start_date (data de entrada) — most recent first; nulls go last
+        const sa = a.start_date || ''
+        const sb = b.start_date || ''
+        if (sa || sb) {
+          if (sa && !sb) return -1
+          if (!sa && sb) return 1
+          if (sa > sb) return -1
+          if (sa < sb) return 1
         }
 
-        // 4. By created_at DESC
+        // 4. Fallback: created_at DESC
         return b.created_at > a.created_at ? 1 : -1
       })
 

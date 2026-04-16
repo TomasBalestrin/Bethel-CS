@@ -219,6 +219,36 @@ export async function POST(request: NextRequest) {
       }) || null
       if (!mentee) {
         console.warn('[WPP Webhook] ABORT: Mentee not found for phone:', phone, '(digits:', phoneDigits, ')')
+        // Register the orphan so admins can reconcile (typos in cadastro are
+        // the most common cause). Idempotent by phone — re-attempts increment
+        // the counter and refresh last_seen_at + last_content.
+        try {
+          const senderName = (data.senderName as string) || null
+          const sampleContent = (extractContent(data) ?? '').slice(0, 200) || null
+          const tbl = (supabase.from as (name: string) => ReturnType<typeof supabase.from>)('wpp_orphan_messages')
+          const { data: existing } = await tbl
+            .select('id, attempts')
+            .eq('phone', phone)
+            .maybeSingle() as unknown as { data: { id: string; attempts: number } | null }
+          if (existing) {
+            await tbl
+              .update({
+                sender_name: senderName,
+                last_content: sampleContent,
+                last_seen_at: new Date().toISOString(),
+                attempts: (existing.attempts ?? 0) + 1,
+              } as never)
+              .eq('id', existing.id)
+          } else {
+            await tbl.insert({
+              phone,
+              sender_name: senderName,
+              last_content: sampleContent,
+            } as never)
+          }
+        } catch (e) {
+          console.error('[WPP Webhook] orphan tracking failed (non-fatal):', e)
+        }
         return NextResponse.json({ ok: true })
       }
 

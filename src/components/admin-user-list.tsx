@@ -69,10 +69,20 @@ interface AdminUserListProps {
 export function AdminUserList({ users, products, wppInstances, kanbanStages, settings, departmentAssignments, currentUserId }: AdminUserListProps) {
   return (
     <div>
-      <h1 className="font-heading text-2xl font-bold text-foreground">Admin</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        Gestão de usuários, produtos, WhatsApp e webhooks do sistema
-      </p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="font-heading text-2xl font-bold text-foreground">Admin</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Gestão de usuários, produtos, WhatsApp e webhooks do sistema
+          </p>
+        </div>
+        <a
+          href="/admin/mensagens-orfas"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-muted/50"
+        >
+          <MessageSquare className="h-3.5 w-3.5" /> Mensagens órfãs
+        </a>
+      </div>
 
       <Tabs defaultValue="users" className="mt-6">
         <div className="overflow-x-auto scrollbar-none">

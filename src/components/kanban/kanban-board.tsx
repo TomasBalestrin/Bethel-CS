@@ -72,7 +72,7 @@ export function KanbanBoard({
   const [selectedSpecialist, setSelectedSpecialist] = useState<string>('all')
   const [atendimentoFilter, setAtendimentoFilter] = useState<string>('all')
   const [advFilters, setAdvFilters] = useState<MenteeFilterValues>(EMPTY_FILTERS)
-  const { unreadMap } = useUnreadCounts()
+  const { unreadMap, lastIncomingMap } = useUnreadCounts()
   const specialistNameMap = useMemo(() => new Map(specialists.map((s) => [s.id, s.full_name])), [specialists])
 
   useEffect(() => {
@@ -337,6 +337,7 @@ export function KanbanBoard({
                 stage={stage}
                 mentees={getMenteesForStage(stage.id)}
                 unreadMap={unreadMap}
+                lastIncomingMap={lastIncomingMap}
                 specialistNameMap={specialistNameMap}
                 onCardClick={handleCardClick}
                 showAddButton={idx === 0 && firstStage?.id === stage.id}

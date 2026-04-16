@@ -67,8 +67,8 @@ export default async function EtapasIniciaisPage() {
       ? supabase.from('revenue_records').select('mentee_id, sale_value').in('mentee_id', menteeIds)
       : Promise.resolve({ data: [] as { mentee_id: string; sale_value: number }[] }),
     menteeIds.length > 0
-      ? supabase.from('attendance_sessions').select('mentee_id, channel, specialist_id').in('mentee_id', menteeIds).is('ended_at', null)
-      : Promise.resolve({ data: [] as { mentee_id: string; channel: string; specialist_id: string }[] }),
+      ? supabase.from('attendance_sessions').select('mentee_id, channel, specialist_id, started_at').in('mentee_id', menteeIds).is('ended_at', null)
+      : Promise.resolve({ data: [] as { mentee_id: string; channel: string; specialist_id: string; started_at: string }[] }),
     menteeIds.length > 0
       ? supabase.from('wpp_messages').select('mentee_id, sent_at').in('mentee_id', menteeIds).order('sent_at', { ascending: false })
       : Promise.resolve({ data: [] as { mentee_id: string; sent_at: string }[] }),
@@ -107,8 +107,8 @@ export default async function EtapasIniciaisPage() {
     if (!deptUserByChannel.has(d.department)) deptUserByChannel.set(d.department, d.user_id)
   })
   const menteeOwnerMap = new Map<string, string | null>(menteeList.map((m) => [m.id, m.created_by]))
-  const activeSessionsMap = new Map<string, Array<{ channel: string; specialist_name: string; specialist_id?: string }>>()
-  const activeSessionsArr = (activeSessions ?? []) as unknown as Array<{ mentee_id: string; channel?: string; specialist_id?: string }>
+  const activeSessionsMap = new Map<string, Array<{ channel: string; specialist_name: string; specialist_id?: string; started_at?: string }>>()
+  const activeSessionsArr = (activeSessions ?? []) as unknown as Array<{ mentee_id: string; channel?: string; specialist_id?: string; started_at?: string }>
   activeSessionsArr.forEach((s) => {
     const channel = s.channel || 'principal'
     const attendantId = channel === 'principal'
@@ -116,7 +116,7 @@ export default async function EtapasIniciaisPage() {
       : deptUserByChannel.get(channel)
     const name = attendantId ? profileNameMap.get(attendantId) ?? 'Responsável' : 'Responsável'
     const arr = activeSessionsMap.get(s.mentee_id) ?? []
-    arr.push({ channel, specialist_name: name, specialist_id: attendantId })
+    arr.push({ channel, specialist_name: name, specialist_id: attendantId, started_at: s.started_at })
     activeSessionsMap.set(s.mentee_id, arr)
   })
 

@@ -5,7 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 
 interface UnreadData {
   unreadMap: Record<string, number>
-  lastMessageMap: Record<string, string> // menteeId → latest sent_at ISO
+  lastMessageMap: Record<string, string> // menteeId → latest sent_at ISO (any direction)
+  lastIncomingMap: Record<string, string> // menteeId → latest INCOMING sent_at ISO (for waiting-time indicator)
 }
 
 /**
@@ -13,7 +14,7 @@ interface UnreadData {
  * per mentee_id, with Supabase Realtime updates.
  */
 export function useUnreadCounts(): UnreadData {
-  const [data, setData] = useState<UnreadData>({ unreadMap: {}, lastMessageMap: {} })
+  const [data, setData] = useState<UnreadData>({ unreadMap: {}, lastMessageMap: {}, lastIncomingMap: {} })
   const initialized = useRef(false)
 
   useEffect(() => {
@@ -23,8 +24,8 @@ export function useUnreadCounts(): UnreadData {
     const supabase = createClient()
 
     async function fetchData() {
-      // Fetch unread counts + last messages in parallel
-      const [{ data: unreadRows }, { data: lastRows }] = await Promise.all([
+      // Fetch unread counts + last messages + last incoming in parallel
+      const [{ data: unreadRows }, { data: lastRows }, { data: incomingRows }] = await Promise.all([
         supabase
           .from('wpp_messages')
           .select('mentee_id')
@@ -34,6 +35,12 @@ export function useUnreadCounts(): UnreadData {
         supabase
           .from('wpp_messages')
           .select('mentee_id, sent_at')
+          .order('sent_at', { ascending: false })
+          .limit(500),
+        supabase
+          .from('wpp_messages')
+          .select('mentee_id, sent_at')
+          .eq('direction', 'incoming')
           .order('sent_at', { ascending: false })
           .limit(500),
       ])
@@ -54,7 +61,16 @@ export function useUnreadCounts(): UnreadData {
         }
       }
 
-      setData({ unreadMap, lastMessageMap })
+      const lastIncomingMap: Record<string, string> = {}
+      if (incomingRows) {
+        for (const row of incomingRows) {
+          if (!lastIncomingMap[row.mentee_id]) {
+            lastIncomingMap[row.mentee_id] = row.sent_at
+          }
+        }
+      }
+
+      setData({ unreadMap, lastMessageMap, lastIncomingMap })
     }
 
     fetchData()

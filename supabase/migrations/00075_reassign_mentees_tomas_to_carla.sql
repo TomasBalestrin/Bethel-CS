@@ -1,6 +1,7 @@
--- Reassign todos os mentorados que estavam sob responsabilidade do especialista
--- Tomás para a especialista Carla. O "responsável" pelo mentorado é rastreado
--- pela coluna mentees.created_by, que referencia profiles(id).
+-- Reassign todos os mentorados que tinham o Tomás como "responsável" (nome
+-- exibido no card) para a Carla. O nome mostrado vem de profiles.full_name
+-- via mentees.created_by — independentemente do role. Tomás não está
+-- cadastrado com role='especialista', então não filtramos por role aqui.
 DO $$
 DECLARE
   tomas_id uuid;
@@ -8,24 +9,22 @@ DECLARE
 BEGIN
   SELECT id INTO tomas_id
   FROM public.profiles
-  WHERE role = 'especialista'
-    AND (lower(full_name) LIKE 'tomás%' OR lower(full_name) LIKE 'tomas%')
+  WHERE lower(full_name) LIKE 'tomás%' OR lower(full_name) LIKE 'tomas%'
   ORDER BY created_at
   LIMIT 1;
 
   SELECT id INTO carla_id
   FROM public.profiles
-  WHERE role = 'especialista'
-    AND lower(full_name) LIKE 'carla%'
+  WHERE lower(full_name) LIKE 'carla%'
   ORDER BY created_at
   LIMIT 1;
 
   IF tomas_id IS NULL THEN
-    RAISE EXCEPTION 'Especialista Tomás não encontrado em profiles';
+    RAISE EXCEPTION 'Tomás não encontrado em profiles';
   END IF;
 
   IF carla_id IS NULL THEN
-    RAISE EXCEPTION 'Especialista Carla não encontrada em profiles';
+    RAISE EXCEPTION 'Carla não encontrada em profiles';
   END IF;
 
   UPDATE public.mentees

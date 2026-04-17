@@ -52,14 +52,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Falha ao salvar encaminhamento: ${insertErr.message}` }, { status: 500 })
     }
 
-    // Cria notificação para o usuário do departamento (se houver).
+    // Cria notificação para o usuário do departamento (se houver). Antes era
+    // non-fatal silencioso: o toast de sucesso aparecia mesmo quando a
+    // notificação não era gravada e o destinatário nunca ficava sabendo.
+    // Agora o response inclui `notified` + `notifyError` para o front poder
+    // alertar explicitamente.
     const { data: assignment } = await admin
       .from('department_assignments')
       .select('user_id')
       .eq('department', channel as 'comercial' | 'marketing' | 'gestao')
       .maybeSingle()
 
-    if (assignment) {
+    let notified = false
+    let notifyError: string | null = null
+    if (!assignment) {
+      notifyError = `Nenhum usuário designado para ${deptLabel} — só a mensagem interna foi gravada.`
+      console.warn('[WPP Forward]', notifyError, { menteeId, channel })
+    } else {
       const { error: notifErr } = await admin.from('forwarding_notifications').insert({
         recipient_id: assignment.user_id,
         mentee_id: menteeId,
@@ -70,11 +79,14 @@ export async function POST(request: NextRequest) {
         sent_by: user.id,
       } as never)
       if (notifErr) {
-        console.error('[WPP Forward] Notification insert failed (non-fatal):', notifErr.message)
+        notifyError = `Falha ao notificar ${deptLabel}: ${notifErr.message}`
+        console.error('[WPP Forward] Notification insert failed:', notifErr.message, notifErr.details)
+      } else {
+        notified = true
       }
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, notified, notifyError })
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error('[WPP Forward] Uncaught error:', message)

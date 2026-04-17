@@ -401,7 +401,32 @@ export async function POST(request: NextRequest) {
       })
 
       if (insertErr) {
-        console.error('[WPP Webhook] INSERT FAILED:', insertErr.message, insertErr.details, insertErr.hint)
+        const code = (insertErr as { code?: string }).code
+        // Unique violation = a mensagem já existe (condição de corrida entre
+        // webhook e /send, ou entre duas entregas do provider). Não é erro
+        // real: retorna 200 pra NextTrack parar de retentar, do contrário a
+        // mesma mensagem fica em loop de 500 até o provider desistir (foi o
+        // caso observado no relatório NextTrack de 14:02–14:14).
+        if (code === '23505') {
+          console.log('[WPP Webhook] SKIP: unique violation — mensagem já inserida (race)', { messageId, menteeId: mentee.id })
+          return NextResponse.json({ ok: true, duplicate: true })
+        }
+        // Qualquer outro erro: loga o payload completo para investigação
+        // posterior (senão só temos a mensagem crua do Postgres).
+        console.error('[WPP Webhook] INSERT FAILED:', {
+          code,
+          message: insertErr.message,
+          details: insertErr.details,
+          hint: insertErr.hint,
+          menteeId: mentee.id,
+          menteePhone: mentee.phone,
+          direction,
+          messageType,
+          contentLen: content?.length ?? 0,
+          hasMediaUrl: !!mediaUrl,
+          channel,
+          payload: JSON.stringify(data).slice(0, 2000),
+        })
         // Return 500 so NextTrack retries the webhook delivery. Previously this
         // returned 200 which caused messages to be silently lost whenever a DB
         // change introduced a schema mismatch.

@@ -76,7 +76,8 @@ export default async function EtapasIniciaisPage() {
     supabase.from('profiles').select('id, full_name, role').order('full_name'),
     supabase.from('department_assignments').select('user_id, department'),
     menteeIds.length > 0
-      ? supabase.from('stage_changes').select('mentee_id, to_stage_id, changed_at').in('mentee_id', menteeIds).order('changed_at', { ascending: false })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? (supabase.from('stage_changes' as never).select('mentee_id, to_stage_id, changed_at' as never) as any).in('mentee_id', menteeIds).order('changed_at', { ascending: false })
       : Promise.resolve({ data: [] as { mentee_id: string; to_stage_id: string; changed_at: string }[] }),
   ])
 

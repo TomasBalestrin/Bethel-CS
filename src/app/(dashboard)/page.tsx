@@ -525,7 +525,9 @@ export default async function DashboardPage({ searchParams }: Props) {
   // do select (cancelled_at fora do types). Tipa localmente para o uso abaixo.
   type DeliveryEventRow = { id: string; delivery_type: string; delivery_date: string; cancelled_at: string | null }
   const deliveryEventsTyped = (deliveryEvents ?? []) as DeliveryEventRow[]
-  const deliveryTypeKeys = ['hotseat', 'comercial', 'gestao', 'mkt', 'extras', 'mentoria_individual']
+  // Chaves batem com delivery_events.delivery_type gravado pelo módulo
+  // /entregas. 'marketing' (não 'mkt') é o canônico.
+  const deliveryTypeKeys = ['hotseat', 'comercial', 'gestao', 'marketing', 'extras', 'mentoria_individual']
   const deliveryEventIds = new Set(deliveryEventsTyped.map((e) => e.id))
   const filteredParts = (deliveryParts ?? []).filter((p) => deliveryEventIds.has(p.delivery_event_id))
 

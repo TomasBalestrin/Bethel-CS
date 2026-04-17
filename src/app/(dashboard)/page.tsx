@@ -236,7 +236,9 @@ export default async function DashboardPage({ searchParams }: Props) {
   if (specialistId && menteeIds.length > 0) stageChangesQuery = stageChangesQuery.in('mentee_id', menteeIds)
   else if (specialistId && menteeIds.length === 0) stageChangesQuery = stageChangesQuery.eq('mentee_id', 'none')
 
-  let deliveryEventsQuery = supabase.from('delivery_events').select('id, delivery_type, delivery_date, cancelled_at').is('cancelled_at', null)
+  // cancelled_at ainda não está no types gerado; casta para any para liberar o build.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let deliveryEventsQuery = (supabase.from('delivery_events').select('id, delivery_type, delivery_date, cancelled_at' as never) as any).is('cancelled_at', null)
   if (startDate) deliveryEventsQuery = deliveryEventsQuery.gte('delivery_date', startDate)
   if (endDate) deliveryEventsQuery = deliveryEventsQuery.lte('delivery_date', endDate)
 

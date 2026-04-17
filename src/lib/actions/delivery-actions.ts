@@ -73,6 +73,22 @@ export async function deleteDeliveryEvent(id: string) {
   return { error: null }
 }
 
+/** Toggle cancelled state. null → agora (cancelado), não-null → null (reverter). */
+export async function toggleDeliveryCancelled(id: string, cancelled: boolean) {
+  const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { error: 'Não autenticado' }
+
+  const { error } = await supabase
+    .from('delivery_events')
+    .update({ cancelled_at: cancelled ? new Date().toISOString() : null } as never)
+    .eq('id', id)
+
+  if (error) return { error: error.message }
+  revalidatePath('/entregas')
+  return { error: null }
+}
+
 /** Add a single mentee as participant of an event. Idempotent: returns ok if
  *  the pair already exists thanks to the UNIQUE constraint. */
 export async function addParticipantToEvent(eventId: string, menteeId: string) {

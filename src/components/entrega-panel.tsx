@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { X, Pencil, Trash2, Upload, Save, UserPlus } from 'lucide-react'
+import { X, Pencil, Trash2, Upload, Save, UserPlus, Ban, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { formatDateBR } from '@/lib/format'
@@ -23,6 +23,7 @@ import {
   addParticipantToEvent,
   removeParticipantFromEvent,
   importParticipantsForEvent,
+  toggleDeliveryCancelled,
 } from '@/lib/actions/delivery-actions'
 
 export const DELIVERY_TYPES = [
@@ -44,6 +45,7 @@ export interface EntregaEvent {
   description: string | null
   reference_month: string | null
   presenter_name: string | null
+  cancelled_at: string | null
   participation_count: number
 }
 
@@ -73,6 +75,8 @@ export function EntregaPanel({ event, onClose }: EntregaPanelProps) {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [togglingCancel, setTogglingCancel] = useState(false)
+  const isCancelled = !!event.cancelled_at
 
   // Participants
   const [participants, setParticipants] = useState<Participant[]>([])
@@ -143,6 +147,18 @@ export function EntregaPanel({ event, onClose }: EntregaPanelProps) {
     toast.success('Entrega excluída')
     router.refresh()
     onClose()
+  }
+
+  async function handleToggleCancelled() {
+    setTogglingCancel(true)
+    const result = await toggleDeliveryCancelled(event.id, !isCancelled)
+    setTogglingCancel(false)
+    if (result.error) {
+      toast.error(result.error)
+      return
+    }
+    toast.success(isCancelled ? 'Cancelamento revertido' : 'Entrega cancelada')
+    router.refresh()
   }
 
   async function handleAddMentee(menteeId: string) {
@@ -257,11 +273,18 @@ export function EntregaPanel({ event, onClose }: EntregaPanelProps) {
       {/* Panel */}
       <div className="w-full max-w-xl bg-background border-l border-border overflow-y-auto shadow-xl">
         <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-border bg-background">
-          <div>
-            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Entrega</p>
-            <h2 className="font-heading text-lg font-bold">
-              {event.title || DELIVERY_TYPES.find((t) => t.value === event.delivery_type)?.label || event.delivery_type}
-            </h2>
+          <div className="flex items-center gap-2">
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Entrega</p>
+              <h2 className={`font-heading text-lg font-bold ${isCancelled ? 'line-through text-destructive' : ''}`}>
+                {event.title || DELIVERY_TYPES.find((t) => t.value === event.delivery_type)?.label || event.delivery_type}
+              </h2>
+            </div>
+            {isCancelled && (
+              <span className="inline-flex items-center rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-destructive">
+                Cancelada
+              </span>
+            )}
           </div>
           <Button variant="ghost" size="sm" onClick={onClose}>
             <X className="h-4 w-4" />
@@ -269,6 +292,14 @@ export function EntregaPanel({ event, onClose }: EntregaPanelProps) {
         </div>
 
         <div className="p-4 space-y-5">
+          {/* Cancelled banner */}
+          {isCancelled && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              <span className="font-semibold">Entrega cancelada</span>
+              {event.cancelled_at && <span className="ml-1 opacity-80">em {formatDateBR(event.cancelled_at)}</span>}
+            </div>
+          )}
+
           {/* Action bar */}
           <div className="flex items-center gap-2 flex-wrap">
             {!editing ? (
@@ -294,6 +325,19 @@ export function EntregaPanel({ event, onClose }: EntregaPanelProps) {
             )}
             <Button size="sm" variant="outline" onClick={() => setConfirmDelete(true)} className="text-destructive hover:bg-destructive/10">
               <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Excluir
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleToggleCancelled}
+              disabled={togglingCancel}
+              className={isCancelled ? '' : 'text-destructive hover:bg-destructive/10 border-destructive/40'}
+            >
+              {isCancelled ? (
+                <><RotateCcw className="mr-1.5 h-3.5 w-3.5" /> {togglingCancel ? 'Revertendo...' : 'Reverter cancelamento'}</>
+              ) : (
+                <><Ban className="mr-1.5 h-3.5 w-3.5" /> {togglingCancel ? 'Cancelando...' : 'Cancelar'}</>
+              )}
             </Button>
           </div>
 

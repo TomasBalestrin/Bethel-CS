@@ -3046,11 +3046,42 @@ function TabIntensivo({ menteeId }: { menteeId: string }) {
 
 // ─── Tab: Engajamento (dashboard com métricas automáticas) ───
 function TabEngajamento({ menteeId, mentee }: { menteeId: string; mentee: MenteeWithStats }) {
-  // Engajamento agora é só a grade de Entregas da Mentoria (substituído a pedido:
-  // removido último-contato/área-membros/presenças/crescimento-fat e os 4 cards
-  // detalhados de whatsapp/ligações/participação/faturamento).
+  // Engajamento hoje = card de Faturamento + grade de Entregas da Mentoria.
+  // Os outros 7 cards históricos (último contato, acessos, presenças, whatsapp,
+  // ligações, participação) foram removidos a pedido.
+  const fatAtual = mentee.faturamento_atual ?? 0
+  const fatAntes = mentee.faturamento_antes_mentoria ?? 0
+  const crescimento = fatAntes > 0 ? Math.round(((fatAtual - fatAntes) / fatAntes) * 100) : 0
+
   return (
-    <div className="animate-fade-in">
+    <div className="space-y-4 animate-fade-in">
+      <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-warning/5 to-transparent">
+          <DollarSign className="h-3.5 w-3.5 text-warning" />
+          <h3 className="text-[11px] font-semibold uppercase tracking-wide">Faturamento</h3>
+        </div>
+        <div className="p-3 grid grid-cols-3 gap-3 text-center">
+          <div>
+            <p className="text-lg font-bold tabular text-foreground">
+              {fatAtual > 0 ? `R$ ${fatAtual.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}` : '—'}
+            </p>
+            <p className="text-[10px] text-muted-foreground">Atual</p>
+          </div>
+          <div>
+            <p className="text-lg font-bold tabular text-foreground">
+              {fatAntes > 0 ? `R$ ${fatAntes.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}` : '—'}
+            </p>
+            <p className="text-[10px] text-muted-foreground">Antes mentoria</p>
+          </div>
+          <div>
+            <p className={`text-lg font-bold tabular ${crescimento > 0 ? 'text-success' : crescimento < 0 ? 'text-destructive' : 'text-foreground'}`}>
+              {crescimento !== 0 ? `${crescimento > 0 ? '+' : ''}${crescimento}%` : '—'}
+            </p>
+            <p className="text-[10px] text-muted-foreground">Crescimento</p>
+          </div>
+        </div>
+      </div>
+
       <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
         <CardEntregasMentoria menteeId={menteeId} startDate={mentee.start_date} />
       </div>

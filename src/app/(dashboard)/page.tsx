@@ -1,6 +1,18 @@
 import { createClient } from '@/lib/supabase/server'
 import { DashboardMetrics } from '@/components/dashboard-metrics'
 import { getCachedSpecialists } from '@/lib/cache'
+import { isBusinessHours } from '@/lib/business-hours'
+
+// Breakdown por pessoa na seção "Trabalho do CS" — 5 linhas fixas.
+// Ordem e rótulos batem com o que o dashboard renderiza.
+const CS_TEAM = [
+  { key: 'carla', label: 'CS - Carla', match: 'carla' },
+  { key: 'aline', label: 'CS - Aline', match: 'aline' },
+  { key: 'hannah', label: 'Consultora Hannah', match: 'hannah' },
+  { key: 'matheus', label: 'Consultor Matheus', match: 'matheus' },
+  { key: 'keyth', label: 'Consultora Keyth', match: 'keyth' },
+] as const
+type CsKey = typeof CS_TEAM[number]['key']
 
 interface Props {
   searchParams: {
@@ -27,12 +39,22 @@ export default async function DashboardPage({ searchParams }: Props) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Parallel: profile + specialists (cached) + system settings
-  const [{ data: profile }, specialists, { data: gapSetting }] = await Promise.all([
+  // Parallel: profile + specialists (cached) + system settings + CS team profiles
+  const [{ data: profile }, specialists, { data: gapSetting }, { data: csTeamProfiles }] = await Promise.all([
     supabase.from('profiles').select('full_name, role').eq('id', user!.id).single(),
     getCachedSpecialists(),
     supabase.from('system_settings').select('value').eq('key', 'attendance_gap_minutes').single(),
+    supabase.from('profiles').select('id, full_name'),
   ])
+
+  // Resolve os 5 nomes fixos por primeiro-nome (case-insensitive, sem acento).
+  // Roles variam (Carla é admin), então buscamos sem filtro de role.
+  const csIdByKey = new Map<CsKey, string>()
+  const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  for (const person of CS_TEAM) {
+    const found = (csTeamProfiles ?? []).find((p) => normalize(p.full_name).startsWith(person.match))
+    if (found) csIdByKey.set(person.key, found.id)
+  }
 
   const isAdmin = profile?.role === 'admin'
   const gapMs = (parseInt(gapSetting?.value ?? '120', 10)) * 60 * 1000
@@ -222,7 +244,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   if (specialistId && menteeIds.length > 0) deliveryPartQuery = deliveryPartQuery.in('mentee_id', menteeIds)
   else if (specialistId && menteeIds.length === 0) deliveryPartQuery = deliveryPartQuery.eq('mentee_id', 'none')
 
-  let callsQuery = supabase.from('call_records').select('duration_seconds')
+  let callsQuery = supabase.from('call_records').select('duration_seconds, specialist_id')
   if (startDate) callsQuery = callsQuery.gte('created_at', startDate)
   if (endDate) callsQuery = callsQuery.lte('created_at', endDate + 'T23:59:59')
   if (specialistId) callsQuery = callsQuery.eq('specialist_id', specialistId)
@@ -244,7 +266,7 @@ export default async function DashboardPage({ searchParams }: Props) {
   if (endDate) wppInQuery = wppInQuery.lte('sent_at', endDate + 'T23:59:59')
   if (specialistId) wppInQuery = wppInQuery.eq('specialist_id', specialistId)
 
-  let manualAttendanceQuery = supabase.from('attendance_sessions').select('started_at, ended_at').not('ended_at', 'is', null)
+  let manualAttendanceQuery = supabase.from('attendance_sessions').select('started_at, ended_at, specialist_id').not('ended_at', 'is', null)
   if (startDate) manualAttendanceQuery = manualAttendanceQuery.gte('started_at', startDate)
   if (endDate) manualAttendanceQuery = manualAttendanceQuery.lte('started_at', endDate + 'T23:59:59')
   if (specialistId) manualAttendanceQuery = manualAttendanceQuery.eq('specialist_id', specialistId)
@@ -353,6 +375,124 @@ export default async function DashboardPage({ searchParams }: Props) {
     }
   })
   const avgManualAttendanceMinutes = manualCount > 0 ? Math.round(totalManualMinutes / manualCount) : 0
+
+  // ─── Breakdown "Trabalho do CS" por pessoa ───
+  // Mapa mentee_id → dono (created_by), usado para atribuir solicitações do mentorado
+  // à CS responsável (Carla/Aline). Usa todos os mentorados do filtro atual.
+  const menteeOwner = new Map<string, string | null>()
+  for (const m of filteredMentees) menteeOwner.set(m.id, m.created_by ?? null)
+
+  // Horário comercial: solicitação = msg incoming em horário comercial; tempo de
+  // espera = intervalo até a primeira outgoing subsequente (mesmo que fora do
+  // horário). Total considera todos os mentorados; por CS usa created_by.
+  let bhTotalSolicitations = 0
+  let bhTotalWaitMs = 0
+  let bhTotalWaitCount = 0
+  const bhByCs: Record<CsKey, { sols: number; waitMs: number; waitCount: number }> = {
+    carla: { sols: 0, waitMs: 0, waitCount: 0 },
+    aline: { sols: 0, waitMs: 0, waitCount: 0 },
+    hannah: { sols: 0, waitMs: 0, waitCount: 0 },
+    matheus: { sols: 0, waitMs: 0, waitCount: 0 },
+    keyth: { sols: 0, waitMs: 0, waitCount: 0 },
+  }
+  const ownerToCsKey = new Map<string, CsKey>()
+  for (const [key, id] of csIdByKey.entries()) ownerToCsKey.set(id, key)
+
+  if (attendanceMsgs && attendanceMsgs.length > 0) {
+    const byMentee: Record<string, { sent_at: string; direction: string }[]> = {}
+    for (const m of attendanceMsgs) {
+      if (!byMentee[m.mentee_id]) byMentee[m.mentee_id] = []
+      byMentee[m.mentee_id].push({ sent_at: m.sent_at, direction: m.direction })
+    }
+    for (const [menteeId, msgs] of Object.entries(byMentee)) {
+      const ownerId = menteeOwner.get(menteeId) ?? null
+      const csKey = ownerId ? ownerToCsKey.get(ownerId) : undefined
+      for (let i = 0; i < msgs.length; i++) {
+        if (msgs[i].direction !== 'incoming') continue
+        if (!isBusinessHours(msgs[i].sent_at)) continue
+        bhTotalSolicitations++
+        if (csKey) bhByCs[csKey].sols++
+        for (let j = i + 1; j < msgs.length; j++) {
+          if (msgs[j].direction === 'outgoing') {
+            const wait = new Date(msgs[j].sent_at).getTime() - new Date(msgs[i].sent_at).getTime()
+            bhTotalWaitMs += wait
+            bhTotalWaitCount++
+            if (csKey) {
+              bhByCs[csKey].waitMs += wait
+              bhByCs[csKey].waitCount++
+            }
+            break
+          }
+        }
+      }
+    }
+  }
+
+  const bhAvgWaitMinutes = bhTotalWaitCount > 0 ? Math.round(bhTotalWaitMs / bhTotalWaitCount / 60000) : 0
+  const businessHoursByCs = CS_TEAM.map((p) => {
+    const d = bhByCs[p.key]
+    return {
+      key: p.key,
+      label: p.label,
+      solicitations: d.sols,
+      avgWaitMinutes: d.waitCount > 0 ? Math.round(d.waitMs / d.waitCount / 60000) : 0,
+    }
+  })
+
+  // Atendimentos por pessoa: sessões manuais finalizadas (attendance_sessions)
+  // agrupadas por specialist_id, SEM filtro de horário comercial.
+  const attByPerson: Record<CsKey, { count: number; totalMin: number }> = {
+    carla: { count: 0, totalMin: 0 },
+    aline: { count: 0, totalMin: 0 },
+    hannah: { count: 0, totalMin: 0 },
+    matheus: { count: 0, totalMin: 0 },
+    keyth: { count: 0, totalMin: 0 },
+  }
+  const specIdToCsKey = new Map<string, CsKey>()
+  for (const [key, id] of csIdByKey.entries()) specIdToCsKey.set(id, key)
+  manualSessions?.forEach((s) => {
+    if (!s.started_at || !s.ended_at || !s.specialist_id) return
+    const key = specIdToCsKey.get(s.specialist_id)
+    if (!key) return
+    attByPerson[key].count++
+    attByPerson[key].totalMin += (new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()) / 60000
+  })
+  const attendanceByPerson = CS_TEAM.map((p) => {
+    const d = attByPerson[p.key]
+    return {
+      key: p.key,
+      label: p.label,
+      count: d.count,
+      avgMinutes: d.count > 0 ? Math.round(d.totalMin / d.count) : 0,
+    }
+  })
+
+  // Ligações por pessoa: call_records agrupadas por specialist_id.
+  const callsByPersonMap: Record<CsKey, { count: number; totalSec: number }> = {
+    carla: { count: 0, totalSec: 0 },
+    aline: { count: 0, totalSec: 0 },
+    hannah: { count: 0, totalSec: 0 },
+    matheus: { count: 0, totalSec: 0 },
+    keyth: { count: 0, totalSec: 0 },
+  }
+  callRecords?.forEach((c) => {
+    const rec = c as { duration_seconds: number | null; specialist_id: string | null }
+    const dur = Number(rec.duration_seconds ?? 0)
+    if (dur <= 0 || !rec.specialist_id) return
+    const key = specIdToCsKey.get(rec.specialist_id)
+    if (!key) return
+    callsByPersonMap[key].count++
+    callsByPersonMap[key].totalSec += dur
+  })
+  const callsByPerson = CS_TEAM.map((p) => {
+    const d = callsByPersonMap[p.key]
+    return {
+      key: p.key,
+      label: p.label,
+      count: d.count,
+      avgSeconds: d.count > 0 ? Math.round(d.totalSec / d.count) : 0,
+    }
+  })
 
   // ─── SEÇÃO 2: Visão Geral ───
   const allMentees = filteredMentees
@@ -470,6 +610,13 @@ export default async function DashboardPage({ searchParams }: Props) {
         totalLigacaoDuration,
         totalWhatsapp,
         totalWhatsappIn,
+        businessHours: {
+          totalSolicitations: bhTotalSolicitations,
+          avgWaitMinutes: bhAvgWaitMinutes,
+          byCs: businessHoursByCs,
+        },
+        attendanceByPerson,
+        callsByPerson,
       }}
       section5={{
         crossell: revByType.crossell,

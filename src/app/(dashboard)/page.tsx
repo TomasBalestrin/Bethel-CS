@@ -396,7 +396,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     keyth: { sols: 0, waitMs: 0, waitCount: 0 },
   }
   const ownerToCsKey = new Map<string, CsKey>()
-  for (const [key, id] of csIdByKey.entries()) ownerToCsKey.set(id, key)
+  for (const [key, id] of Array.from(csIdByKey.entries())) ownerToCsKey.set(id, key)
 
   if (attendanceMsgs && attendanceMsgs.length > 0) {
     const byMentee: Record<string, { sent_at: string; direction: string }[]> = {}
@@ -449,7 +449,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     keyth: { count: 0, totalMin: 0 },
   }
   const specIdToCsKey = new Map<string, CsKey>()
-  for (const [key, id] of csIdByKey.entries()) specIdToCsKey.set(id, key)
+  for (const [key, id] of Array.from(csIdByKey.entries())) specIdToCsKey.set(id, key)
   manualSessions?.forEach((s) => {
     if (!s.started_at || !s.ended_at || !s.specialist_id) return
     const key = specIdToCsKey.get(s.specialist_id)

@@ -233,11 +233,11 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
   const deliveryCards = useMemo(() => {
     return [
       { key: 'hotseat', label: 'Hotseat' },
-      { key: 'comercial', label: 'Comercial' },
-      { key: 'gestao', label: 'Gestão' },
-      { key: 'mkt', label: 'Mkt' },
-      { key: 'extras', label: 'Entregas Extras' },
+      { key: 'comercial', label: 'Entrega de Comercial' },
+      { key: 'marketing', label: 'Entrega de Marketing' },
+      { key: 'gestao', label: 'Entrega de Gestão' },
       { key: 'mentoria_individual', label: 'Mentoria Individual' },
+      { key: 'extras', label: 'Entrega Extra' },
     ].map(({ key, label }) => {
       const stat = props.engajamento.deliveryStats[key] ?? { delivered: 0, participated: 0 }
       const rate = stat.delivered > 0 ? Math.round((stat.participated / stat.delivered) * 100) : 0

@@ -1034,7 +1034,11 @@ export async function bulkImportDeliveryEvents(input: BulkDeliveryEventsInput): 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { total: 0, created: 0, errors: [{ row: 0, name: '', error: 'Não autenticado' }] }
 
-  const VALID_TYPES = ['hotseat', 'comercial', 'gestao', 'mkt', 'extras', 'mentoria_individual']
+  // Tipos canônicos batem com delivery_events.delivery_type que o módulo
+  // /entregas grava. 'mkt' é aceito como alias de 'marketing' pra não quebrar
+  // CSVs antigos, mas sempre gravamos a forma canônica.
+  const VALID_TYPES = ['hotseat', 'comercial', 'gestao', 'marketing', 'extras', 'mentoria_individual', 'sos', 'omv']
+  const TYPE_ALIASES: Record<string, string> = { mkt: 'marketing' }
   let created = 0
   const errors: BulkImportResult['errors'] = []
 
@@ -1045,7 +1049,11 @@ export async function bulkImportDeliveryEvents(input: BulkDeliveryEventsInput): 
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/\s+/g, '_')
 
-    const matchedType = VALID_TYPES.find((t) => typeNorm.includes(t)) || typeNorm
+    const canonical = VALID_TYPES.find((t) => typeNorm.includes(t))
+    const aliased = !canonical
+      ? Object.keys(TYPE_ALIASES).find((alias) => typeNorm.includes(alias))
+      : undefined
+    const matchedType = canonical || (aliased ? TYPE_ALIASES[aliased] : typeNorm)
 
     if (!row.date) { errors.push({ row: rowNum, name: row.type, error: 'Data obrigatória' }); continue }
 

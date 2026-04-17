@@ -98,7 +98,6 @@ type RevenueRecord = Database['public']['Tables']['revenue_records']['Row']
 type Testimonial = Database['public']['Tables']['testimonials']['Row']
 type ActionPlan = Database['public']['Tables']['action_plans']['Row']
 type Product = Database['public']['Tables']['products']['Row']
-type EngagementRecord = Database['public']['Tables']['engagement_records']['Row']
 
 // Currency mask helpers
 function formatCurrency(cents: number): string {
@@ -2170,9 +2169,6 @@ function TabAcompanhamento({ menteeId, mentee, onStatsChange }: { menteeId: stri
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden lg:col-span-2">
           <CardMenteeTasks menteeId={menteeId} />
         </div>
-        <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden lg:col-span-2">
-          <CardEntregasMentoria menteeId={menteeId} startDate={mentee.start_date} />
-        </div>
         <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
           <CardIndicacoes menteeId={menteeId} onChanged={fetchStats} />
         </div>
@@ -3050,162 +3046,13 @@ function TabIntensivo({ menteeId }: { menteeId: string }) {
 
 // ─── Tab: Engajamento (dashboard com métricas automáticas) ───
 function TabEngajamento({ menteeId, mentee }: { menteeId: string; mentee: MenteeWithStats }) {
-  const [engagements, setEngagements] = useState<EngagementRecord[]>([])
-  const [lastMsgDate, setLastMsgDate] = useState<string | null>(null)
-  const [wppStats, setWppStats] = useState({ sent: 0, received: 0 })
-  const [callStats, setCallStats] = useState({ count: 0, minutes: 0 })
-  const supabase = createClient()
-
-  useEffect(() => {
-    // Fetch engagement records
-    supabase.from('engagement_records').select('*').eq('mentee_id', menteeId)
-      .order('recorded_at', { ascending: false })
-      .then(({ data }) => { if (data) setEngagements(data) })
-
-    // Last outgoing message
-    supabase.from('wpp_messages').select('sent_at').eq('mentee_id', menteeId).eq('direction', 'outgoing')
-      .order('sent_at', { ascending: false }).limit(1)
-      .then(({ data }) => { if (data?.[0]) setLastMsgDate(data[0].sent_at) })
-
-    // WhatsApp counts
-    supabase.from('wpp_messages').select('direction').eq('mentee_id', menteeId)
-      .then(({ data }) => {
-        if (!data) return
-        const sent = data.filter((m) => m.direction === 'outgoing').length
-        const received = data.filter((m) => m.direction === 'incoming').length
-        setWppStats({ sent, received })
-      })
-
-    // Call stats
-    supabase.from('call_records').select('duration_seconds').eq('mentee_id', menteeId)
-      .then(({ data }) => {
-        if (!data) return
-        setCallStats({
-          count: data.length,
-          minutes: Math.round(data.reduce((s, c) => s + Number(c.duration_seconds ?? 0), 0) / 60),
-        })
-      })
-  }, [menteeId]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const daysSinceContact = lastMsgDate
-    ? Math.floor((Date.now() - new Date(lastMsgDate).getTime()) / 86400000)
-    : null
-
-  const engAulas = engagements.filter((e) => e.type === 'aula').reduce((s, e) => s + Number(e.value), 0)
-  const engLives = engagements.filter((e) => e.type === 'live').reduce((s, e) => s + Number(e.value), 0)
-  const engEventos = engagements.filter((e) => e.type === 'evento').reduce((s, e) => s + Number(e.value), 0)
-
-  const fatAtual = mentee.faturamento_atual ?? 0
-  const fatAntes = mentee.faturamento_antes_mentoria ?? 0
-  const crescimento = fatAntes > 0 ? Math.round(((fatAtual - fatAntes) / fatAntes) * 100) : 0
-
+  // Engajamento agora é só a grade de Entregas da Mentoria (substituído a pedido:
+  // removido último-contato/área-membros/presenças/crescimento-fat e os 4 cards
+  // detalhados de whatsapp/ligações/participação/faturamento).
   return (
-    <div className="space-y-4 animate-fade-in">
-      {/* Health indicators */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className={`rounded-lg border p-3 text-center ${daysSinceContact != null && daysSinceContact > 7 ? 'border-destructive/30 bg-destructive/5' : daysSinceContact != null && daysSinceContact > 3 ? 'border-warning/30 bg-warning/5' : 'border-border bg-card'}`}>
-          <p className={`text-2xl font-bold tabular ${daysSinceContact != null && daysSinceContact > 7 ? 'text-destructive' : daysSinceContact != null && daysSinceContact > 3 ? 'text-warning' : 'text-foreground'}`}>
-            {daysSinceContact != null ? `${daysSinceContact}d` : '—'}
-          </p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Último contato</p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-3 text-center">
-          <p className="text-2xl font-bold tabular text-foreground">{engAulas}</p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Acessos área membros</p>
-        </div>
-        <div className="rounded-lg border border-border bg-card p-3 text-center">
-          <p className="text-2xl font-bold tabular text-foreground">{engLives}</p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Presenças ao vivo</p>
-        </div>
-        <div className={`rounded-lg border p-3 text-center ${crescimento > 0 ? 'border-success/30 bg-success/5' : crescimento < 0 ? 'border-destructive/30 bg-destructive/5' : 'border-border bg-card'}`}>
-          <p className={`text-2xl font-bold tabular ${crescimento > 0 ? 'text-success' : crescimento < 0 ? 'text-destructive' : 'text-foreground'}`}>
-            {crescimento !== 0 ? `${crescimento > 0 ? '+' : ''}${crescimento}%` : '—'}
-          </p>
-          <p className="text-[10px] text-muted-foreground mt-0.5">Crescimento fat.</p>
-        </div>
-      </div>
-
-      {/* Detailed metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {/* WhatsApp */}
-        <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-          <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-success/5 to-transparent">
-            <MessageSquare className="h-3.5 w-3.5 text-success" />
-            <h3 className="text-[11px] font-semibold uppercase tracking-wide">WhatsApp</h3>
-          </div>
-          <div className="p-3 grid grid-cols-2 gap-3 text-center">
-            <div>
-              <p className="text-lg font-bold tabular text-foreground">{wppStats.sent}</p>
-              <p className="text-[10px] text-muted-foreground">Enviadas</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold tabular text-foreground">{wppStats.received}</p>
-              <p className="text-[10px] text-muted-foreground">Recebidas</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Ligações */}
-        <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-          <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-info/5 to-transparent">
-            <Phone className="h-3.5 w-3.5 text-info" />
-            <h3 className="text-[11px] font-semibold uppercase tracking-wide">Ligações</h3>
-          </div>
-          <div className="p-3 grid grid-cols-2 gap-3 text-center">
-            <div>
-              <p className="text-lg font-bold tabular text-foreground">{callStats.count}</p>
-              <p className="text-[10px] text-muted-foreground">Realizadas</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold tabular text-foreground">{callStats.minutes}min</p>
-              <p className="text-[10px] text-muted-foreground">Tempo total</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Participação */}
-        <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-          <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
-            <TrendingUp className="h-3.5 w-3.5 text-accent" />
-            <h3 className="text-[11px] font-semibold uppercase tracking-wide">Participação</h3>
-          </div>
-          <div className="p-3 grid grid-cols-3 gap-2 text-center">
-            <div>
-              <p className="text-lg font-bold tabular text-foreground">{engAulas}</p>
-              <p className="text-[10px] text-muted-foreground">Área membros</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold tabular text-foreground">{engLives}</p>
-              <p className="text-[10px] text-muted-foreground">Lives</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold tabular text-foreground">{engEventos}</p>
-              <p className="text-[10px] text-muted-foreground">Eventos</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Faturamento */}
-        <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-          <div className="flex items-center gap-2 px-3 py-2 border-b border-border bg-gradient-to-r from-warning/5 to-transparent">
-            <DollarSign className="h-3.5 w-3.5 text-warning" />
-            <h3 className="text-[11px] font-semibold uppercase tracking-wide">Faturamento</h3>
-          </div>
-          <div className="p-3 grid grid-cols-2 gap-3 text-center">
-            <div>
-              <p className="text-lg font-bold tabular text-foreground">
-                {fatAtual > 0 ? `R$ ${fatAtual.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}` : '—'}
-              </p>
-              <p className="text-[10px] text-muted-foreground">Atual</p>
-            </div>
-            <div>
-              <p className="text-lg font-bold tabular text-foreground">
-                {fatAntes > 0 ? `R$ ${fatAntes.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}` : '—'}
-              </p>
-              <p className="text-[10px] text-muted-foreground">Antes mentoria</p>
-            </div>
-          </div>
-        </div>
+    <div className="animate-fade-in">
+      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+        <CardEntregasMentoria menteeId={menteeId} startDate={mentee.start_date} />
       </div>
     </div>
   )

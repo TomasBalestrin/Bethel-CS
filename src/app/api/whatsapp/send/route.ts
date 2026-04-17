@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendTextMessage, sendMediaMessage } from '@/lib/nextapps'
+import { logInsertError } from '@/lib/log-insert-error'
 
 export async function POST(request: NextRequest) {
   try {
@@ -174,6 +175,14 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: true })
       }
       console.error('[WPP Send] DB INSERT FAILED (message was sent but not saved):', insertErr.message, insertErr.details, insertErr.hint)
+      await logInsertError({
+        route: '/api/whatsapp/send',
+        targetTable: 'wpp_messages',
+        error: insertErr,
+        menteeId,
+        specialistId: instance.specialist_id || user.id,
+        payload: { type: type || 'text', channel, hasMediaUrl: !!imageUrl, contentLen: (message || '').length },
+      })
       return NextResponse.json({ error: `Mensagem enviada mas não foi salva: ${insertErr.message}` }, { status: 500 })
     }
 

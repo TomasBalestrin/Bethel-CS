@@ -56,6 +56,7 @@ export default async function EtapasIniciaisPage() {
     { data: lastMessages },
     { data: allProfilesData },
     { data: deptAssignmentsData },
+    { data: stageChangesData },
   ] = await Promise.all([
     menteeIds.length > 0
       ? supabase.from('attendances').select('mentee_id').in('mentee_id', menteeIds)
@@ -74,6 +75,10 @@ export default async function EtapasIniciaisPage() {
       : Promise.resolve({ data: [] as { mentee_id: string; sent_at: string }[] }),
     supabase.from('profiles').select('id, full_name, role').order('full_name'),
     supabase.from('department_assignments').select('user_id, department'),
+    menteeIds.length > 0
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? (supabase.from('stage_changes' as never).select('mentee_id, to_stage_id, changed_at' as never) as any).in('mentee_id', menteeIds).order('changed_at', { ascending: false })
+      : Promise.resolve({ data: [] as { mentee_id: string; to_stage_id: string; changed_at: string }[] }),
   ])
 
   const allProfiles = (allProfilesData ?? []) as { id: string; full_name: string; role: string }[]
@@ -126,6 +131,17 @@ export default async function EtapasIniciaisPage() {
   })
   const now = Date.now()
 
+  // Última entrada na etapa atual (stage_changes ordenado desc). Fallback: created_at.
+  const stageEnteredMap = new Map<string, string>()
+  const stageChanges = (stageChangesData ?? []) as { mentee_id: string; to_stage_id: string; changed_at: string }[]
+  for (const sc of stageChanges) {
+    if (stageEnteredMap.has(sc.mentee_id)) continue
+    const mentee = menteeList.find((m) => m.id === sc.mentee_id)
+    if (mentee && mentee.current_stage_id && sc.to_stage_id === mentee.current_stage_id) {
+      stageEnteredMap.set(sc.mentee_id, sc.changed_at)
+    }
+  }
+
   const menteesWithStats: MenteeWithStats[] = menteeList.map((m) => {
     const lastContact = lastContactMap.get(m.id)
     const daysSince = lastContact ? Math.floor((now - new Date(lastContact).getTime()) / 86400000) : undefined
@@ -138,6 +154,7 @@ export default async function EtapasIniciaisPage() {
       has_active_session: !!sessions?.length,
       active_sessions: sessions,
       days_since_contact: daysSince,
+      stage_entered_at: stageEnteredMap.get(m.id) ?? m.created_at,
     }
   })
 

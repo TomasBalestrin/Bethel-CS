@@ -82,6 +82,13 @@ interface DashboardMetricsProps {
     avgManualAttendanceMinutes: number
     totalAttendanceMinutes: number
     avgAttendanceMinutes: number
+    businessHours: {
+      totalSolicitations: number
+      avgWaitMinutes: number
+      byCs: { key: string; label: string; solicitations: number; avgWaitMinutes: number }[]
+    }
+    attendanceByPerson: { key: string; label: string; count: number; avgMinutes: number }[]
+    callsByPerson: { key: string; label: string; count: number; avgSeconds: number }[]
   }
   section5: {
     crossell: number
@@ -101,6 +108,16 @@ function formatMinutes(m: number) {
   const h = Math.floor(m / 60)
   const min = Math.round(m % 60)
   return h > 0 ? `${h}h ${min}min` : `${min}min`
+}
+
+function formatSeconds(s: number) {
+  const totalMin = Math.floor(s / 60)
+  const sec = Math.round(s % 60)
+  if (totalMin < 1) return `${sec}s`
+  const h = Math.floor(totalMin / 60)
+  const min = totalMin % 60
+  if (h > 0) return `${h}h ${min}min`
+  return sec > 0 ? `${min}min ${sec}s` : `${min}min`
 }
 
 export function DashboardMetrics(props: DashboardMetricsProps) {
@@ -228,10 +245,6 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
     })
   }, [props.engajamento.deliveryStats])
 
-  const avgWaitFormatted = useMemo(
-    () => props.section4.avgWaitMinutes > 0 ? formatMinutes(props.section4.avgWaitMinutes) : '—',
-    [props.section4.avgWaitMinutes]
-  )
   const avgManualAttFormatted = useMemo(
     () => props.section4.avgManualAttendanceMinutes > 0 ? `${props.section4.avgManualAttendanceMinutes} min` : '—',
     [props.section4.avgManualAttendanceMinutes]
@@ -441,17 +454,85 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
           <Phone className="h-4 w-4 text-warning" />
           <h2 className="text-sm font-semibold text-foreground">Trabalho do CS</h2>
         </div>
-        <div className="p-4">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-            <MetricCard icon={Headphones} label="Total de atendimentos" value={props.section4.totalAtendimentos} color="text-accent" bg="bg-accent/10" source="sessões de chat (gap configurável)" note={atendimentosNote} />
-            <MetricCard icon={Headphones} label="Tempo de espera" value={avgWaitFormatted} color="text-warning" bg="bg-warning/10" source="tempo médio até CS responder" />
-            <MetricCard icon={Headphones} label="Tempo médio de atendimento" value={avgManualAttFormatted} color="text-accent" bg="bg-accent/10" source="botão iniciar/finalizar no chat" />
+        <div className="p-4 space-y-5">
+          {/* Horário comercial (08:30–18:30 SP) */}
+          <div>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              Horário comercial (08:30–18:30)
+            </h3>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+              <MetricCard icon={Headphones} label="Solicitações de atendimento" value={props.section4.businessHours.totalSolicitations} color="text-info" bg="bg-info/10" note="mensagens recebidas em horário comercial" />
+              <MetricCard icon={Headphones} label="Tempo médio de espera" value={props.section4.businessHours.avgWaitMinutes > 0 ? formatMinutes(props.section4.businessHours.avgWaitMinutes) : '—'} color="text-warning" bg="bg-warning/10" note="espera até a primeira resposta" />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 mt-3">
+              {props.section4.businessHours.byCs.filter((p) => p.key === 'carla' || p.key === 'aline').map((p) => (
+                <PersonStatCard
+                  key={p.key}
+                  label={p.label}
+                  primaryLabel="Solicitações"
+                  primaryValue={p.solicitations}
+                  secondaryLabel="Espera média"
+                  secondaryValue={p.avgWaitMinutes > 0 ? formatMinutes(p.avgWaitMinutes) : '—'}
+                />
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 mt-3">
-            <MetricCard icon={Phone} label="Ligações realizadas" value={props.section4.totalLigacoes} color="text-warning" bg="bg-warning/10" source="call_records" />
-            <MetricCard icon={Phone} label="Tempo de ligações" value={totalLigacaoDurationFormatted} color="text-warning" bg="bg-warning/10" source="call_records (duration)" />
-            <MetricCard icon={MessageCircle} label="Mensagens enviadas" value={props.section4.totalWhatsapp} color="text-success" bg="bg-success/10" source="wpp_messages (outgoing)" />
-            <MetricCard icon={MessageCircle} label="Mensagens recebidas" value={props.section4.totalWhatsappIn} color="text-info" bg="bg-info/10" source="wpp_messages (incoming)" />
+
+          {/* Atendimentos por pessoa */}
+          <div>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              Atendimentos por pessoa
+            </h3>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+              <MetricCard icon={Headphones} label="Total de atendimentos" value={props.section4.totalAtendimentos} color="text-accent" bg="bg-accent/10" note={atendimentosNote} />
+              <MetricCard icon={Headphones} label="Tempo médio de atendimento" value={avgManualAttFormatted} color="text-accent" bg="bg-accent/10" note="botão iniciar/finalizar no chat" />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 mt-3">
+              {props.section4.attendanceByPerson.map((p) => (
+                <PersonStatCard
+                  key={p.key}
+                  label={p.label}
+                  primaryLabel="Atendimentos"
+                  primaryValue={p.count}
+                  secondaryLabel="Duração média"
+                  secondaryValue={p.avgMinutes > 0 ? formatMinutes(p.avgMinutes) : '—'}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Mensagens */}
+          <div>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              Mensagens
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <MetricCard icon={MessageCircle} label="Mensagens recebidas" value={props.section4.totalWhatsappIn} color="text-info" bg="bg-info/10" source="wpp_messages (incoming)" />
+              <MetricCard icon={MessageCircle} label="Mensagens enviadas" value={props.section4.totalWhatsapp} color="text-success" bg="bg-success/10" source="wpp_messages (outgoing)" />
+            </div>
+          </div>
+
+          {/* Ligações por pessoa */}
+          <div>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              Ligações por pessoa
+            </h3>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+              <MetricCard icon={Phone} label="Total de ligações" value={props.section4.totalLigacoes} color="text-warning" bg="bg-warning/10" source="call_records" />
+              <MetricCard icon={Phone} label="Tempo total de ligações" value={totalLigacaoDurationFormatted} color="text-warning" bg="bg-warning/10" source="call_records (duration)" />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 mt-3">
+              {props.section4.callsByPerson.map((p) => (
+                <PersonStatCard
+                  key={p.key}
+                  label={p.label}
+                  primaryLabel="Ligações"
+                  primaryValue={p.count}
+                  secondaryLabel="Tempo médio"
+                  secondaryValue={p.avgSeconds > 0 ? formatSeconds(p.avgSeconds) : '—'}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -504,6 +585,36 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
     </div>
   )
 }
+
+const PersonStatCard = memo(function PersonStatCard({
+  label,
+  primaryLabel,
+  primaryValue,
+  secondaryLabel,
+  secondaryValue,
+}: {
+  label: string
+  primaryLabel: string
+  primaryValue: string | number
+  secondaryLabel: string
+  secondaryValue: string | number
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-background p-3">
+      <p className="text-xs font-semibold text-foreground leading-tight">{label}</p>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <div>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{primaryLabel}</p>
+          <p className="font-heading text-base font-bold tabular text-foreground">{primaryValue}</p>
+        </div>
+        <div>
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wide">{secondaryLabel}</p>
+          <p className="font-heading text-base font-bold tabular text-foreground">{secondaryValue}</p>
+        </div>
+      </div>
+    </div>
+  )
+})
 
 const MetricCard = memo(function MetricCard({
   icon: Icon,

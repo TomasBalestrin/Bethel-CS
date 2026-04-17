@@ -215,27 +215,39 @@ export function EntregasList({ events }: EntregasListProps) {
         )}
         {filtered.map((event) => {
           const presenterName = event.presenter_name
+          const isCancelled = !!event.cancelled_at
           return (
             <button
               key={event.id}
               onClick={() => setSelectedEvent(event)}
-              className="w-full text-left flex items-center justify-between rounded-lg border border-border bg-card p-3 hover:bg-muted/30 hover:border-accent/30 transition-colors"
+              className={`w-full text-left flex items-center justify-between rounded-lg border p-3 transition-colors ${
+                isCancelled
+                  ? 'border-destructive/40 bg-destructive/5 hover:bg-destructive/10'
+                  : 'border-border bg-card hover:bg-muted/30 hover:border-accent/30'
+              }`}
             >
               <div className="flex items-center gap-3 min-w-0">
                 <Badge className={`text-[10px] shrink-0 ${TYPE_COLORS[event.delivery_type] ?? 'bg-muted text-muted-foreground'}`}>
                   {DELIVERY_TYPES.find((t) => t.value === event.delivery_type)?.label ?? event.delivery_type}
                 </Badge>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">
+                  <p className={`text-sm font-medium ${isCancelled ? 'text-destructive line-through' : 'text-foreground'}`}>
                     {formatDateBR(event.delivery_date)}
-                    {event.reference_month && <span className="text-xs text-muted-foreground ml-2">({getMonthLabel(event.reference_month)})</span>}
+                    {event.reference_month && <span className="text-xs text-muted-foreground ml-2 no-underline">({getMonthLabel(event.reference_month)})</span>}
                   </p>
-                  {event.title && <p className="text-xs text-foreground mt-0.5 truncate">{event.title}</p>}
+                  {event.title && <p className={`text-xs mt-0.5 truncate ${isCancelled ? 'text-destructive/80 line-through' : 'text-foreground'}`}>{event.title}</p>}
                   {!event.title && event.description && <p className="text-xs text-muted-foreground mt-0.5 truncate">{event.description}</p>}
                   {presenterName && <p className="text-[10px] text-muted-foreground mt-0.5">Por: {presenterName}</p>}
                 </div>
               </div>
-              <span className="text-xs text-muted-foreground shrink-0 ml-3">{event.participation_count} participações</span>
+              <div className="flex items-center gap-2 shrink-0 ml-3">
+                {isCancelled && (
+                  <span className="inline-flex items-center rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-destructive">
+                    Cancelada
+                  </span>
+                )}
+                <span className="text-xs text-muted-foreground">{event.participation_count} participações</span>
+              </div>
             </button>
           )
         })}

@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { X, Pencil, Trash2, Upload, Save, UserPlus } from 'lucide-react'
+import { X, Pencil, Trash2, Upload, Save, UserPlus, Ban, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { formatDateBR } from '@/lib/format'
@@ -23,6 +23,7 @@ import {
   addParticipantToEvent,
   removeParticipantFromEvent,
   importParticipantsForEvent,
+  toggleDeliveryCancelled,
 } from '@/lib/actions/delivery-actions'
 
 export const DELIVERY_TYPES = [
@@ -44,6 +45,7 @@ export interface EntregaEvent {
   description: string | null
   reference_month: string | null
   presenter_name: string | null
+  cancelled_at: string | null
   participation_count: number
 }
 
@@ -73,6 +75,8 @@ export function EntregaPanel({ event, onClose }: EntregaPanelProps) {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [togglingCancel, setTogglingCancel] = useState(false)
+  const isCancelled = !!event.cancelled_at
 
   // Participants
   const [participants, setParticipants] = useState<Participant[]>([])
@@ -82,9 +86,19 @@ export function EntregaPanel({ event, onClose }: EntregaPanelProps) {
   const [addSearch, setAddSearch] = useState('')
   const [allMentees, setAllMentees] = useState<{ id: string; full_name: string; phone: string }[]>([])
 
-  // Import
+  // Import — two-step UX: upload → mapping → import.
   const importInputRef = useRef<HTMLInputElement>(null)
   const [importing, setImporting] = useState(false)
+  const [parsing, setParsing] = useState(false)
+  const [mapping, setMapping] = useState<{
+    fileName: string
+    headers: string[]
+    rows: Record<string, unknown>[]
+    name: string // header name selected for matching against mentee.full_name
+    phone: string
+    email: string
+  } | null>(null)
+  const SKIP = '__skip__'
 
   useEffect(() => {
     const supabase = createClient()
@@ -145,6 +159,18 @@ export function EntregaPanel({ event, onClose }: EntregaPanelProps) {
     onClose()
   }
 
+  async function handleToggleCancelled() {
+    setTogglingCancel(true)
+    const result = await toggleDeliveryCancelled(event.id, !isCancelled)
+    setTogglingCancel(false)
+    if (result.error) {
+      toast.error(result.error)
+      return
+    }
+    toast.success(isCancelled ? 'Cancelamento revertido' : 'Entrega cancelada')
+    router.refresh()
+  }
+
   async function handleAddMentee(menteeId: string) {
     const mentee = allMentees.find((m) => m.id === menteeId)
     if (!mentee) return
@@ -177,35 +203,60 @@ export function EntregaPanel({ event, onClose }: EntregaPanelProps) {
   }
 
   async function handleImportFile(file: File) {
-    setImporting(true)
+    setParsing(true)
     try {
       const XLSX = await import('xlsx')
       const buf = await file.arrayBuffer()
       const wb = XLSX.read(new Uint8Array(buf), { type: 'array' })
       const sheet = wb.Sheets[wb.SheetNames[0]]
       const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' })
-
-      // Flexible header mapping — accept any of name / phone / email
-      const rowsNormalized = rows.map((r) => {
-        const entries = Object.entries(r).map(([k, v]) => [k.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, ''), String(v ?? '').trim()] as const)
-        const pick = (...keys: string[]) => {
-          for (const key of keys) {
-            const hit = entries.find(([k]) => k === key || k.includes(key))
-            if (hit && hit[1]) return hit[1]
-          }
-          return ''
+      if (rows.length === 0) {
+        toast.error('Planilha vazia')
+        return
+      }
+      const headers = Object.keys(rows[0])
+      // Auto-detect sugere o mapeamento inicial — usuário ainda confirma.
+      const norm = (s: string) => s.toLowerCase().trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      const findHeader = (keys: string[]) => {
+        for (const h of headers) {
+          const n = norm(h)
+          if (keys.some((k) => n === k || n.includes(k))) return h
         }
-        return {
-          name: pick('nome', 'name', 'mentorado', 'full name'),
-          phone: pick('telefone', 'phone', 'whatsapp', 'celular', 'cel', 'tel', 'fone'),
-          email: pick('email', 'e-mail', 'mail'),
-        }
+        return SKIP
+      }
+      setMapping({
+        fileName: file.name,
+        headers,
+        rows,
+        name: findHeader(['nome', 'name', 'mentorado', 'full name']),
+        phone: findHeader(['telefone', 'phone', 'whatsapp', 'celular', 'cel', 'tel', 'fone']),
+        email: findHeader(['email', 'e-mail', 'mail']),
       })
+    } catch (err) {
+      toast.error('Erro ao processar arquivo: ' + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setParsing(false)
+      if (importInputRef.current) importInputRef.current.value = ''
+    }
+  }
+
+  async function runImport() {
+    if (!mapping) return
+    if (mapping.name === SKIP && mapping.phone === SKIP && mapping.email === SKIP) {
+      toast.error('Selecione pelo menos um campo (nome, telefone ou email)')
+      return
+    }
+    setImporting(true)
+    try {
+      const rowsNormalized = mapping.rows.map((r) => ({
+        name: mapping.name !== SKIP ? String(r[mapping.name] ?? '').trim() : '',
+        phone: mapping.phone !== SKIP ? String(r[mapping.phone] ?? '').trim() : '',
+        email: mapping.email !== SKIP ? String(r[mapping.email] ?? '').trim() : '',
+      }))
 
       const result = await importParticipantsForEvent({ eventId: event.id, rows: rowsNormalized })
 
       if (result.added > 0) {
-        // Refresh participant list
         const supabase = createClient()
         const { data } = await supabase
           .from('delivery_participations')
@@ -229,12 +280,12 @@ export function EntregaPanel({ event, onClose }: EntregaPanelProps) {
       if (result.errors.length > 0) {
         console.warn('[EntregaPanel] Import errors:', result.errors)
       }
+      setMapping(null)
       router.refresh()
     } catch (err) {
-      toast.error('Erro ao processar arquivo: ' + (err instanceof Error ? err.message : String(err)))
+      toast.error('Erro na importação: ' + (err instanceof Error ? err.message : String(err)))
     } finally {
       setImporting(false)
-      if (importInputRef.current) importInputRef.current.value = ''
     }
   }
 
@@ -257,11 +308,18 @@ export function EntregaPanel({ event, onClose }: EntregaPanelProps) {
       {/* Panel */}
       <div className="w-full max-w-xl bg-background border-l border-border overflow-y-auto shadow-xl">
         <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-border bg-background">
-          <div>
-            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Entrega</p>
-            <h2 className="font-heading text-lg font-bold">
-              {event.title || DELIVERY_TYPES.find((t) => t.value === event.delivery_type)?.label || event.delivery_type}
-            </h2>
+          <div className="flex items-center gap-2">
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Entrega</p>
+              <h2 className={`font-heading text-lg font-bold ${isCancelled ? 'line-through text-destructive' : ''}`}>
+                {event.title || DELIVERY_TYPES.find((t) => t.value === event.delivery_type)?.label || event.delivery_type}
+              </h2>
+            </div>
+            {isCancelled && (
+              <span className="inline-flex items-center rounded-full bg-destructive/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-destructive">
+                Cancelada
+              </span>
+            )}
           </div>
           <Button variant="ghost" size="sm" onClick={onClose}>
             <X className="h-4 w-4" />
@@ -269,6 +327,14 @@ export function EntregaPanel({ event, onClose }: EntregaPanelProps) {
         </div>
 
         <div className="p-4 space-y-5">
+          {/* Cancelled banner */}
+          {isCancelled && (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              <span className="font-semibold">Entrega cancelada</span>
+              {event.cancelled_at && <span className="ml-1 opacity-80">em {formatDateBR(event.cancelled_at)}</span>}
+            </div>
+          )}
+
           {/* Action bar */}
           <div className="flex items-center gap-2 flex-wrap">
             {!editing ? (
@@ -294,6 +360,19 @@ export function EntregaPanel({ event, onClose }: EntregaPanelProps) {
             )}
             <Button size="sm" variant="outline" onClick={() => setConfirmDelete(true)} className="text-destructive hover:bg-destructive/10">
               <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Excluir
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleToggleCancelled}
+              disabled={togglingCancel}
+              className={isCancelled ? '' : 'text-destructive hover:bg-destructive/10 border-destructive/40'}
+            >
+              {isCancelled ? (
+                <><RotateCcw className="mr-1.5 h-3.5 w-3.5" /> {togglingCancel ? 'Revertendo...' : 'Reverter cancelamento'}</>
+              ) : (
+                <><Ban className="mr-1.5 h-3.5 w-3.5" /> {togglingCancel ? 'Cancelando...' : 'Cancelar'}</>
+              )}
             </Button>
           </div>
 
@@ -361,8 +440,8 @@ export function EntregaPanel({ event, onClose }: EntregaPanelProps) {
                 <p className="text-xs text-muted-foreground">{participants.length} mentorado(s)</p>
               </div>
               <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" onClick={() => importInputRef.current?.click()} disabled={importing}>
-                  <Upload className="mr-1.5 h-3.5 w-3.5" /> {importing ? 'Importando...' : 'Importar'}
+                <Button size="sm" variant="outline" onClick={() => importInputRef.current?.click()} disabled={importing || parsing}>
+                  <Upload className="mr-1.5 h-3.5 w-3.5" /> {parsing ? 'Lendo...' : importing ? 'Importando...' : 'Importar'}
                 </Button>
                 <input
                   ref={importInputRef}
@@ -425,6 +504,51 @@ export function EntregaPanel({ event, onClose }: EntregaPanelProps) {
             )}
           </div>
         </div>
+
+        {/* Import mapping dialog */}
+        {mapping && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" onClick={() => !importing && setMapping(null)}>
+            <div className="bg-background rounded-lg p-5 max-w-lg w-full mx-4 border border-border shadow-xl" onClick={(e) => e.stopPropagation()}>
+              <h3 className="font-semibold text-base mb-1">Importar Participantes</h3>
+              <p className="text-xs text-muted-foreground mb-4">
+                {mapping.fileName} — {mapping.rows.length} linha(s). Associe as colunas da planilha aos campos usados para identificar os mentorados. Pelo menos um deve estar selecionado.
+              </p>
+
+              <div className="space-y-3">
+                {([
+                  { key: 'name', label: 'Nome' },
+                  { key: 'phone', label: 'Telefone' },
+                  { key: 'email', label: 'Email' },
+                ] as const).map((f) => (
+                  <div key={f.key} className="grid grid-cols-[100px_1fr] items-center gap-2">
+                    <Label className="text-xs">{f.label}</Label>
+                    <Select
+                      value={mapping[f.key] || SKIP}
+                      onValueChange={(v) => setMapping((prev) => prev ? { ...prev, [f.key]: v } : prev)}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={SKIP}>— Não usar</SelectItem>
+                        {mapping.headers.map((h) => (
+                          <SelectItem key={h} value={h}>{h}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex justify-end gap-2 mt-5">
+                <Button size="sm" variant="outline" onClick={() => setMapping(null)} disabled={importing}>
+                  Cancelar
+                </Button>
+                <Button size="sm" onClick={runImport} disabled={importing}>
+                  {importing ? 'Importando...' : `Importar ${mapping.rows.length}`}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Delete confirm */}
         {confirmDelete && (

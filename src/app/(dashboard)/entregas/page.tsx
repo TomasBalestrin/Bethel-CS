@@ -32,6 +32,7 @@ export default async function EntregasPage() {
       description: (raw.description as string | null) ?? (e.notes as string | null) ?? null,
       reference_month: (raw.reference_month as string | null) ?? null,
       presenter_name: (raw.presenter_name as string | null) ?? null,
+      cancelled_at: (raw.cancelled_at as string | null) ?? null,
       participation_count: participationCounts.get(e.id) ?? 0,
     }
   })

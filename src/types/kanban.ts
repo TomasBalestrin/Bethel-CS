@@ -21,5 +21,8 @@ export interface MenteeWithStats extends MenteeSummary, Partial<Omit<MenteeRow, 
   days_since_contact?: number
   has_active_session?: boolean
   active_sessions?: Array<{ channel: string; specialist_name: string; specialist_id?: string; started_at?: string }>
+  /** Entrada na etapa atual (última stage_changes.changed_at para to_stage_id = current_stage_id).
+   *  Fallback: created_at quando não há registro. */
+  stage_entered_at?: string
 }
 

@@ -3,7 +3,7 @@
 import { memo, useEffect, useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { Users, DollarSign, Star, Clock, Calendar, Headphones } from 'lucide-react'
+import { Star, Clock, Calendar, Headphones, Layers } from 'lucide-react'
 import type { MenteeWithStats } from '@/types/kanban'
 import { formatDateBR } from '@/lib/format'
 
@@ -76,8 +76,6 @@ export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, sp
   }
 
   const isInactive = mentee.days_since_contact != null && mentee.days_since_contact >= 30
-  const hasIndications = mentee.indication_count > 0
-  const hasRevenue = mentee.revenue_total > 0
 
   // Tick every 30s so the duration/wait indicators stay up-to-date without a
   // full page refresh. Only starts the interval when this card actually has
@@ -100,6 +98,11 @@ export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, sp
   // Wait time for a mentee reply
   const waitMs = lastIncomingAt ? Date.now() - new Date(lastIncomingAt).getTime() : 0
   const waitLabel = hasWait ? formatDuration(waitMs) : null
+
+  // Tempo na etapa atual (stage_changes mais recente; fallback created_at)
+  const stageLabel = mentee.stage_entered_at
+    ? formatDuration(Date.now() - new Date(mentee.stage_entered_at).getTime())
+    : null
   const waitColorClass = !hasWait
     ? ''
     : waitMs >= 2 * 60 * 60 * 1000
@@ -152,9 +155,9 @@ export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, sp
           </span>
         </div>
 
-        {/* Product + specialist badges + date */}
+        {/* Product (apenas Implementação Comercial) + specialist badges + data de início */}
         <div className="flex items-center flex-wrap gap-1 mt-1.5">
-          {mentee.product_name && (
+          {mentee.product_name === 'Implementação Comercial' && (
             <span className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
               {mentee.product_name}
             </span>
@@ -167,7 +170,7 @@ export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, sp
           {mentee.start_date && (
             <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground/60 shrink-0 ml-auto tabular" title="Data de início">
               <Calendar size={9} />
-              {formatDateBR(mentee.start_date)}
+              Início {formatDateBR(mentee.start_date)}
             </span>
           )}
         </div>
@@ -212,21 +215,19 @@ export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, sp
 
         {/* Metrics row */}
         <div className="mt-2 pt-2 border-t border-border/30 flex items-center gap-3 text-[11px] tabular">
-          <span className={`flex items-center gap-1 ${hasIndications ? 'text-accent font-medium' : 'text-muted-foreground/60'}`} title="Indicações">
-            <Users size={11} className="shrink-0" />
-            {mentee.indication_count}
-          </span>
-          <span className={`flex items-center gap-1 ${hasRevenue ? 'text-success font-medium' : 'text-muted-foreground/60'}`} title="Receita">
-            <DollarSign size={11} className="shrink-0" />
-            R$ {mentee.revenue_total.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-          </span>
+          {stageLabel && (
+            <span className="flex items-center gap-1 text-muted-foreground" title="Tempo na etapa atual">
+              <Layers size={11} className="shrink-0" />
+              Etapa Atual: {stageLabel}
+            </span>
+          )}
           {mentee.days_since_contact != null && (
             <span
-              className={`flex items-center gap-0.5 ml-auto ${mentee.days_since_contact > 7 ? 'text-destructive font-semibold' : mentee.days_since_contact > 3 ? 'text-warning font-medium' : 'text-muted-foreground/60'}`}
-              title={`${mentee.days_since_contact} dias sem contato`}
+              className={`flex items-center gap-1 ml-auto ${mentee.days_since_contact > 7 ? 'text-destructive font-semibold' : mentee.days_since_contact > 3 ? 'text-warning font-medium' : 'text-muted-foreground/60'}`}
+              title={`${mentee.days_since_contact} dias sem atendimento`}
             >
               <Clock size={10} className="shrink-0" />
-              {mentee.days_since_contact}d
+              {mentee.days_since_contact}d sem atendimento
             </span>
           )}
         </div>

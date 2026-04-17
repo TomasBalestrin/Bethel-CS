@@ -1947,13 +1947,17 @@ function CardMenteeTasks({ menteeId }: { menteeId: string }) {
 }
 
 // ─── Card: Entregas Mentoria ───
+// Labels + ordem batem com o dropdown do módulo /entregas (entrega-panel.tsx
+// DELIVERY_TYPES). A chave 'marketing' (não 'mkt') é o que o módulo grava em
+// delivery_events.delivery_type — antes estava 'mkt' aqui e as entregas de
+// marketing nunca apareciam no card.
 const DELIVERY_TYPES = [
   { key: 'hotseat', label: 'Hotseat' },
-  { key: 'comercial', label: 'Comercial' },
-  { key: 'gestao', label: 'Gestão' },
-  { key: 'mkt', label: 'Mkt' },
-  { key: 'extras', label: 'Entregas Extras' },
+  { key: 'comercial', label: 'Entrega de Comercial' },
+  { key: 'marketing', label: 'Entrega de Marketing' },
+  { key: 'gestao', label: 'Entrega de Gestão' },
   { key: 'mentoria_individual', label: 'Mentoria Individual' },
+  { key: 'extras', label: 'Entrega Extra' },
   { key: 'sos', label: 'SOS' },
   { key: 'omv', label: 'OMV' },
 ]

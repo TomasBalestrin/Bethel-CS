@@ -161,6 +161,7 @@ export async function POST(request: NextRequest) {
       channel,
       quoted_message_id: quotedMessageId || null,
       delivery_status: 'sent',
+      source: 'api',
     })
     if (insertErr) {
       // Unique violation on message_id means the webhook beat us to the insert

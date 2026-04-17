@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Shield, User, Plus, Pencil, Trash2, Package, MessageSquare, Wifi, WifiOff, Webhook, Settings, Building2 } from 'lucide-react'
+import { Shield, User, Plus, Pencil, Trash2, Package, MessageSquare, Wifi, WifiOff, Webhook, Settings, Building2, AlertTriangle } from 'lucide-react'
 import dynamic from 'next/dynamic'
 
 const WebhooksSection = dynamic(
@@ -76,12 +76,20 @@ export function AdminUserList({ users, products, wppInstances, kanbanStages, set
             Gestão de usuários, produtos, WhatsApp e webhooks do sistema
           </p>
         </div>
-        <a
-          href="/admin/mensagens-orfas"
-          className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-muted/50"
-        >
-          <MessageSquare className="h-3.5 w-3.5" /> Mensagens órfãs
-        </a>
+        <div className="flex items-center gap-2 flex-wrap">
+          <a
+            href="/admin/mensagens-orfas"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-muted/50"
+          >
+            <MessageSquare className="h-3.5 w-3.5" /> Mensagens órfãs
+          </a>
+          <a
+            href="/admin/erros-sync"
+            className="inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-muted/50"
+          >
+            <AlertTriangle className="h-3.5 w-3.5" /> Erros de sync
+          </a>
+        </div>
       </div>
 
       <Tabs defaultValue="users" className="mt-6">

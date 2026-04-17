@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getMediaUrl } from '@/lib/nextapps'
+import { logInsertError } from '@/lib/log-insert-error'
 
 /**
  * NextTrack WhatsApp Webhook Handler
@@ -426,6 +427,15 @@ export async function POST(request: NextRequest) {
           hasMediaUrl: !!mediaUrl,
           channel,
           payload: JSON.stringify(data).slice(0, 2000),
+        })
+        // Persiste em wpp_insert_errors pra admin ver sem depender do log Vercel.
+        await logInsertError({
+          route: '/api/whatsapp/webhook',
+          targetTable: 'wpp_messages',
+          error: insertErr,
+          menteeId: mentee.id,
+          specialistId: instance.specialist_id ?? null,
+          payload: { direction, messageType, contentLen: content?.length ?? 0, hasMediaUrl: !!mediaUrl, channel, raw: data },
         })
         // Return 500 so NextTrack retries the webhook delivery. Previously this
         // returned 200 which caused messages to be silently lost whenever a DB

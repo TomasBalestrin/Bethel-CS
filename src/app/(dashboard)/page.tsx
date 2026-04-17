@@ -521,13 +521,17 @@ export default async function DashboardPage({ searchParams }: Props) {
   const menteesAdvanced = new Set(((stageChanges as { mentee_id: string }[] | null) ?? []).map((s) => s.mentee_id)).size
 
   // ─── Engajamento: delivery stats ───
+  // Engajamento: delivery stats. deliveryEvents é `any[]` por causa do cast
+  // do select (cancelled_at fora do types). Tipa localmente para o uso abaixo.
+  type DeliveryEventRow = { id: string; delivery_type: string; delivery_date: string; cancelled_at: string | null }
+  const deliveryEventsTyped = (deliveryEvents ?? []) as DeliveryEventRow[]
   const deliveryTypeKeys = ['hotseat', 'comercial', 'gestao', 'mkt', 'extras', 'mentoria_individual']
-  const deliveryEventIds = new Set((deliveryEvents ?? []).map((e) => e.id))
+  const deliveryEventIds = new Set(deliveryEventsTyped.map((e) => e.id))
   const filteredParts = (deliveryParts ?? []).filter((p) => deliveryEventIds.has(p.delivery_event_id))
 
   const deliveryStats: Record<string, { delivered: number; participated: number }> = {}
   for (const key of deliveryTypeKeys) {
-    const eventsOfType = (deliveryEvents ?? []).filter((e) => e.delivery_type === key)
+    const eventsOfType = deliveryEventsTyped.filter((e) => e.delivery_type === key)
     const eventIdsOfType = new Set(eventsOfType.map((e) => e.id))
     const partsOfType = filteredParts.filter((p) => eventIdsOfType.has(p.delivery_event_id))
     deliveryStats[key] = { delivered: eventsOfType.length, participated: partsOfType.length }
@@ -596,9 +600,9 @@ export default async function DashboardPage({ searchParams }: Props) {
       }}
       engajamento={{
         deliveryStats,
-        eventos: (deliveryEvents ?? []).filter((e) => e.delivery_type === 'evento').length,
-        intensivo: (deliveryEvents ?? []).filter((e) => e.delivery_type === 'intensivo').length,
-        encontro: (deliveryEvents ?? []).filter((e) => e.delivery_type === 'encontro_premium').length,
+        eventos: deliveryEventsTyped.filter((e) => e.delivery_type === 'evento').length,
+        intensivo: deliveryEventsTyped.filter((e) => e.delivery_type === 'intensivo').length,
+        encontro: deliveryEventsTyped.filter((e) => e.delivery_type === 'encontro_premium').length,
       }}
       section4={{
         totalAtendimentos: totalAttendanceSessions,

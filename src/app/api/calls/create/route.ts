@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createRoom, createMeetingToken, getRoomUrl } from '@/lib/daily'
 import { sendMessage } from '@/lib/nextapps'
 
 export async function POST(request: NextRequest) {
   const supabase = createClient()
+  // Admin client bypassa o RLS da call_records para os writes (INSERT/UPDATE).
+  // Sem isso, especialistas caem em "INSERT sem policy" (silent reject) — é o
+  // que impedia ligações de serem registradas.
+  const admin = createAdminClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
@@ -23,7 +28,7 @@ export async function POST(request: NextRequest) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin
 
   // Auto-close stale calls (older than 2 hours — Daily rooms expire after 2h)
-  await supabase
+  await admin
     .from('call_records')
     .update({ ended_at: new Date().toISOString() })
     .is('ended_at', null)
@@ -32,7 +37,9 @@ export async function POST(request: NextRequest) {
   // Check for existing RECENT active call (unless forceNew) — max 30 min old
   if (!forceNew) {
     const recentThreshold = new Date(Date.now() - 30 * 60 * 1000).toISOString()
-    const { data: existingCall } = await supabase
+    // Admin client para garantir que a lookup enxergue ligações criadas por
+    // outros especialistas (admin clicando ligar num mentorado de outra pessoa).
+    const { data: existingCall } = await admin
       .from('call_records')
       .select('id, daily_room_name, daily_room_url, call_type, created_at')
       .eq('mentee_id', menteeId)
@@ -60,7 +67,7 @@ export async function POST(request: NextRequest) {
   }
 
   // End all existing active calls for this mentee before creating new one
-  await supabase
+  await admin
     .from('call_records')
     .update({ ended_at: new Date().toISOString() })
     .eq('mentee_id', menteeId)
@@ -92,12 +99,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Falha ao gerar token' }, { status: 500 })
   }
 
-  // Save call record
-  const { data: callRecord, error: insertError } = await supabase
+  // Save call record — usa admin client para contornar RLS (sem isso, a
+  // especialista não teria policy de INSERT — é o bug do caso da Aline).
+  // Para calls feitas por um admin em nome de outro especialista, o registro
+  // fica atribuído ao owner do mentorado (mesma semântica do /api/whatsapp/send).
+  const { data: menteeOwner } = await admin
+    .from('mentees')
+    .select('created_by')
+    .eq('id', menteeId)
+    .single()
+  const specialistIdForCall = menteeOwner?.created_by || user.id
+
+  const { data: callRecord, error: insertError } = await admin
     .from('call_records')
     .insert({
       mentee_id: menteeId,
-      specialist_id: user.id,
+      specialist_id: specialistIdForCall,
       daily_room_name: room.name,
       daily_room_url: room.url,
       recording_status: 'pending',
@@ -108,8 +125,8 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (insertError) {
-    console.error('[Calls/Create] Insert failed:', insertError)
-    return NextResponse.json({ error: 'Falha ao salvar ligação' }, { status: 500 })
+    console.error('[Calls/Create] Insert failed:', insertError.message, insertError.details, insertError.hint)
+    return NextResponse.json({ error: `Falha ao salvar ligação: ${insertError.message}` }, { status: 500 })
   }
 
   // Build mentee link

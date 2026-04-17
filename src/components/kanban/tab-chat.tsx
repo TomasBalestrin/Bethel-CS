@@ -282,9 +282,45 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
     }
   }, [messages, loading, scrollToBottom])
 
-  // ─── Realtime ───
+  // ─── Realtime + backfill ───
+  // O Supabase realtime perde eventos quando o WebSocket cai (laptop dorme,
+  // WiFi oscila). Sem backfill, mensagens chegadas no intervalo só apareciam
+  // após reload manual. Três camadas de proteção:
+  //   1. Subscription normal escuta INSERTs.
+  //   2. Handler de status CHANNEL_ERROR / TIMED_OUT dispara refetch via
+  //      GET /api/whatsapp/messages/<id>?since=<último sent_at local>.
+  //   3. Polling leve a cada 60s faz o mesmo refetch — funciona como
+  //      salvaguarda para casos em que o status callback não dispara.
   useEffect(() => {
     const supabase = createClient()
+
+    async function backfill() {
+      try {
+        // Pega o último sent_at local para pedir só o delta.
+        let lastSentAt: string | null = null
+        setMessages((prev) => {
+          const real = prev.filter((m) => !m.id.startsWith('temp-'))
+          lastSentAt = real.length > 0 ? real[real.length - 1].sent_at : null
+          return prev
+        })
+        const url = lastSentAt
+          ? `/api/whatsapp/messages/${menteeId}?channel=${channel}&since=${encodeURIComponent(lastSentAt)}&markRead=false`
+          : `/api/whatsapp/messages/${menteeId}?channel=${channel}&markRead=false`
+        const res = await fetch(url)
+        if (!res.ok) return
+        const rows = (await res.json()) as WppMessage[]
+        if (rows.length === 0) return
+        setMessages((prev) => {
+          const seen = new Set(prev.map((m) => m.id))
+          const fresh = rows.filter((r) => !seen.has(r.id))
+          if (fresh.length === 0) return prev
+          return [...prev, ...fresh].sort((a, b) => a.sent_at.localeCompare(b.sent_at))
+        })
+      } catch (err) {
+        console.warn('[tab-chat] backfill failed:', err)
+      }
+    }
+
     const realtimeChannel = supabase
       .channel(`wpp_messages:mentee_id=eq.${menteeId}`)
       .on('postgres_changes', {
@@ -292,13 +328,11 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         filter: `mentee_id=eq.${menteeId}`,
       }, (payload) => {
         const newMsg = payload.new as WppMessage
-        // Only process messages for this channel
         const msgChannel = (newMsg as Record<string, unknown>).channel as string || 'principal'
         if (msgChannel !== channel) return
 
         setMessages((prev) => {
           if (prev.some((m) => m.id === newMsg.id)) return prev
-          // Replace optimistic message (temp-*) if it matches this real message
           const tempIdx = prev.findIndex((m) =>
             m.id.startsWith('temp-') && m.direction === newMsg.direction &&
             (m.content === newMsg.content || (m.media_url && m.media_url === newMsg.media_url))
@@ -311,13 +345,27 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           return [...prev, newMsg]
         })
         if (newMsg.direction === 'incoming') {
-          // Notify parent about new unread message (-1 = increment by 1)
           onUnreadRef.current?.(-1)
           supabase.from('wpp_messages').update({ is_read: true }).eq('id', newMsg.id).then(() => {})
         }
       })
-      .subscribe()
-    return () => { supabase.removeChannel(realtimeChannel) }
+      .subscribe((status) => {
+        // Reconexão: se a subscription morre ou expira, eventos do intervalo
+        // foram perdidos — refaz a busca dos mais novos desde o último sent_at.
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          console.log('[tab-chat] realtime status:', status, '— running backfill')
+          backfill()
+        }
+      })
+
+    // Salvaguarda: polling a cada 60s que preenche gaps caso o callback de
+    // status do realtime não dispare ou um INSERT escape.
+    const pollId = setInterval(backfill, 60 * 1000)
+
+    return () => {
+      clearInterval(pollId)
+      supabase.removeChannel(realtimeChannel)
+    }
   }, [menteeId, channel])
 
   // ─── Upload to Supabase Storage ───
@@ -355,9 +403,16 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
     setSending(true)
     setUploading(true)
 
+    // Rastreia o balão otimista ativo. Se o fetch rejeitar (erro de rede
+    // antes de receber resposta), o catch precisa conseguir removê-lo — antes
+    // o catch era vazio e o balão ficava fantasma até o próximo reload.
+    let optimisticId: string | null = null
+    let errorKind: 'file' | 'audio' | 'text' = 'text'
+
     try {
       // Handle file attachment — send as native media
       if (attachedFile) {
+        errorKind = 'file'
         const url = await uploadFile(attachedFile, attachedFile.name)
         if (!url) { setSending(false); setUploading(false); return }
 
@@ -386,6 +441,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           delivery_status: 'sent',
           created_at: new Date().toISOString(),
         }
+        optimisticId = optimistic.id
         setMessages((prev) => [...prev, optimistic])
         setInput('')
         setAttachedFile(null)
@@ -407,7 +463,8 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
         if (!res.ok) {
           setMessages((prev) => prev.filter((m) => m.id !== optimistic.id))
-          toast.error('Erro ao enviar arquivo')
+          const errData = await res.json().catch(() => null)
+          toast.error(errData?.error || 'Erro ao enviar arquivo')
         }
         setSending(false)
         textareaRef.current?.focus()
@@ -416,6 +473,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
       // Handle audio — send as native audio
       if (audioBlob) {
+        errorKind = 'audio'
         const audioMime = audioBlob.type || 'audio/webm'
         const ext = audioMime.includes('mp4') ? 'mp4' : audioMime.includes('ogg') ? 'ogg' : 'webm'
         const url = await uploadFile(audioBlob, `audio_${Date.now()}.${ext}`)
@@ -441,6 +499,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
           delivery_status: 'sent',
           created_at: new Date().toISOString(),
         }
+        optimisticId = optimistic.id
         setMessages((prev) => [...prev, optimistic])
         setAudioBlob(null)
         setAudioUrl(null)
@@ -460,7 +519,8 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
 
         if (!res.ok) {
           setMessages((prev) => prev.filter((m) => m.id !== optimistic.id))
-          toast.error('Erro ao enviar áudio')
+          const errData = await res.json().catch(() => null)
+          toast.error(errData?.error || 'Erro ao enviar áudio')
         }
         setSending(false)
         textareaRef.current?.focus()
@@ -492,6 +552,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         delivery_status: 'sent',
         created_at: new Date().toISOString(),
       }
+      optimisticId = optimistic.id
       setMessages((prev) => [...prev, optimistic])
       setReplyingTo(null)
 
@@ -506,8 +567,16 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         const errData = await res.json().catch(() => null)
         toast.error(errData?.error || 'Erro ao enviar mensagem')
       }
-    } catch {
-      // Revert handled above
+    } catch (err) {
+      // Erro de rede (fetch rejeitou antes de receber resposta) ou qualquer
+      // exceção acima. Remove o balão fantasma e mostra o motivo real em toast.
+      if (optimisticId) {
+        const id = optimisticId
+        setMessages((prev) => prev.filter((m) => m.id !== id))
+      }
+      const label = errorKind === 'file' ? 'arquivo' : errorKind === 'audio' ? 'áudio' : 'mensagem'
+      const message = err instanceof Error ? err.message : String(err)
+      toast.error(`Erro ao enviar ${label}: ${message}`)
     } finally {
       setSending(false)
       setUploading(false)
@@ -527,7 +596,12 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ menteeId, callType }),
       })
-      if (!res.ok) throw new Error('Falha ao criar ligação')
+      if (!res.ok) {
+        // Surfa o erro real do backend (antes era um genérico "Falha ao
+        // criar ligação", escondendo erros de RLS e do Daily.co).
+        const err = await res.json().catch(() => null)
+        throw new Error(err?.error || `HTTP ${res.status}`)
+      }
       const data = await res.json()
       callStore.startCall({
         roomUrl: data.roomUrl,
@@ -545,7 +619,7 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
       }
     } catch (err) {
       console.error('Call error:', err)
-      toast.error('Erro ao iniciar ligação')
+      toast.error(`Erro ao iniciar ligação: ${err instanceof Error ? err.message : String(err)}`)
     } finally {
       setCallingLoading(false)
     }
@@ -637,52 +711,35 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
     }
   }
 
-  // Forward mentee to department channel
+  // Forward mentee to department channel.
+  // Usa /api/whatsapp/forward (admin client no backend) porque o INSERT direto
+  // caía na policy WITH CHECK specialist_id = auth.uid() quando o usuário logado
+  // não era o dono do mentorado — o encaminhamento sumia silenciosamente.
   async function handleForward() {
     if (!forwardChannel || !forwardDescription.trim()) return
     setForwarding(true)
     try {
-      const supabase = createClient()
-      const deptLabel = forwardChannel === 'comercial' ? 'Comercial' : forwardChannel === 'marketing' ? 'Marketing' : 'Gestão'
-
-      // Save internal message to the target channel
-      await supabase.from('wpp_messages').insert({
-        mentee_id: menteeId,
-        specialist_id: specialistId || '',
-        instance_id: 'internal',
-        direction: 'outgoing' as const,
-        message_type: 'text' as const,
-        content: `📋 Encaminhamento — ${deptLabel}\n\n👤 ${menteeName}\n📱 ${menteePhone}\n\n📝 ${forwardDescription.trim()}`,
-        is_read: false,
-        sent_at: new Date().toISOString(),
-        channel: forwardChannel,
-      })
-
-      // Find the user assigned to this department and create notification
-      const { data: assignment } = await supabase
-        .from('department_assignments')
-        .select('user_id')
-        .eq('department', forwardChannel as 'comercial' | 'marketing' | 'gestao')
-        .single()
-
-      if (assignment) {
-        await supabase.from('forwarding_notifications').insert({
-          recipient_id: assignment.user_id,
-          mentee_id: menteeId,
-          department: forwardChannel,
+      const res = await fetch('/api/whatsapp/forward', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          menteeId,
+          channel: forwardChannel,
           description: forwardDescription.trim(),
-          mentee_name: menteeName,
-          mentee_phone: menteePhone,
-          sent_by: specialistId || null,
-        })
+        }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => null)
+        toast.error(err?.error || 'Erro ao encaminhar')
+        return
       }
-
+      const deptLabel = forwardChannel === 'comercial' ? 'Comercial' : forwardChannel === 'marketing' ? 'Marketing' : 'Gestão'
       toast.success(`Encaminhado para ${deptLabel}`)
       setForwardOpen(false)
       setForwardChannel(null)
       setForwardDescription('')
-    } catch {
-      toast.error('Erro ao encaminhar')
+    } catch (err) {
+      toast.error('Erro ao encaminhar: ' + (err instanceof Error ? err.message : String(err)))
     } finally {
       setForwarding(false)
     }

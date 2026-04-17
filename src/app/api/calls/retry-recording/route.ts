@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getRecordings } from '@/lib/daily'
 
 /**
@@ -12,17 +13,21 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
+  // Admin client bypassa RLS em call_records — um especialista retentando a
+  // gravação de uma call própria ou admin mexendo em qualquer call não deve
+  // falhar silenciosamente por falta de policy.
+  const admin = createAdminClient()
+
   const { callId } = await request.json()
   if (!callId) return NextResponse.json({ error: 'callId obrigatório' }, { status: 400 })
 
-  const { data: call } = await supabase
+  const { data: call } = await admin
     .from('call_records')
     .select('daily_room_name, recording_status, recording_url')
     .eq('id', callId)
     .single()
 
   if (!call) return NextResponse.json({ error: 'Ligação não encontrada' }, { status: 404 })
-  // Allow retry even if status is 'ready' when URL is missing (recovery from stale state)
   if (call.recording_status === 'ready' && call.recording_url) {
     return NextResponse.json({ status: 'ready', message: 'Gravação já está disponível' })
   }
@@ -32,7 +37,6 @@ export async function POST(request: NextRequest) {
     console.log('[retry-recording] Daily returned', recordings.length, 'recordings for', call.daily_room_name)
 
     if (recordings.length > 0) {
-      // Pick the first one with a usable download URL, falling back to the first
       const rec = recordings.find((r) => !!r.download_url) || recordings[0]
       if (!rec.download_url) {
         return NextResponse.json({
@@ -40,7 +44,7 @@ export async function POST(request: NextRequest) {
           message: `Gravação encontrada (status: ${rec.status || 'desconhecido'}) mas ainda sendo processada pelo Daily — aguarde 1-3 minutos e tente novamente`,
         })
       }
-      await supabase
+      await admin
         .from('call_records')
         .update({
           recording_url: rec.download_url,

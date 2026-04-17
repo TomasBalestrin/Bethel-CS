@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getRecordings } from '@/lib/daily'
 
 /**
@@ -14,19 +15,22 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
-  // Admin check
+  // Admin check — só admin pode rodar recovery em massa
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
 
+  // Writes passam pelo admin client para contornar RLS em call_records
+  const admin = createAdminClient()
+
   // Find stuck calls
-  const { data: stuckCalls, error: queryErr } = await supabase
+  const { data: stuckCalls, error: queryErr } = await admin
     .from('call_records')
     .select('id, daily_room_name')
     .in('recording_status', ['processing', 'pending'])
     .is('recording_url', null)
     .not('ended_at', 'is', null)
     .order('started_at', { ascending: false })
-    .limit(100) // batch size to avoid timeouts
+    .limit(100)
 
   if (queryErr) {
     return NextResponse.json({ error: queryErr.message }, { status: 500 })
@@ -46,7 +50,7 @@ export async function POST(request: NextRequest) {
       const recordings = await getRecordings(call.daily_room_name)
       const rec = recordings.find((r) => !!r.download_url)
       if (rec) {
-        const { error: updateErr } = await supabase
+        const { error: updateErr } = await admin
           .from('call_records')
           .update({
             recording_url: rec.download_url,

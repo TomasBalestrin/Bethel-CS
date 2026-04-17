@@ -734,7 +734,14 @@ export function TabChat({ menteeId, menteePhone, menteeName, specialistId, onUnr
         return
       }
       const deptLabel = forwardChannel === 'comercial' ? 'Comercial' : forwardChannel === 'marketing' ? 'Marketing' : 'Gestão'
-      toast.success(`Encaminhado para ${deptLabel}`)
+      const data = await res.json().catch(() => null) as { notified?: boolean; notifyError?: string | null } | null
+      // Antes "encaminhado" era silencioso mesmo quando a notificação falhava
+      // — agora diferencia para o usuário saber se o destinatário foi avisado.
+      if (data?.notified) {
+        toast.success(`Encaminhado para ${deptLabel}`)
+      } else {
+        toast.warning(`Mensagem gravada, mas ${deptLabel} não foi notificado${data?.notifyError ? ': ' + data.notifyError : ''}`)
+      }
       setForwardOpen(false)
       setForwardChannel(null)
       setForwardDescription('')

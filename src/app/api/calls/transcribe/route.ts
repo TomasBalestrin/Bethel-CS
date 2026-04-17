@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getRecordings } from '@/lib/daily'
 import OpenAI from 'openai'
 
@@ -67,6 +68,11 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
 
+  // Admin client para writes em call_records / attendance_notes — evita que
+  // UPDATEs de status (processing, ready, failed) caiam em RLS quando o
+  // trigger vem de outro contexto (retry automático, recovery, admin).
+  const admin = createAdminClient()
+
   if (!process.env.OPENAI_API_KEY) {
     return NextResponse.json({ error: 'OPENAI_API_KEY não configurada' }, { status: 500 })
   }
@@ -76,7 +82,7 @@ export async function POST(request: NextRequest) {
   if (!callId) return NextResponse.json({ error: 'callId obrigatório' }, { status: 400 })
 
   // Get the call record — include daily_room_name so we can refresh an expired URL
-  const { data: call } = await supabase
+  const { data: call } = await admin
     .from('call_records')
     .select('id, mentee_id, specialist_id, recording_url, recording_status, transcription_status, daily_room_name')
     .eq('id', callId)
@@ -96,7 +102,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Mark as processing
-  await supabase
+  await admin
     .from('call_records')
     .update({ transcription_status: 'processing' })
     .eq('id', callId)
@@ -119,7 +125,7 @@ export async function POST(request: NextRequest) {
       const fresh = recordings.find((r) => !!r.download_url)
       if (fresh?.download_url && fresh.download_url !== downloadUrl) {
         downloadUrl = fresh.download_url
-        await supabase
+        await admin
           .from('call_records')
           .update({ recording_url: downloadUrl })
           .eq('id', callId)
@@ -180,7 +186,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Save transcription FIRST so the UI shows "ready" even if summary fails
-    await supabase
+    await admin
       .from('call_records')
       .update({
         transcription: transcription,
@@ -191,7 +197,7 @@ export async function POST(request: NextRequest) {
 
     // Auto-generate summary from transcription
     try {
-      const { data: mentee } = await supabase
+      const { data: mentee } = await admin
         .from('mentees')
         .select('full_name')
         .eq('id', call.mentee_id)
@@ -232,7 +238,7 @@ Seja conciso e objetivo. Foque no que é útil para o especialista na próxima c
           parsed = { summary: summaryContent, questions: null, difficulties: null, next_steps: null }
         }
 
-        await supabase.from('attendance_notes').insert({
+        await admin.from('attendance_notes').insert({
           mentee_id: call.mentee_id,
           specialist_id: call.specialist_id,
           summary: parsed.summary,
@@ -255,7 +261,7 @@ Seja conciso e objetivo. Foque no que é útil para o especialista na próxima c
     const stack = err instanceof Error ? err.stack : undefined
     console.error('[Transcribe] FAILED after', Math.round((Date.now() - t0) / 1000), 's:', message, stack)
 
-    await supabase
+    await admin
       .from('call_records')
       .update({ transcription_status: 'failed' })
       .eq('id', callId)

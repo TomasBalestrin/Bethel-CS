@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { AlertTriangle, CheckCircle2, Activity, MessageSquare, Wifi } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Activity, MessageSquare, Wifi, TrendingDown } from 'lucide-react'
 
 export interface HealthStats {
   errors24h: number
@@ -7,6 +7,8 @@ export interface HealthStats {
   lastIncomingAt: string | null
   connectedInstances: number
   totalInstances: number
+  /** Mentorados ativos com BM não conectado OU sem atualização há >30 dias. */
+  bmOutdated?: number
 }
 
 function formatAgo(iso: string | null): string {
@@ -52,7 +54,7 @@ export function AdminHealthWidget({ stats }: { stats: HealthStats }) {
         </div>
         <div className="flex-1 min-w-0">
           <h3 className={`text-sm font-semibold text-${color}`}>{headline}</h3>
-          <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4 text-xs">
+          <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-5 text-xs">
             <Stat
               icon={Activity}
               label="Erros 24h"
@@ -73,6 +75,13 @@ export function AdminHealthWidget({ stats }: { stats: HealthStats }) {
               value={`${stats.connectedInstances}/${stats.totalInstances}`}
               hint="conectadas"
               emphasis={stats.connectedInstances === 0 && stats.totalInstances > 0}
+            />
+            <Stat
+              icon={TrendingDown}
+              label="BM desatualizado"
+              value={String(stats.bmOutdated ?? 0)}
+              hint={(stats.bmOutdated ?? 0) > 0 ? 'mentorados ativos' : 'em dia'}
+              emphasis={(stats.bmOutdated ?? 0) > 0}
             />
             <Link
               href="/admin/erros-sync"

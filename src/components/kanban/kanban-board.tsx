@@ -37,6 +37,7 @@ import { BulkImportDialog } from './bulk-import-dialog'
 import { moveMentee, transitionToMentorship } from '@/lib/actions/mentee-actions'
 import { useUnreadCounts } from '@/hooks/use-unread-counts'
 import { MenteeFilters, EMPTY_FILTERS, type MenteeFilterValues } from '@/components/mentee-filters'
+import { classifyBm } from '@/lib/bm-freshness'
 import type { MenteeWithStats } from '@/types/kanban'
 import type { Database, KanbanType } from '@/types/database'
 
@@ -71,6 +72,10 @@ export function KanbanBoard({
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedSpecialist, setSelectedSpecialist] = useState<string>('all')
   const [atendimentoFilter, setAtendimentoFilter] = useState<string>('all')
+  // Filtro de frescor dos dados do Bethel Metrics. Usa a mesma classificação
+  // do BmBadge (classifyBm) — útil pra ops achar rapidamente mentorados com
+  // dados desatualizados ou não mapeados.
+  const [bmFilter, setBmFilter] = useState<string>('all')
   const [advFilters, setAdvFilters] = useState<MenteeFilterValues>(EMPTY_FILTERS)
   const { unreadMap, lastIncomingMap } = useUnreadCounts()
   const specialistNameMap = useMemo(() => new Map(specialists.map((s) => [s.id, s.full_name])), [specialists])
@@ -178,7 +183,7 @@ export function KanbanBoard({
     setTransitionMentee(null)
   }
 
-  const filteredMentees = mentees.filter((m) => {
+  const filteredMentees: MenteeWithStats[] = mentees.filter((m) => {
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       if (!m.full_name?.toLowerCase().includes(q)) return false
@@ -192,6 +197,11 @@ export function KanbanBoard({
     } else if (atendimentoFilter !== 'all') {
       const sessions = m.active_sessions ?? []
       if (!sessions.some((s) => s.specialist_id === atendimentoFilter)) return false
+    }
+    // BM freshness filter
+    if (bmFilter !== 'all') {
+      const status = classifyBm(m.metrics_source_updated_at ?? null).status
+      if (bmFilter !== status) return false
     }
     // Advanced filters
     if (advFilters.funilOrigem && m.funnel_origin !== advFilters.funilOrigem) return false
@@ -304,6 +314,18 @@ export function KanbanBoard({
                   )}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+          <Select value={bmFilter} onValueChange={setBmFilter}>
+            <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectValue placeholder="Bethel Metrics" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">BM — todos</SelectItem>
+              <SelectItem value="fresh">BM atualizado (&lt;7d)</SelectItem>
+              <SelectItem value="stale">BM 7-30d</SelectItem>
+              <SelectItem value="outdated">BM &gt;30d</SelectItem>
+              <SelectItem value="unlinked">BM não conectado</SelectItem>
             </SelectContent>
           </Select>
         </div>

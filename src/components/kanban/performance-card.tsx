@@ -42,15 +42,26 @@ function hasAnyMetric(m: Metrics): boolean {
   )
 }
 
-export function PerformanceCard({ menteeId, seed, seedUpdatedAt }: {
+export function PerformanceCard({ menteeId, seed, seedUpdatedAt, seedSourceUpdatedAt, onStateChange }: {
   menteeId: string
   seed: Metrics
   seedUpdatedAt: string | null
+  seedSourceUpdatedAt?: string | null
+  // Notifica o pai sempre que o estado sync/source mudar, pra o BmBadge no
+  // painel (fora do card) refletir em tempo real.
+  onStateChange?: (s: { sourceUpdatedAt: string | null; syncing: boolean }) => void
 }) {
   const [metrics, setMetrics] = useState<Metrics>(seed)
   const [updatedAt, setUpdatedAt] = useState<string | null>(seedUpdatedAt)
+  const [sourceUpdatedAt, setSourceUpdatedAt] = useState<string | null>(seedSourceUpdatedAt ?? null)
   const [refreshing, setRefreshing] = useState(false)
   const [notFound, setNotFound] = useState(false)
+
+  // Notifica o pai do estado atual. Roda a cada render do Badge.
+  useEffect(() => {
+    onStateChange?.({ sourceUpdatedAt, syncing: refreshing })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceUpdatedAt, refreshing])
 
   async function load(force: boolean) {
     if (refreshing) return
@@ -61,9 +72,10 @@ export function PerformanceCard({ menteeId, seed, seedUpdatedAt }: {
         if (force) toast.error('Erro ao atualizar métricas')
         return
       }
-      const data = await res.json() as { metrics: Metrics; updatedAt: string | null; notFound?: boolean }
+      const data = await res.json() as { metrics: Metrics; updatedAt: string | null; sourceUpdatedAt: string | null; notFound?: boolean }
       setMetrics(data.metrics)
       setUpdatedAt(data.updatedAt)
+      setSourceUpdatedAt(data.sourceUpdatedAt ?? null)
       setNotFound(!!data.notFound)
       if (force) {
         toast.success(data.notFound ? 'Mentorado não encontrado no Bethel Metrics' : 'Métricas atualizadas')
@@ -86,7 +98,7 @@ export function PerformanceCard({ menteeId, seed, seedUpdatedAt }: {
 
   if (!has && notFound) {
     return (
-      <div className="rounded-lg border border-dashed border-border/50 bg-muted/5 px-3 py-2.5 flex items-center gap-2">
+      <div id="bm-performance-card" className="rounded-lg border border-dashed border-border/50 bg-muted/5 px-3 py-2.5 flex items-center gap-2">
         <AlertCircle className="h-4 w-4 text-muted-foreground/40 shrink-0" />
         <p className="text-[11px] text-muted-foreground/60 flex-1">
           Mentorado não encontrado no Bethel Metrics
@@ -104,7 +116,7 @@ export function PerformanceCard({ menteeId, seed, seedUpdatedAt }: {
 
   if (!has) {
     return (
-      <div className="rounded-lg border border-dashed border-border/50 bg-muted/5 px-3 py-2.5 flex items-center gap-2">
+      <div id="bm-performance-card" className="rounded-lg border border-dashed border-border/50 bg-muted/5 px-3 py-2.5 flex items-center gap-2">
         <TrendingUp className="h-4 w-4 text-muted-foreground/20 shrink-0" />
         <p className="text-[11px] text-muted-foreground/40 flex-1">
           {refreshing ? 'Buscando métricas…' : 'Métricas via Bethel Metrics'}
@@ -121,7 +133,7 @@ export function PerformanceCard({ menteeId, seed, seedUpdatedAt }: {
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
+    <div id="bm-performance-card" className="rounded-lg border border-border bg-card shadow-card overflow-hidden scroll-mt-4">
       <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
         <div className="flex items-center gap-2">
           <TrendingUp className="h-3.5 w-3.5 text-accent" />

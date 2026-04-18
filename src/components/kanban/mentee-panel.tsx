@@ -5,6 +5,7 @@ import Image from 'next/image'
 // Sheet no longer used — panel is fullscreen overlay
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PerformanceCard } from '@/components/kanban/performance-card'
+import { BmBadge } from '@/components/bm-badge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -711,6 +712,18 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, onTransitionToM
 }) {
   const [saving] = useState(false)
 
+  // Estado do BM — compartilhado entre o BmBadge (no topo, ao lado do
+  // StageMover) e o PerformanceCard (mais abaixo na tela). O Card avisa
+  // via onStateChange quando sincroniza, e o badge reflete.
+  const [bmSourceUpdatedAt, setBmSourceUpdatedAt] = useState<string | null>(
+    (mentee.metrics_source_updated_at as string | null) ?? null
+  )
+  const [bmSyncing, setBmSyncing] = useState(false)
+  function scrollToPerformance() {
+    const el = document.getElementById('bm-performance-card')
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   // Fetch action plan data for Empresa block
   const [empresaData, setEmpresaData] = useState<{
     nome_empresa?: string
@@ -926,6 +939,12 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, onTransitionToM
             }
           }}
         />
+        <BmBadge
+          sourceUpdatedAt={bmSourceUpdatedAt}
+          syncing={bmSyncing}
+          size="label"
+          onClick={scrollToPerformance}
+        />
         {mentee.contract_validity && (
           <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-0.5 text-[11px] text-muted-foreground">
             <Clock className="h-3 w-3" /> {mentee.contract_validity}
@@ -1002,6 +1021,7 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, onTransitionToM
           <PerformanceCard
             menteeId={mentee.id}
             seedUpdatedAt={mentee.metrics_updated_at ?? null}
+            seedSourceUpdatedAt={(mentee.metrics_source_updated_at as string | null) ?? null}
             seed={{
               faturamento_atual: mentee.faturamento_atual ?? null,
               faturamento_mes_anterior: mentee.faturamento_mes_anterior ?? null,
@@ -1016,6 +1036,10 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, onTransitionToM
               taxa_conversao: mentee.taxa_conversao ?? null,
               ticket_medio: mentee.ticket_medio ?? null,
               funis_ativos: (mentee.funis_ativos as Array<{ id?: string; nome: string; slug?: string }> | null) ?? [],
+            }}
+            onStateChange={({ sourceUpdatedAt, syncing }) => {
+              setBmSourceUpdatedAt(sourceUpdatedAt)
+              setBmSyncing(syncing)
             }}
           />
         </div>

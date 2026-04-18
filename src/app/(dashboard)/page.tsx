@@ -251,20 +251,34 @@ export default async function DashboardPage({ searchParams }: Props) {
   if (endDate) callsQuery = callsQuery.lte('created_at', endDate + 'T23:59:59')
   if (specialistId) callsQuery = callsQuery.eq('specialist_id', specialistId)
 
-  // Attendance messages: filter by mentee_ids to avoid full table scan
-  let attendanceMsgsQuery = supabase.from('wpp_messages').select('mentee_id, direction, sent_at').order('sent_at', { ascending: true })
-  if (startDate) attendanceMsgsQuery = attendanceMsgsQuery.gte('sent_at', startDate)
+  // Quando o usuário não aplica filtro de data, default para os últimos 30 dias
+  // em queries que dependem de wpp_messages — caso contrário o Supabase retorna
+  // apenas as 1000 mais antigas (order ASC + default row cap), que podem ser de
+  // quando o sistema mal tinha uso, zerando as métricas de horário comercial.
+  const THIRTY_DAYS_AGO = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const effectiveStart = startDate ?? THIRTY_DAYS_AGO
+
+  // Attendance messages: filter by mentee_ids + janela de tempo. Limit alto
+  // pra cobrir volumes reais; ORDER ASC é necessário pro algoritmo de
+  // sessionização (separar por gap) funcionar.
+  let attendanceMsgsQuery = supabase.from('wpp_messages')
+    .select('mentee_id, direction, sent_at')
+    .gte('sent_at', effectiveStart)
+    .order('sent_at', { ascending: true })
+    .limit(50000)
   if (endDate) attendanceMsgsQuery = attendanceMsgsQuery.lte('sent_at', endDate + 'T23:59:59')
   if (specialistId) attendanceMsgsQuery = attendanceMsgsQuery.eq('specialist_id', specialistId)
   if (menteeIds.length > 0) attendanceMsgsQuery = attendanceMsgsQuery.in('mentee_id', menteeIds)
 
-  let wppOutQuery = supabase.from('wpp_messages').select('id', { count: 'exact', head: true }).eq('direction', 'outgoing')
-  if (startDate) wppOutQuery = wppOutQuery.gte('sent_at', startDate)
+  let wppOutQuery = supabase.from('wpp_messages').select('id', { count: 'exact', head: true })
+    .eq('direction', 'outgoing')
+    .gte('sent_at', effectiveStart)
   if (endDate) wppOutQuery = wppOutQuery.lte('sent_at', endDate + 'T23:59:59')
   if (specialistId) wppOutQuery = wppOutQuery.eq('specialist_id', specialistId)
 
-  let wppInQuery = supabase.from('wpp_messages').select('id', { count: 'exact', head: true }).eq('direction', 'incoming')
-  if (startDate) wppInQuery = wppInQuery.gte('sent_at', startDate)
+  let wppInQuery = supabase.from('wpp_messages').select('id', { count: 'exact', head: true })
+    .eq('direction', 'incoming')
+    .gte('sent_at', effectiveStart)
   if (endDate) wppInQuery = wppInQuery.lte('sent_at', endDate + 'T23:59:59')
   if (specialistId) wppInQuery = wppInQuery.eq('specialist_id', specialistId)
 

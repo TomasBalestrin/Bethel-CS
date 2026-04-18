@@ -258,17 +258,30 @@ export default async function DashboardPage({ searchParams }: Props) {
   const THIRTY_DAYS_AGO = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
   const effectiveStart = startDate ?? THIRTY_DAYS_AGO
 
-  // Attendance messages: filter by mentee_ids + janela de tempo. Limit alto
-  // pra cobrir volumes reais; ORDER ASC é necessário pro algoritmo de
-  // sessionização (separar por gap) funcionar.
+  // Attendance messages: janela de tempo + limit alto pra cobrir volumes
+  // reais. ORDER ASC é necessário pro algoritmo de sessionização (separar
+  // por gap) funcionar.
+  //
+  // IMPORTANTE: não aplicar .in('mentee_id', menteeIds) globalmente — com
+  // 100+ mentorados a URL do PostgREST ultrapassa ~5KB e gateways podem
+  // truncá-la, retornando 0 rows em silêncio (sintoma reportado). A RLS
+  // em wpp_messages já garante isolamento por specialist_id; o bound por
+  // mentorado só é aplicado quando o admin filtra por especialista
+  // específico (fora do owner do mentorado, `.eq('specialist_id', ...)`
+  // acima já restringe).
   let attendanceMsgsQuery = supabase.from('wpp_messages')
     .select('mentee_id, direction, sent_at')
     .gte('sent_at', effectiveStart)
     .order('sent_at', { ascending: true })
     .limit(50000)
   if (endDate) attendanceMsgsQuery = attendanceMsgsQuery.lte('sent_at', endDate + 'T23:59:59')
-  if (specialistId) attendanceMsgsQuery = attendanceMsgsQuery.eq('specialist_id', specialistId)
-  if (menteeIds.length > 0) attendanceMsgsQuery = attendanceMsgsQuery.in('mentee_id', menteeIds)
+  if (specialistId) {
+    attendanceMsgsQuery = attendanceMsgsQuery.eq('specialist_id', specialistId)
+    // Com specialistId o conjunto de menteeIds já veio filtrado e tende a
+    // ser pequeno (< ~40), então o bound extra é seguro e útil.
+    if (menteeIds.length > 0) attendanceMsgsQuery = attendanceMsgsQuery.in('mentee_id', menteeIds)
+    else attendanceMsgsQuery = attendanceMsgsQuery.eq('mentee_id', 'none')
+  }
 
   let wppOutQuery = supabase.from('wpp_messages').select('id', { count: 'exact', head: true })
     .eq('direction', 'outgoing')
@@ -317,6 +330,19 @@ export default async function DashboardPage({ searchParams }: Props) {
     deliveryPartQuery,
     manualAttendanceQuery,
   ])
+
+  // Diagnostic: log how many messages came back so we can see 0 in Vercel log
+  // when dashboard shows zeroes. Remove once confirmed working.
+  console.log('[Dashboard] attendanceMsgs', {
+    rows: attendanceMsgs?.length ?? 0,
+    menteeIdsCount: menteeIds.length,
+    isAdmin,
+    specialistId: specialistId ?? '(none)',
+    effectiveStart,
+    endDate: endDate ?? '(none)',
+    firstSentAt: attendanceMsgs?.[0]?.sent_at ?? null,
+    lastSentAt: attendanceMsgs?.[attendanceMsgs.length - 1]?.sent_at ?? null,
+  })
 
   // ─── Calculate attendance sessions (single pass) ───
   const ACTIVE_GAP_MS = 5 * 60 * 1000

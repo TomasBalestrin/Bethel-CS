@@ -142,6 +142,16 @@ export default async function EtapasIniciaisPage() {
     }
   }
 
+  // metrics_source_updated_at — coluna 00084, ainda não nos types gerados.
+  // Fetch separado com cast pra alimentar o semáforo BM no card.
+  const metricsFreshnessMap = new Map<string, string | null>()
+  if (menteeIds.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: freshness } = await (supabase.from('mentees').select('id, metrics_source_updated_at' as never) as any)
+      .in('id', menteeIds) as { data: Array<{ id: string; metrics_source_updated_at: string | null }> | null }
+    freshness?.forEach((r) => metricsFreshnessMap.set(r.id, r.metrics_source_updated_at))
+  }
+
   const menteesWithStats: MenteeWithStats[] = menteeList.map((m) => {
     const lastContact = lastContactMap.get(m.id)
     const daysSince = lastContact ? Math.floor((now - new Date(lastContact).getTime()) / 86400000) : undefined
@@ -155,6 +165,7 @@ export default async function EtapasIniciaisPage() {
       active_sessions: sessions,
       days_since_contact: daysSince,
       stage_entered_at: stageEnteredMap.get(m.id) ?? m.created_at,
+      metrics_source_updated_at: metricsFreshnessMap.get(m.id) ?? null,
     }
   })
 

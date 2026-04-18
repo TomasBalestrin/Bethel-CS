@@ -25,6 +25,7 @@ export default async function AdminPage() {
   }
 
   const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
   const [
     { data: users },
@@ -36,6 +37,7 @@ export default async function AdminPage() {
     errorsCountRes,
     lastErrorRes,
     lastIncomingRes,
+    bmOutdatedRes,
   ] = await Promise.all([
     supabase.from('profiles').select('id, full_name, role, avatar_url, wpp_phone, created_at, updated_at').order('full_name'),
     supabase.from('products').select('id, name, created_at').order('name'),
@@ -58,6 +60,12 @@ export default async function AdminPage() {
       .order('sent_at', { ascending: false })
       .limit(1)
       .maybeSingle(),
+    // Mentorados ativos com BM desatualizado (>30d OU nunca conectado).
+    // Exclui encerrados/cancelados pra não inflar o número.
+    (supabase.from as (name: string) => ReturnType<typeof supabase.from>)('mentees')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'ativo')
+      .or(`metrics_source_updated_at.is.null,metrics_source_updated_at.lt.${thirtyDaysAgo}`),
   ])
 
   const instances = wppInstances ?? []
@@ -67,6 +75,7 @@ export default async function AdminPage() {
     lastIncomingAt: lastIncomingRes.data?.sent_at ?? null,
     connectedInstances: instances.filter((i) => i.status === 'connected').length,
     totalInstances: instances.length,
+    bmOutdated: (bmOutdatedRes as { count: number | null }).count ?? 0,
   }
 
   return (

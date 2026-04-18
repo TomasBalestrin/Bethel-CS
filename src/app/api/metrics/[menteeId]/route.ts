@@ -28,17 +28,20 @@ export async function GET(
 
   // Leitura inicial — precisa de email/phone/cpf pra match no BM, e dos campos
   // de métrica pra retornar sem chamar BM em caso de cache hit.
-  const { data: mentee, error } = await supabase
-    .from('mentees')
-    .select('id, email, phone, cpf, metrics_updated_at, faturamento_atual, faturamento_mes_anterior, faturamento_antes_mentoria, ultimo_acesso, dias_acessou_sistema, dias_preencheu, total_leads, total_vendas, total_receita_periodo, total_entrada_periodo, taxa_conversao, ticket_medio, funis_ativos')
+  // Campos de metrics_*_updated_at e o conjunto de métricas que retornamos.
+  // Select dinâmico pra incluir metrics_source_updated_at (nova coluna em 00084).
+  const menteeSelect = 'id, email, phone, cpf, metrics_updated_at, metrics_source_updated_at, faturamento_atual, faturamento_mes_anterior, faturamento_antes_mentoria, ultimo_acesso, dias_acessou_sistema, dias_preencheu, total_leads, total_vendas, total_receita_periodo, total_entrada_periodo, taxa_conversao, ticket_medio, funis_ativos'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: mentee, error } = await (supabase.from('mentees').select(menteeSelect as never) as any)
     .eq('id', menteeId)
-    .single()
+    .single() as { data: Record<string, unknown> | null; error: { message: string } | null }
 
   if (error || !mentee) {
     return NextResponse.json({ error: 'Mentorado não encontrado' }, { status: 404 })
   }
 
-  const updatedAt = mentee.metrics_updated_at as string | null
+  const updatedAt = (mentee.metrics_updated_at as string | null) ?? null
+  const sourceUpdatedAt = (mentee.metrics_source_updated_at as string | null) ?? null
   const isFresh = !!updatedAt && Date.now() - new Date(updatedAt).getTime() < TTL_MS
 
   // Cache hit — retorna local sem chamar BM
@@ -46,20 +49,22 @@ export async function GET(
     return NextResponse.json({
       cached: true,
       updatedAt,
+      sourceUpdatedAt,
       metrics: extractMetrics(mentee),
     })
   }
 
   // Cache miss ou force — puxa do BM
   const bmData = await fetchMenteeMetrics({
-    email: mentee.email,
-    phone: mentee.phone,
-    cpf: mentee.cpf,
+    email: mentee.email as string | null,
+    phone: mentee.phone as string | null,
+    cpf: mentee.cpf as string | null,
   })
 
   if (!bmData) {
     // Não achou no BM. Atualiza apenas metrics_updated_at pra não ficar
     // tentando a cada request (respeita TTL). Retorna o que tem localmente.
+    // metrics_source_updated_at permanece null → semáforo mostra "não conectado".
     const admin = createAdminClient()
     await admin
       .from('mentees')
@@ -68,6 +73,7 @@ export async function GET(
     return NextResponse.json({
       cached: false,
       updatedAt: new Date().toISOString(),
+      sourceUpdatedAt: null,
       metrics: extractMetrics(mentee),
       notFound: true,
     })
@@ -91,6 +97,8 @@ export async function GET(
     ticket_medio: bmData.ticket_medio,
     funis_ativos: bmData.funis_ativos,
     metrics_updated_at: now,
+    // Quando o BM teve atividade real — usado pelo semáforo visual (BM badge).
+    metrics_source_updated_at: bmData.source_updated_at,
   }
   const { error: updateErr } = await admin
     .from('mentees')
@@ -112,6 +120,7 @@ export async function GET(
   return NextResponse.json({
     cached: false,
     updatedAt: now,
+    sourceUpdatedAt: bmData.source_updated_at,
     metrics: extractMetrics({ ...mentee, ...updates }),
   })
 }

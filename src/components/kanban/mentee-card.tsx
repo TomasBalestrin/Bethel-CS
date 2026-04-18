@@ -6,6 +6,7 @@ import { CSS } from '@dnd-kit/utilities'
 import { Star, Clock, Calendar, Headphones, Layers } from 'lucide-react'
 import type { MenteeWithStats } from '@/types/kanban'
 import { formatDateBR } from '@/lib/format'
+import { BmBadge } from '@/components/bm-badge'
 
 const LEVEL_COLORS: Record<number, string> = {
   1: '#94928B',
@@ -140,19 +141,22 @@ export const MenteeCard = memo(function MenteeCard({ mentee, unreadCount = 0, sp
       />
 
       <div className="px-3 pt-3 pb-2.5">
-        {/* Header: Name + Priority */}
+        {/* Header: Name + Priority + BM dot */}
         <div className="flex items-start justify-between gap-2">
           <h4 className="flex items-start gap-1 font-heading font-semibold text-[13px] leading-snug text-foreground min-w-0">
             {mentee.cliente_fit && <Star className="h-3 w-3 text-warning fill-warning shrink-0 mt-0.5" />}
             <span>{mentee.full_name}</span>
           </h4>
-          <span
-            className="shrink-0 inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular"
-            style={{ backgroundColor: `${color}18`, color }}
-            title={LEVEL_LABELS[mentee.priority_level] ?? ''}
-          >
-            P{mentee.priority_level}
-          </span>
+          <div className="shrink-0 flex items-center gap-1.5 mt-0.5">
+            <BmBadge sourceUpdatedAt={mentee.metrics_source_updated_at as string | null | undefined} size="dot" />
+            <span
+              className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-bold tabular"
+              style={{ backgroundColor: `${color}18`, color }}
+              title={LEVEL_LABELS[mentee.priority_level] ?? ''}
+            >
+              P{mentee.priority_level}
+            </span>
+          </div>
         </div>
 
         {/* Product (apenas Implementação Comercial) + specialist badges + data de início */}

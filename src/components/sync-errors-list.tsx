@@ -9,7 +9,8 @@ interface SyncErrorRow {
   id: string
   occurred_at: string
   route: string
-  target_table: string
+  operation: string
+  target: string
   error_code: string | null
   error_message: string
   error_details: string | null
@@ -102,7 +103,8 @@ export function SyncErrorsList({ errors, menteeNames, specialistNames }: Props) 
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <code className="text-[10px] font-mono rounded bg-muted px-1.5 py-0.5">{e.route}</code>
-                    <span className="text-[10px] text-muted-foreground">→ {e.target_table}</span>
+                    <span className="text-[10px] font-mono rounded bg-muted/60 text-muted-foreground px-1.5 py-0.5 uppercase">{e.operation}</span>
+                    <span className="text-[10px] text-muted-foreground">→ {e.target}</span>
                     {e.error_code && (
                       <span className="text-[10px] font-mono rounded bg-destructive/10 text-destructive px-1.5 py-0.5">{e.error_code}</span>
                     )}

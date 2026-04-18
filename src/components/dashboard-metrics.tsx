@@ -87,6 +87,11 @@ interface DashboardMetricsProps {
       avgWaitMinutes: number
       byCs: { key: string; label: string; solicitations: number; avgWaitMinutes: number }[]
     }
+    outOfBusinessHours: {
+      totalSolicitations: number
+      avgWaitMinutes: number
+      byCs: { key: string; label: string; solicitations: number; avgWaitMinutes: number }[]
+    }
     attendanceByPerson: { key: string; label: string; count: number; avgMinutes: number }[]
     callsByPerson: { key: string; label: string; count: number; avgSeconds: number }[]
   }
@@ -466,6 +471,29 @@ export function DashboardMetrics(props: DashboardMetricsProps) {
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 mt-3">
               {props.section4.businessHours.byCs.filter((p) => p.key === 'carla' || p.key === 'aline').map((p) => (
+                <PersonStatCard
+                  key={p.key}
+                  label={p.label}
+                  primaryLabel="Solicitações"
+                  primaryValue={p.solicitations}
+                  secondaryLabel="Espera média"
+                  secondaryValue={p.avgWaitMinutes > 0 ? formatMinutes(p.avgWaitMinutes) : '—'}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Fora do horário comercial (18:31–08:29 + fins de semana) */}
+          <div>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              Fora do horário comercial (18:31–08:29)
+            </h3>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+              <MetricCard icon={Headphones} label="Solicitações de atendimento" value={props.section4.outOfBusinessHours.totalSolicitations} color="text-info" bg="bg-info/10" note="mensagens recebidas à noite ou fim de semana" />
+              <MetricCard icon={Headphones} label="Tempo médio de espera" value={props.section4.outOfBusinessHours.avgWaitMinutes > 0 ? formatMinutes(props.section4.outOfBusinessHours.avgWaitMinutes) : '—'} color="text-warning" bg="bg-warning/10" note="espera até a primeira resposta" />
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 mt-3">
+              {props.section4.outOfBusinessHours.byCs.filter((p) => p.key === 'carla' || p.key === 'aline').map((p) => (
                 <PersonStatCard
                   key={p.key}
                   label={p.label}

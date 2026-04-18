@@ -384,19 +384,23 @@ export default async function DashboardPage({ searchParams }: Props) {
   const menteeOwner = new Map<string, string | null>()
   for (const m of filteredMentees) menteeOwner.set(m.id, m.created_by ?? null)
 
-  // Horário comercial: solicitação = msg incoming em horário comercial; tempo de
-  // espera = intervalo até a primeira outgoing subsequente (mesmo que fora do
-  // horário). Total considera todos os mentorados; por CS usa created_by.
-  let bhTotalSolicitations = 0
-  let bhTotalWaitMs = 0
-  let bhTotalWaitCount = 0
-  const bhByCs: Record<CsKey, { sols: number; waitMs: number; waitCount: number }> = {
+  // Horário comercial (seg-sex 08:30-18:30 SP) e Fora do horário (resto).
+  // solicitação = msg incoming; tempo de espera = intervalo até a primeira
+  // outgoing subsequente (mesmo que fora da janela). O bucket é escolhido pelo
+  // horário da msg incoming. Por CS usa created_by do mentorado.
+  type BucketCounts = { total: number; waitMs: number; waitCount: number }
+  type ByCs = Record<CsKey, { sols: number; waitMs: number; waitCount: number }>
+  const emptyCs = (): ByCs => ({
     carla: { sols: 0, waitMs: 0, waitCount: 0 },
     aline: { sols: 0, waitMs: 0, waitCount: 0 },
     hannah: { sols: 0, waitMs: 0, waitCount: 0 },
     matheus: { sols: 0, waitMs: 0, waitCount: 0 },
     keyth: { sols: 0, waitMs: 0, waitCount: 0 },
-  }
+  })
+  const bh: BucketCounts = { total: 0, waitMs: 0, waitCount: 0 }
+  const obh: BucketCounts = { total: 0, waitMs: 0, waitCount: 0 }
+  const bhByCs = emptyCs()
+  const obhByCs = emptyCs()
   const ownerToCsKey = new Map<string, CsKey>()
   for (const [key, id] of Array.from(csIdByKey.entries())) ownerToCsKey.set(id, key)
 
@@ -411,17 +415,19 @@ export default async function DashboardPage({ searchParams }: Props) {
       const csKey = ownerId ? ownerToCsKey.get(ownerId) : undefined
       for (let i = 0; i < msgs.length; i++) {
         if (msgs[i].direction !== 'incoming') continue
-        if (!isBusinessHours(msgs[i].sent_at)) continue
-        bhTotalSolicitations++
-        if (csKey) bhByCs[csKey].sols++
+        const inBH = isBusinessHours(msgs[i].sent_at)
+        const bucket = inBH ? bh : obh
+        const byCs = inBH ? bhByCs : obhByCs
+        bucket.total++
+        if (csKey) byCs[csKey].sols++
         for (let j = i + 1; j < msgs.length; j++) {
           if (msgs[j].direction === 'outgoing') {
             const wait = new Date(msgs[j].sent_at).getTime() - new Date(msgs[i].sent_at).getTime()
-            bhTotalWaitMs += wait
-            bhTotalWaitCount++
+            bucket.waitMs += wait
+            bucket.waitCount++
             if (csKey) {
-              bhByCs[csKey].waitMs += wait
-              bhByCs[csKey].waitCount++
+              byCs[csKey].waitMs += wait
+              byCs[csKey].waitCount++
             }
             break
           }
@@ -430,16 +436,25 @@ export default async function DashboardPage({ searchParams }: Props) {
     }
   }
 
-  const bhAvgWaitMinutes = bhTotalWaitCount > 0 ? Math.round(bhTotalWaitMs / bhTotalWaitCount / 60000) : 0
-  const businessHoursByCs = CS_TEAM.map((p) => {
-    const d = bhByCs[p.key]
-    return {
-      key: p.key,
-      label: p.label,
-      solicitations: d.sols,
-      avgWaitMinutes: d.waitCount > 0 ? Math.round(d.waitMs / d.waitCount / 60000) : 0,
-    }
-  })
+  const avgMin = (ms: number, count: number) => (count > 0 ? Math.round(ms / count / 60000) : 0)
+  const bhByCsList = CS_TEAM.map((p) => ({
+    key: p.key,
+    label: p.label,
+    solicitations: bhByCs[p.key].sols,
+    avgWaitMinutes: avgMin(bhByCs[p.key].waitMs, bhByCs[p.key].waitCount),
+  }))
+  const obhByCsList = CS_TEAM.map((p) => ({
+    key: p.key,
+    label: p.label,
+    solicitations: obhByCs[p.key].sols,
+    avgWaitMinutes: avgMin(obhByCs[p.key].waitMs, obhByCs[p.key].waitCount),
+  }))
+  // Backward compat com o nome usado no return { businessHours: { ... } }
+  const bhTotalSolicitations = bh.total
+  const bhAvgWaitMinutes = avgMin(bh.waitMs, bh.waitCount)
+  const businessHoursByCs = bhByCsList
+  const obhTotalSolicitations = obh.total
+  const obhAvgWaitMinutes = avgMin(obh.waitMs, obh.waitCount)
 
   // Atendimentos por pessoa: sessões manuais finalizadas (attendance_sessions)
   // agrupadas por specialist_id, SEM filtro de horário comercial.
@@ -622,6 +637,11 @@ export default async function DashboardPage({ searchParams }: Props) {
           totalSolicitations: bhTotalSolicitations,
           avgWaitMinutes: bhAvgWaitMinutes,
           byCs: businessHoursByCs,
+        },
+        outOfBusinessHours: {
+          totalSolicitations: obhTotalSolicitations,
+          avgWaitMinutes: obhAvgWaitMinutes,
+          byCs: obhByCsList,
         },
         attendanceByPerson,
         callsByPerson,

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Image from 'next/image'
 // Sheet no longer used — panel is fullscreen overlay
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { PerformanceCard } from '@/components/kanban/performance-card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -578,18 +579,6 @@ function ContactRow({ icon: Icon, label, value, href, color, bg }: {
   )
 }
 
-// ─── Metric box for performance data ───
-function MetricBox({ label, value, highlight }: { label: string; value: string | number; highlight?: boolean }) {
-  return (
-    <div className={`rounded-md border border-border p-2 text-center ${highlight ? 'bg-accent/5 border-accent/20' : 'bg-card'}`}>
-      <p className="text-[10px] text-muted-foreground leading-tight">{label}</p>
-      <p className={`font-heading text-sm font-bold tabular leading-tight mt-0.5 ${highlight ? 'text-accent' : 'text-foreground'}`}>
-        {value}
-      </p>
-    </div>
-  )
-}
-
 // ─── Stage Mover — compact inline selector for status bar ───
 function StageMoverInline({ menteeId, currentStageId, kanbanType, onMoved }: {
   menteeId: string
@@ -914,7 +903,6 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, onTransitionToM
   const statusColor = mentee.status === 'ativo' ? 'bg-success/10 text-success border-success/20' : mentee.status === 'cancelado' ? 'bg-destructive/10 text-destructive border-destructive/20' : 'bg-info/10 text-info border-info/20'
 
   const hasCloserData = mentee.niche || mentee.closer_name || mentee.main_pain || mentee.main_difficulty
-  const hasMetrics = mentee.metrics_updated_at
   const hasMentoriaDetails = mentee.end_date || mentee.seller_name || mentee.funnel_origin || mentee.source || mentee.has_partner
 
   return (
@@ -1010,49 +998,26 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, onTransitionToM
             </div>
           )}
 
-          {/* Performance (Bethel Metrics) — fills the space below contact */}
-          {hasMetrics ? (
-            <div className="rounded-lg border border-border bg-card shadow-card overflow-hidden">
-              <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-gradient-to-r from-accent/5 to-transparent">
-                <div className="flex items-center gap-2">
-                  <TrendingUp className="h-3.5 w-3.5 text-accent" />
-                  <h3 className="text-[11px] font-semibold text-foreground uppercase tracking-wide">Performance</h3>
-                </div>
-                <span className="text-[10px] text-muted-foreground">
-                  {new Date(mentee.metrics_updated_at!).toLocaleDateString('pt-BR')}
-                </span>
-              </div>
-              <div className="p-3 space-y-2">
-                <div className="grid grid-cols-2 gap-1.5">
-                  <MetricBox label="Fat. atual" value={mentee.faturamento_atual != null ? formatBRL(mentee.faturamento_atual) : '—'} highlight />
-                  <MetricBox label="Mês anterior" value={mentee.faturamento_mes_anterior != null ? formatBRL(mentee.faturamento_mes_anterior) : '—'} />
-                  <MetricBox label="Antes mentoria" value={mentee.faturamento_antes_mentoria != null ? formatBRL(mentee.faturamento_antes_mentoria) : '—'} />
-                  <MetricBox label="Ticket médio" value={mentee.ticket_medio != null ? formatBRL(mentee.ticket_medio) : '—'} />
-                  <MetricBox label="Leads" value={mentee.total_leads ?? '—'} />
-                  <MetricBox label="Vendas" value={mentee.total_vendas ?? '—'} />
-                  <MetricBox label="Conversão" value={mentee.taxa_conversao != null ? `${mentee.taxa_conversao}%` : '—'} />
-                  <MetricBox label="Dias acessou" value={mentee.dias_acessou_sistema ?? '—'} />
-                </div>
-                {mentee.funis_ativos && Array.isArray(mentee.funis_ativos) && (mentee.funis_ativos as Array<{nome: string}>).length > 0 && (
-                  <div>
-                    <p className="text-[10px] text-muted-foreground mb-1">Funis ativos</p>
-                    <div className="flex flex-wrap gap-1">
-                      {(mentee.funis_ativos as Array<{id?: string; nome: string; slug?: string}>).map((f, i) => (
-                        <Badge key={f.id ?? i} variant="muted" className="text-[10px]">{f.nome}</Badge>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-dashed border-border/50 bg-muted/5 px-3 py-2.5 flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-muted-foreground/20 shrink-0" />
-              <p className="text-[11px] text-muted-foreground/40">
-                Métricas via Bethel Metrics (webhook semanal)
-              </p>
-            </div>
-          )}
+          {/* Performance (Bethel Metrics) — componente isolado gerencia fetch + cache + botão */}
+          <PerformanceCard
+            menteeId={mentee.id}
+            seedUpdatedAt={mentee.metrics_updated_at ?? null}
+            seed={{
+              faturamento_atual: mentee.faturamento_atual ?? null,
+              faturamento_mes_anterior: mentee.faturamento_mes_anterior ?? null,
+              faturamento_antes_mentoria: mentee.faturamento_antes_mentoria ?? null,
+              ultimo_acesso: mentee.ultimo_acesso ?? null,
+              dias_acessou_sistema: mentee.dias_acessou_sistema ?? null,
+              dias_preencheu: mentee.dias_preencheu ?? null,
+              total_leads: mentee.total_leads ?? null,
+              total_vendas: mentee.total_vendas ?? null,
+              total_receita_periodo: mentee.total_receita_periodo ?? null,
+              total_entrada_periodo: mentee.total_entrada_periodo ?? null,
+              taxa_conversao: mentee.taxa_conversao ?? null,
+              ticket_medio: mentee.ticket_medio ?? null,
+              funis_ativos: (mentee.funis_ativos as Array<{ id?: string; nome: string; slug?: string }> | null) ?? [],
+            }}
+          />
         </div>
 
         {/* Right: Mentoria + Info Pessoais + Observações stacked */}

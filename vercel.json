@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/health/invariants",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

@@ -47,12 +47,18 @@ export default async function SaidasPage() {
 
   const menteeIds = menteeList.map((m) => m.id)
 
-  // Fetch stats in parallel
+  // Fetch stats in parallel — mesmas fontes que etapas-iniciais para o card
+  // mostrar todos os indicadores (Etapa Atual, dias sem atendimento,
+  // sessão ativa, etc.).
   const [
     { data: attendances },
     { data: indications },
     { data: revenues },
+    { data: activeSessions },
+    { data: lastMessages },
     { data: allProfilesData },
+    { data: deptAssignmentsData },
+    { data: stageChangesData },
   ] = await Promise.all([
     menteeIds.length > 0
       ? supabase.from('attendances').select('mentee_id').in('mentee_id', menteeIds)
@@ -63,10 +69,22 @@ export default async function SaidasPage() {
     menteeIds.length > 0
       ? supabase.from('revenue_records').select('mentee_id, sale_value').in('mentee_id', menteeIds)
       : Promise.resolve({ data: [] as { mentee_id: string; sale_value: number }[] }),
+    menteeIds.length > 0
+      ? supabase.from('attendance_sessions').select('mentee_id, channel, specialist_id, started_at').in('mentee_id', menteeIds).is('ended_at', null)
+      : Promise.resolve({ data: [] as { mentee_id: string; channel: string; specialist_id: string; started_at: string }[] }),
+    menteeIds.length > 0
+      ? supabase.from('wpp_messages').select('mentee_id, sent_at').in('mentee_id', menteeIds).order('sent_at', { ascending: false })
+      : Promise.resolve({ data: [] as { mentee_id: string; sent_at: string }[] }),
     supabase.from('profiles').select('id, full_name, role').order('full_name'),
+    supabase.from('department_assignments').select('user_id, department'),
+    menteeIds.length > 0
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? (supabase.from('stage_changes' as never).select('mentee_id, to_stage_id, changed_at' as never) as any).in('mentee_id', menteeIds).order('changed_at', { ascending: false })
+      : Promise.resolve({ data: [] as { mentee_id: string; to_stage_id: string; changed_at: string }[] }),
   ])
 
   const allProfiles = (allProfilesData ?? []) as { id: string; full_name: string; role: string }[]
+  const deptAssignments = (deptAssignmentsData ?? []) as { user_id: string; department: string }[]
 
   const attendanceMap = new Map<string, number>()
   attendances?.forEach((a) => { attendanceMap.set(a.mentee_id, (attendanceMap.get(a.mentee_id) ?? 0) + 1) })
@@ -77,12 +95,62 @@ export default async function SaidasPage() {
   const revenueMap = new Map<string, number>()
   revenues?.forEach((r) => { revenueMap.set(r.mentee_id, (revenueMap.get(r.mentee_id) ?? 0) + Number(r.sale_value)) })
 
-  const menteesWithStats: MenteeWithStats[] = menteeList.map((m) => ({
-    ...m,
-    attendance_count: attendanceMap.get(m.id) ?? 0,
-    indication_count: indicationMap.get(m.id) ?? 0,
-    revenue_total: revenueMap.get(m.id) ?? 0,
-  }))
+  // Sessões ativas: o "atendente" é derivado do canal (não de quem clicou
+  // iniciar) — Principal usa o owner do mentorado, demais usam o user
+  // designado para aquele departamento.
+  const profileNameMap = new Map(allProfiles.map((p) => [p.id, p.full_name]))
+  const deptUserByChannel = new Map<string, string>()
+  deptAssignments.forEach((d) => {
+    if (!deptUserByChannel.has(d.department)) deptUserByChannel.set(d.department, d.user_id)
+  })
+  const menteeOwnerMap = new Map<string, string | null>(menteeList.map((m) => [m.id, m.created_by]))
+  const activeSessionsMap = new Map<string, Array<{ channel: string; specialist_name: string; specialist_id?: string; started_at?: string }>>()
+  const activeSessionsArr = (activeSessions ?? []) as unknown as Array<{ mentee_id: string; channel?: string; specialist_id?: string; started_at?: string }>
+  activeSessionsArr.forEach((s) => {
+    const channel = s.channel || 'principal'
+    const attendantId = channel === 'principal'
+      ? menteeOwnerMap.get(s.mentee_id) ?? undefined
+      : deptUserByChannel.get(channel)
+    const name = attendantId ? profileNameMap.get(attendantId) ?? 'Responsável' : 'Responsável'
+    const arr = activeSessionsMap.get(s.mentee_id) ?? []
+    arr.push({ channel, specialist_name: name, specialist_id: attendantId, started_at: s.started_at })
+    activeSessionsMap.set(s.mentee_id, arr)
+  })
+
+  // Última mensagem por mentorado → days_since_contact
+  const lastContactMap = new Map<string, string>()
+  lastMessages?.forEach((m) => {
+    if (!lastContactMap.has(m.mentee_id)) lastContactMap.set(m.mentee_id, m.sent_at)
+  })
+  const now = Date.now()
+
+  // Última entrada na etapa atual (mais recente em stage_changes para o
+  // current_stage_id). Fallback: created_at.
+  const stageEnteredMap = new Map<string, string>()
+  const stageChanges = (stageChangesData ?? []) as { mentee_id: string; to_stage_id: string; changed_at: string }[]
+  for (const sc of stageChanges) {
+    if (stageEnteredMap.has(sc.mentee_id)) continue
+    const mentee = menteeList.find((m) => m.id === sc.mentee_id)
+    if (mentee && mentee.current_stage_id && sc.to_stage_id === mentee.current_stage_id) {
+      stageEnteredMap.set(sc.mentee_id, sc.changed_at)
+    }
+  }
+
+  const menteesWithStats: MenteeWithStats[] = menteeList.map((m) => {
+    const lastContact = lastContactMap.get(m.id)
+    const daysSince = lastContact ? Math.floor((now - new Date(lastContact).getTime()) / 86400000) : undefined
+    const sessions = activeSessionsMap.get(m.id)
+    return {
+      ...m,
+      attendance_count: attendanceMap.get(m.id) ?? 0,
+      indication_count: indicationMap.get(m.id) ?? 0,
+      revenue_total: revenueMap.get(m.id) ?? 0,
+      has_active_session: !!sessions?.length,
+      active_sessions: sessions,
+      days_since_contact: daysSince,
+      stage_entered_at: stageEnteredMap.get(m.id) ?? m.created_at,
+    }
+  })
 
   return (
     <KanbanBoard

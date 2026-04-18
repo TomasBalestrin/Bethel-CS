@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { AlertTriangle, RefreshCw } from 'lucide-react'
+import { reportClientError } from '@/lib/report-client-error'
 
 export default function GlobalError({
   error,
@@ -12,6 +13,13 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error('Global error:', error)
+    reportClientError({
+      kind: 'render',
+      message: error.message,
+      stack: error.stack,
+      digest: error.digest,
+      route: 'global',
+    })
   }, [error])
 
   return (

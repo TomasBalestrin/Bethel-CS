@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 
 const CallPortal = dynamic(() => import('@/components/call-portal').then((m) => ({ default: m.CallPortal })), { ssr: false })
 import { WebVitals } from '@/components/web-vitals'
+import { ClientErrorReporter } from '@/components/client-error-reporter'
 import './globals.css'
 
 const geistSans = localFont({
@@ -55,6 +56,7 @@ export default function RootLayout({
     <html lang="pt-BR" className={cn(geistSans.variable, geistBody.variable)}>
       <body>
         <WebVitals />
+        <ClientErrorReporter />
         {children}
         <CallPortal />
         <Toaster position="bottom-right" richColors />

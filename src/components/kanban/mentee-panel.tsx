@@ -579,18 +579,6 @@ function ContactRow({ icon: Icon, label, value, href, color, bg }: {
   )
 }
 
-// ─── Metric box for performance data ───
-function MetricBox({ label, value, highlight }: { label: string; value: string | number; highlight?: boolean }) {
-  return (
-    <div className={`rounded-md border border-border p-2 text-center ${highlight ? 'bg-accent/5 border-accent/20' : 'bg-card'}`}>
-      <p className="text-[10px] text-muted-foreground leading-tight">{label}</p>
-      <p className={`font-heading text-sm font-bold tabular leading-tight mt-0.5 ${highlight ? 'text-accent' : 'text-foreground'}`}>
-        {value}
-      </p>
-    </div>
-  )
-}
-
 // ─── Stage Mover — compact inline selector for status bar ───
 function StageMoverInline({ menteeId, currentStageId, kanbanType, onMoved }: {
   menteeId: string
@@ -915,7 +903,6 @@ function TabInfo({ mentee, editing, setEditing, onMenteeUpdated, onTransitionToM
   const statusColor = mentee.status === 'ativo' ? 'bg-success/10 text-success border-success/20' : mentee.status === 'cancelado' ? 'bg-destructive/10 text-destructive border-destructive/20' : 'bg-info/10 text-info border-info/20'
 
   const hasCloserData = mentee.niche || mentee.closer_name || mentee.main_pain || mentee.main_difficulty
-  const hasMetrics = mentee.metrics_updated_at
   const hasMentoriaDetails = mentee.end_date || mentee.seller_name || mentee.funnel_origin || mentee.source || mentee.has_partner
 
   return (

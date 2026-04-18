@@ -6,7 +6,8 @@ type SyncErrorRow = {
   id: string
   occurred_at: string
   route: string
-  target_table: string
+  operation: string
+  target: string
   error_code: string | null
   error_message: string
   error_details: string | null
@@ -24,9 +25,9 @@ export default async function ErrosSyncPage() {
   const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') redirect('/')
 
-  // Cast through unknown — tabela não está nos types gerados ainda (migração 00079).
-  const result = await (supabase.from as (name: string) => ReturnType<typeof supabase.from>)('wpp_insert_errors')
-    .select('id, occurred_at, route, target_table, error_code, error_message, error_details, error_hint, mentee_id, specialist_id, payload')
+  // Cast through unknown — tabela não está nos types gerados (migrações 00079/00083).
+  const result = await (supabase.from as (name: string) => ReturnType<typeof supabase.from>)('system_errors')
+    .select('id, occurred_at, route, operation, target, error_code, error_message, error_details, error_hint, mentee_id, specialist_id, payload')
     .order('occurred_at', { ascending: false })
     .limit(100)
   const errors = (result.data ?? []) as unknown as SyncErrorRow[]

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { logInsertError } from '@/lib/log-insert-error'
+import { logOpError } from '@/lib/log-op-error'
 
 // Encaminha um mentorado para um departamento (Comercial/Marketing/Gestão).
 // Grava uma mensagem interna no canal alvo e cria a notificação correspondente.
@@ -50,13 +50,14 @@ export async function POST(request: NextRequest) {
 
     if (insertErr) {
       console.error('[WPP Forward] INSERT failed:', insertErr.message, insertErr.details)
-      await logInsertError({
+      await logOpError({
         route: '/api/whatsapp/forward',
-        targetTable: 'wpp_messages',
+        operation: 'insert',
+        target: 'wpp_messages',
         error: insertErr,
         menteeId,
         specialistId: mentee.created_by || user.id,
-        payload: { channel, descriptionLen: description.length },
+        context: { channel, descriptionLen: description.length },
       })
       return NextResponse.json({ error: `Falha ao salvar encaminhamento: ${insertErr.message}` }, { status: 500 })
     }

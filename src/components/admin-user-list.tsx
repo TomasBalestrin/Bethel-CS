@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Shield, User, Plus, Pencil, Trash2, Package, MessageSquare, Wifi, WifiOff, Webhook, Settings, Building2, AlertTriangle } from 'lucide-react'
+import { AdminHealthWidget, type HealthStats } from '@/components/admin-health-widget'
 import dynamic from 'next/dynamic'
 
 const WebhooksSection = dynamic(
@@ -64,9 +65,10 @@ interface AdminUserListProps {
   settings: SystemSetting[]
   departmentAssignments: DeptAssignment[]
   currentUserId: string
+  healthStats?: HealthStats
 }
 
-export function AdminUserList({ users, products, wppInstances, kanbanStages, settings, departmentAssignments, currentUserId }: AdminUserListProps) {
+export function AdminUserList({ users, products, wppInstances, kanbanStages, settings, departmentAssignments, currentUserId, healthStats }: AdminUserListProps) {
   return (
     <div>
       <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -91,6 +93,12 @@ export function AdminUserList({ users, products, wppInstances, kanbanStages, set
           </a>
         </div>
       </div>
+
+      {healthStats && (
+        <div className="mt-4">
+          <AdminHealthWidget stats={healthStats} />
+        </div>
+      )}
 
       <Tabs defaultValue="users" className="mt-6">
         <div className="overflow-x-auto scrollbar-none">
